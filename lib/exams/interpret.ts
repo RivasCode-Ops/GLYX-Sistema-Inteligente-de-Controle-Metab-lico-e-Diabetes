@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { isOpenAIConfigured } from "@/lib/env";
+import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { parsedExamSummarySchema, type ParsedExamSummary } from "@/lib/exams/types";
 
 const SYSTEM = `És um assistente clínico-educativo para leigos (Português do Brasil).
@@ -42,7 +42,7 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: aiModel(),
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM },

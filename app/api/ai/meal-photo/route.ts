@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { isOpenAIConfigured } from "@/lib/env";
+import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: aiModel(),
     messages: [
       {
         role: "user",
