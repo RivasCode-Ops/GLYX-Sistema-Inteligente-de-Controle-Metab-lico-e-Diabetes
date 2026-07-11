@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { parseMealJson } from "@/lib/ai/parse-meal";
-import { checkAndRecordAiUsage, rateLimitMessage } from "@/lib/ai/rate-limit";
+import { providerErrorMessage } from "@/lib/ai/provider-error";
+import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -56,28 +57,35 @@ export async function POST(req: Request) {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const completion = await openai.chat.completions.create({
-    model: aiModel(),
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text:
-              "Analise esta foto de refeição. Responda APENAS um JSON válido com chaves: name (string curta), calories (int estimado), carbs_g, protein_g, fat_g, glycemic_load_estimate (0-100), notes (string breve em pt-BR). Se não for comida, use name: \"indefinido\" e zeros.",
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:${mime};base64,${base64}`,
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model: aiModel(),
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                "Analise esta foto de refeição. Responda APENAS um JSON válido com chaves: name (string curta), calories (int estimado), carbs_g, protein_g, fat_g, glycemic_load_estimate (0-100), notes (string breve em pt-BR). Se não for comida, use name: \"indefinido\" e zeros.",
             },
-          },
-        ],
-      },
-    ],
-    max_tokens: 400,
-  });
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mime};base64,${base64}`,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 400,
+    });
+  } catch (e) {
+    return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
+  }
+
+  await recordAiTokens(supabase, rate.usageId, completion.usage, aiModel());
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
   const parsed = parseMealJson(raw);

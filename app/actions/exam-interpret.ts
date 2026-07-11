@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { checkAndRecordAiUsage, rateLimitMessage } from "@/lib/ai/rate-limit";
+import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
+import { aiModel } from "@/lib/env";
 import { interpretExamText } from "@/lib/exams/interpret";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,6 +40,8 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
   if (!result.ok) {
     return { error: result.error, demo: result.demo };
   }
+
+  await recordAiTokens(supabase, rate.usageId, result.usage, aiModel());
 
   const { error: upErr } = await supabase
     .from("exams")

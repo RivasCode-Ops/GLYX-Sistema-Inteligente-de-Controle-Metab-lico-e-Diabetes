@@ -22,7 +22,11 @@ Schema JSON esperado:
 const MAX_CHARS = 14000;
 
 export type InterpretResult =
-  | { ok: true; data: ParsedExamSummary }
+  | {
+      ok: true;
+      data: ParsedExamSummary;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    }
   | { ok: false; error: string; demo?: boolean };
 
 export async function interpretExamText(rawText: string): Promise<InterpretResult> {
@@ -40,6 +44,7 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   let raw: string;
+  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
   try {
     const completion = await openai.chat.completions.create({
       model: aiModel(),
@@ -55,6 +60,7 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
       temperature: 0.3,
     });
     raw = completion.choices[0]?.message?.content ?? "";
+    usage = completion.usage ?? undefined;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro ao contactar o modelo.";
     return { ok: false, error: msg };
@@ -72,5 +78,5 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
     return { ok: false, error: "JSON do modelo não corresponde ao formato esperado." };
   }
 
-  return { ok: true, data: parsed.data };
+  return { ok: true, data: parsed.data, usage };
 }

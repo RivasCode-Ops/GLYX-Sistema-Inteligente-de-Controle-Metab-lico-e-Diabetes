@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
-import { checkAndRecordAiUsage, rateLimitMessage } from "@/lib/ai/rate-limit";
+import { providerErrorMessage } from "@/lib/ai/provider-error";
+import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_MESSAGES = 30;
@@ -56,30 +57,39 @@ export async function POST(req: Request) {
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const stream = await openai.chat.completions.create({
-    model: aiModel(),
-    messages: [
-      { role: "system", content: SYSTEM },
-      ...messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-    ],
-    max_tokens: 800,
-    stream: true,
-  });
+  let stream;
+  try {
+    stream = await openai.chat.completions.create({
+      model: aiModel(),
+      messages: [
+        { role: "system", content: SYSTEM },
+        ...messages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+      ],
+      max_tokens: 800,
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+  } catch (e) {
+    return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
+  }
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
+      let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content;
           if (delta) controller.enqueue(encoder.encode(delta));
+          if (chunk.usage) usage = chunk.usage;
         }
       } catch {
         // conexão com o provedor caiu no meio — encerra com o que já foi enviado
       }
+      await recordAiTokens(supabase, rate.usageId, usage, aiModel());
       controller.close();
     },
   });

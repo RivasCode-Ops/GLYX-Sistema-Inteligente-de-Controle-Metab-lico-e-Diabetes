@@ -27,10 +27,15 @@ function fakeSupabase(opts: { count: number; oldestCreatedAt?: string }) {
     from: () => ({
       select: (_cols: string, config?: { count?: string }) =>
         builder(config?.count ? "count" : "rows"),
-      insert: async (row: unknown) => {
+      insert: (row: unknown) => {
         inserts.push(row);
-        return { error: null };
+        return {
+          select: () => ({
+            maybeSingle: async () => ({ data: { id: "usage-1" }, error: null }),
+          }),
+        };
       },
+      update: () => ({ eq: async () => ({ error: null }) }),
     }),
   };
 
@@ -42,6 +47,9 @@ describe("checkAndRecordAiUsage", () => {
     const { client, inserts } = fakeSupabase({ count: 3 });
     const result = await checkAndRecordAiUsage(client, "user-1", "chat");
     expect(result.allowed).toBe(true);
+    if (result.allowed) {
+      expect(result.usageId).toBe("usage-1");
+    }
     expect(inserts).toHaveLength(1);
     expect(inserts[0]).toMatchObject({ user_id: "user-1", kind: "chat" });
   });

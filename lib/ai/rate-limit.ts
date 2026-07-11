@@ -11,7 +11,7 @@ const HOURLY_LIMITS: Record<AiKind, number> = {
 };
 
 export type RateLimitResult =
-  | { allowed: true }
+  | { allowed: true; usageId: string | null }
   | { allowed: false; limit: number; retryAfterMinutes: number };
 
 export async function checkAndRecordAiUsage(
@@ -46,8 +46,30 @@ export async function checkAndRecordAiUsage(
     return { allowed: false, limit, retryAfterMinutes };
   }
 
-  await supabase.from("ai_usage").insert({ user_id: userId, kind });
-  return { allowed: true };
+  const { data: inserted } = await supabase
+    .from("ai_usage")
+    .insert({ user_id: userId, kind })
+    .select("id")
+    .maybeSingle();
+  return { allowed: true, usageId: inserted?.id ?? null };
+}
+
+// Grava a contagem de tokens reportada pelo provedor após a chamada concluir.
+export async function recordAiTokens(
+  supabase: SupabaseClient,
+  usageId: string | null,
+  usage: { prompt_tokens?: number; completion_tokens?: number } | null | undefined,
+  model: string
+): Promise<void> {
+  if (!usageId || !usage) return;
+  await supabase
+    .from("ai_usage")
+    .update({
+      prompt_tokens: usage.prompt_tokens ?? null,
+      completion_tokens: usage.completion_tokens ?? null,
+      model,
+    })
+    .eq("id", usageId);
 }
 
 export function rateLimitMessage(r: Extract<RateLimitResult, { allowed: false }>): string {
