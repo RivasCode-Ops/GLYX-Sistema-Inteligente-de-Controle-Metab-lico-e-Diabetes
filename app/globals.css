@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply min-h-dvh bg-zinc-950 text-zinc-100 antialiased;
+}
+
+/* subtle grid */
+.glyx-bg {
+  background-image: radial-gradient(
+      ellipse 90% 60% at 50% -30%,
+      rgba(12, 74, 110, 0.35),
+      transparent
+    ),
+    linear-gradient(to bottom, #09090b, #09090b);
+}

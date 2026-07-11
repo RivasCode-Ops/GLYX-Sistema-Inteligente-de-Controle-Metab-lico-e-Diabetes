@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYX — Sistema Inteligente de Controle Metabólico e Diabetes</title>
+  <meta name="description" content="Protótipo conceitual do app GLYX para controle metabólico, diabetes, alimentação, exercícios, medicação e IA assistencial." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root,[data-theme="light"]{
+      --bg:#f5f7f8;--surface:#ffffff;--surface-2:#f2f5f7;--surface-3:#ebf0f2;--text:#162127;--muted:#61717b;--faint:#8b98a1;
+      --primary:#0f8b8d;--primary-2:#1f6feb;--success:#2e7d32;--warning:#b26a00;--danger:#c62828;--violet:#6c63ff;
+      --border:rgba(22,33,39,.10);--shadow:0 10px 30px rgba(16,24,40,.08);--radius:22px;--radius-sm:14px;
+    }
+    [data-theme="dark"]{
+      --bg:#0d1418;--surface:#121c22;--surface-2:#17242b;--surface-3:#1e2c34;--text:#ecf3f6;--muted:#9fb0ba;--faint:#73838d;
+      --primary:#1eb5b7;--primary-2:#75a7ff;--success:#74c67a;--warning:#f0ad4e;--danger:#ff7b72;--violet:#9a92ff;
+      --border:rgba(236,243,246,.10);--shadow:0 16px 40px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;font-family:'Inter',system-ui,sans-serif;background:radial-gradient(circle at top right, rgba(30,181,183,.14), transparent 26%), var(--bg);color:var(--text);line-height:1.5}
+    a{text-decoration:none;color:inherit} button{font:inherit} img,svg{display:block;max-width:100%}
+    .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+    .sidebar{position:sticky;top:0;height:100vh;padding:24px;border-right:1px solid var(--border);background:linear-gradient(180deg,var(--surface),var(--surface-2))}
+    .brand{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+    .logo{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--primary-2));display:grid;place-items:center;box-shadow:var(--shadow)}
+    .logo svg{width:26px;height:26px;color:white}
+    .brand h1{font-size:1.1rem;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:.86rem}
+    .nav{display:grid;gap:8px}
+    .nav a{padding:12px 14px;border-radius:14px;color:var(--muted);background:transparent;border:1px solid transparent}
+    .nav a.active,.nav a:hover{background:var(--surface-3);color:var(--text);border-color:var(--border)}
+    .sidebar-note{margin-top:24px;padding:16px;border:1px solid var(--border);background:var(--surface-2);border-radius:18px;color:var(--muted);font-size:.9rem}
+    .main{padding:26px 28px 120px}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+    .topbar h2{margin:0;font-size:1.6rem}.topbar p{margin:6px 0 0;color:var(--muted)}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill,.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:10px 14px;border-radius:999px}
+    .btn.primary{background:linear-gradient(135deg,var(--primary),#139fa2);color:white;border:none}
+    .hero{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;margin-bottom:18px}
+    .card{background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .card-pad{padding:20px}
+    .headline{padding:24px;display:flex;flex-direction:column;gap:18px;min-height:280px;justify-content:space-between}
+    .headline .eyebrow{display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;background:rgba(30,181,183,.10);color:var(--primary);width:max-content;font-size:.84rem;font-weight:700}
+    .headline h3{font-size:2.35rem;line-height:1.02;letter-spacing:-.04em;margin:0;max-width:12ch}
+    .headline p{color:var(--muted);max-width:58ch;margin:0}
+    .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+    .metric{padding:18px}.metric .label{color:var(--muted);font-size:.88rem}.metric .value{font-size:1.8rem;font-weight:800;margin:6px 0}.delta{font-size:.85rem}
+    .up{color:var(--warning)} .down{color:var(--success)} .risk{color:var(--danger)}
+    .section-title{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:28px 0 14px}.section-title h3{margin:0;font-size:1.1rem}.section-title p{margin:0;color:var(--muted);font-size:.92rem}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+    .list{display:grid;gap:12px}.item{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}.item:last-child{border-bottom:none}
+    .tag{display:inline-flex;padding:7px 10px;border-radius:999px;font-size:.76rem;font-weight:700}
+    .tag.success{background:rgba(116,198,122,.14);color:var(--success)}.tag.warn{background:rgba(240,173,78,.14);color:var(--warning)}.tag.danger{background:rgba(255,123,114,.14);color:var(--danger)}.tag.info{background:rgba(117,167,255,.14);color:var(--primary-2)}
+    .progress{height:10px;border-radius:999px;background:var(--surface-3);overflow:hidden;margin-top:10px}.bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-2))}
+    .modules{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.module{padding:18px}.module h4{margin:12px 0 8px}.module p{margin:0;color:var(--muted);font-size:.92rem}
+    .tiny{font-size:.82rem;color:var(--muted)}
+    .footer-nav{display:none}
+    @media (max-width: 1100px){.hero,.grid-3,.modules,.metric-grid,.grid-2{grid-template-columns:1fr 1fr}.app{grid-template-columns:1fr}.sidebar{display:none}.main{padding-bottom:110px}.footer-nav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:12px;right:12px;bottom:12px;background:rgba(18,28,34,.92);backdrop-filter:blur(18px);border:1px solid var(--border);border-radius:20px;padding:10px;z-index:10}.footer-nav a{padding:10px 8px;text-align:center;font-size:.78rem;color:var(--muted)}.footer-nav a.active{color:var(--text);background:var(--surface-3);border-radius:14px}}
+    @media (max-width: 720px){.hero,.grid-3,.modules,.metric-grid,.grid-2{grid-template-columns:1fr}.headline h3{font-size:1.8rem}.topbar{align-items:flex-start;flex-direction:column}.main{padding:18px 16px 110px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 12c2.5-5 5.5-7.5 8-7.5 4.5 0 8 3.5 8 7.5s-3.5 7.5-8 7.5c-2.5 0-5.5-2.5-8-7.5Z"></path>
+            <path d="M8 12h8"></path>
+            <path d="M12 8v8"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>GLYX</h1>
+          <p>Controle Metabólico Inteligente</p>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Módulos principais">
+        <a class="active" href="#dashboard">Dashboard</a>
+        <a href="#glicemia">Glicemia</a>
+        <a href="#alimentacao">Alimentação</a>
+        <a href="#exercicio">Exercícios</a>
+        <a href="#medicacao">Medicação</a>
+        <a href="#ia">IA metabólica</a>
+        <a href="#insights">Insights</a>
+        <a href="#exames">Exames</a>
+        <a href="#historico">Histórico</a>
+        <a href="#perfil">Perfil</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>Regra central:</strong> apoio assistencial, não prescrição. IA investiga padrões, sinaliza risco e explica hipóteses com linguagem clara.
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h2 id="dashboard">Painel e rotina metabólica</h2>
+          <p>Visão unificada de glicemia, alimentação, treino, sono, hidratação, medicação e risco metabólico.</p>
+        </div>
+        <div class="toolbar">
+          <span class="pill">CGM ativo · Libre API Ready</span>
+          <span class="pill">Apple Health / Google Fit</span>
+          <button class="btn" data-theme-toggle>Alternar tema</button>
+          <button class="btn primary">Registrar refeição</button>
+        </div>
+      </div>
+
+      <section class="hero">
+        <article class="card headline">
+          <div>
+            <span class="eyebrow">Risco metabólico assistencial</span>
+            <h3>Seu metabolismo explicado em contexto, não só em números.</h3>
+            <p>O GLYX cruza sinais contínuos de glicose, refeições, exercício, medicação, sono e sinais fisiológicos para gerar alertas compreensíveis, hipóteses explicáveis e rotinas mais seguras.</p>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="tiny">Glicemia atual</div>
+              <div style="font-size:2rem;font-weight:800">148 mg/dL</div>
+              <div class="delta up">Tendência de subida nas últimas 2h</div>
+            </div>
+            <div>
+              <div class="tiny">Risco metabólico</div>
+              <div style="font-size:2rem;font-weight:800">Moderado</div>
+              <div class="delta risk">Correlação com sono curto + almoço alto em carga glicêmica</div>
+            </div>
+          </div>
+        </article>
+        <article class="card card-pad">
+          <div class="section-title" style="margin-top:0">
+            <h3>Rotina do dia</h3>
+            <span class="tag warn">Atenção 2 pendências</span>
+          </div>
+          <div class="list">
+            <div class="item"><div><strong>Hidratação</strong><div class="tiny">1,4 L de 2,5 L</div></div><div>56%</div></div>
+            <div class="item"><div><strong>Medicação</strong><div class="tiny">Metformina 18:00 pendente</div></div><div class="tag danger">Pendente</div></div>
+            <div class="item"><div><strong>Exercício</strong><div class="tiny">Caminhada leve recomendada</div></div><div>24 min</div></div>
+            <div class="item"><div><strong>Sono</strong><div class="tiny">5h47 · recuperação abaixo do ideal</div></div><div class="tag warn">Baixo</div></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="metric-grid">
+        <article class="card metric"><div class="label">Carboidratos do dia</div><div class="value">128 g</div><div class="delta">Meta dinâmica: 150 g</div><div class="progress"><div class="bar" style="width:85%"></div></div></article>
+        <article class="card metric"><div class="label">Calorias consumidas</div><div class="value">1.742</div><div class="delta">Planejado para hoje: 2.050 kcal</div><div class="progress"><div class="bar" style="width:75%"></div></div></article>
+        <article class="card metric"><div class="label">Passos / gasto</div><div class="value">6.820</div><div class="delta down">328 kcal · ajuda no controle pós-prandial</div><div class="progress"><div class="bar" style="width:68%"></div></div></article>
+        <article class="card metric"><div class="label">Tempo em faixa</div><div class="value">71%</div><div class="delta">Últimas 24h entre 70–180 mg/dL</div><div class="progress"><div class="bar" style="width:71%"></div></div></article>
+      </section>
+
+      <div class="section-title" id="glicemia"><div><h3>Módulos centrais</h3><p>Arquitetura pensada para escala de integrações, narrativa clínica responsável e uso diário.</p></div></div>
+      <section class="modules">
+        <article class="card module"><span class="tag info">Glicemia</span><h4>Leitura contínua e tendências</h4><p>Curva CGM, alertas, padrões de subida, janelas pós-refeição e análise histórica.</p></article>
+        <article class="card module" id="alimentacao"><span class="tag success">Alimentação</span><h4>Foto, porção e carga glicêmica</h4><p>Reconhecimento por imagem, calorias, macros, estimativa assistencial e compensações metabólicas.</p></article>
+        <article class="card module" id="exercicio"><span class="tag warn">Exercícios</span><h4>Treino alinhado ao controle glicêmico</h4><p>Plano por nível, disponibilidade e objetivo, com atenção à segurança durante o exercício.</p></article>
+        <article class="card module" id="medicacao"><span class="tag danger">Medicação</span><h4>Lembretes e adesão</h4><p>Horários, dosagens, confirmação de uso e correlação com glicemia, sintomas e refeições.</p></article>
+        <article class="card module" id="ia"><span class="tag info">IA metabólica</span><h4>Hipóteses explicáveis</h4><p>Investiga antes de concluir, reconhece limites e comunica risco sem substituir conduta médica.</p></article>
+        <article class="card module" id="insights"><span class="tag success">Insights</span><h4>Padrões multivariados</h4><p>Cruza sono, passos, estresse, refeições e medicação para sugerir ajustes de rotina.</p></article>
+        <article class="card module" id="exames"><span class="tag warn">Exames</span><h4>Leitura assistida</h4><p>Central de laudos, glossário, explicações educativas e preparação para consulta clínica.</p></article>
+        <article class="card module" id="historico"><span class="tag info">Histórico</span><h4>Timeline unificada</h4><p>Eventos, alertas, refeições, doses, sintomas e evolução do comportamento metabólico.</p></article>
+      </section>
+
+      <div class="section-title"><div><h3>Dados e integrações</h3><p>Ecossistema de dados para CGM, wearables, saúde móvel e expansão futura.</p></div></div>
+      <section class="grid-3">
+        <article class="card card-pad">
+          <h3 style="margin-top:0">Sensores de glicose</h3>
+          <p class="tiny">Libre, Dexcom e camada preparada para APIs futuras.</p>
+          <div class="list">
+            <div class="item"><div><strong>Streaming contínuo</strong><div class="tiny">coleta de leitura, timestamp, origem e status do sensor</div></div><span class="tag info">Pronto</span></div>
+            <div class="item"><div><strong>Alertas em contexto</strong><div class="tiny">alta, baixa, tendência de subida e variabilidade</div></div><span class="tag warn">Regras</span></div>
+          </div>
+        </article>
+        <article class="card card-pad">
+          <h3 style="margin-top:0">Smartwatch e sinais vitais</h3>
+          <p class="tiny">Batimentos, passos, sono, estresse, gasto calórico e atividade.</p>
+          <div class="list">
+            <div class="item"><div><strong>Correlação temporal</strong><div class="tiny">antes/depois de refeições, medicação e exercícios</div></div><span class="tag success">Motor</span></div>
+            <div class="item"><div><strong>Segurança</strong><div class="tiny">sinalizar contexto de possível hipoglicemia em treino</div></div><span class="tag danger">Crítico</span></div>
+          </div>
+        </article>
+        <article class="card card-pad">
+          <h3 style="margin-top:0">Apple Health e Google Fit</h3>
+          <p class="tiny">Caminho de sincronização para consolidar dados pessoais de saúde.</p>
+          <div class="list">
+            <div class="item"><div><strong>Normalização</strong><div class="tiny">modelo comum para métricas vindas de várias fontes</div></div><span class="tag info">ETL</span></div>
+            <div class="item"><div><strong>Consentimento</strong><div class="tiny">permissões granulares e revogação por fonte</div></div><span class="tag success">LGPD</span></div>
+          </div>
+        </article>
+      </section>
+
+      <div class="section-title"><div><h3>Fluxos assistenciais</h3><p>O produto orienta, registra, correlaciona e explica; não faz prescrição nem diagnóstico final.</p></div></div>
+      <section class="grid-2">
+        <article class="card card-pad">
+          <h3 style="margin-top:0">Plano alimentar dinâmico</h3>
+          <div class="list">
+            <div class="item"><div><strong>Objetivos e restrições</strong><div class="tiny">diabetes, perda de peso, força, rotina, preferências e alergias</div></div><span class="tag info">Perfil</span></div>
+            <div class="item"><div><strong>Substituições inteligentes</strong><div class="tiny">trocas práticas e compensações coerentes com o dia</div></div><span class="tag success">Adaptável</span></div>
+            <div class="item"><div><strong>Distribuição por treino</strong><div class="tiny">dias mais intensos ou leves ajustam refeições e timing</div></div><span class="tag warn">Integrado</span></div>
+          </div>
+        </article>
+        <article class="card card-pad" id="perfil">
+          <h3 style="margin-top:0">Perfil e segurança</h3>
+          <div class="list">
+            <div class="item"><div><strong>Cadastro clínico essencial</strong><div class="tiny">tipo de diabetes, metas, uso de medicamentos, contatos e observações</div></div><span class="tag info">Base</span></div>
+            <div class="item"><div><strong>Permissões sensíveis</strong><div class="tiny">saúde, câmera, notificações, localização opcional</div></div><span class="tag warn">Consentimento</span></div>
+            <div class="item"><div><strong>Escalada de alerta</strong><div class="tiny">risco elevado gera recomendação de atenção humana e consulta</div></div><span class="tag danger">Proteção</span></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <nav class="footer-nav" aria-label="Navegação móvel">
+    <a class="active" href="#dashboard">Painel</a>
+    <a href="#glicemia">Glicemia</a>
+    <a href="#alimentacao">Alimentação</a>
+    <a href="#exercicio">Treino</a>
+    <a href="#ia">IA</a>
+  </nav>
+
+  <script>
+    (function(){
+      const btn=document.querySelector('[data-theme-toggle]');
+      const root=document.documentElement;
+      let theme=root.getAttribute('data-theme')||'dark';
+      function setTheme(t){root.setAttribute('data-theme',t);theme=t;btn.textContent=t==='dark'?'Alternar para claro':'Alternar para escuro';}
+      setTheme(theme);
+      btn.addEventListener('click',()=>setTheme(theme==='dark'?'light':'dark'));
+    })();
+  </script>
+</body>
+</html>
