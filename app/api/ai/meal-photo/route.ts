@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { checkAndRecordAiUsage, rateLimitMessage } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -21,6 +24,15 @@ export async function POST(req: Request) {
   if (!(file instanceof Blob) || file.size === 0) {
     return NextResponse.json({ error: "Imagem obrigatória." }, { status: 400 });
   }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      { error: "Imagem muito grande (máx. 4 MB). Reduza a resolução e tente de novo." },
+      { status: 413 }
+    );
+  }
+  if (file.type && !file.type.startsWith("image/")) {
+    return NextResponse.json({ error: "O arquivo precisa ser uma imagem." }, { status: 415 });
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const base64 = buffer.toString("base64");
@@ -34,6 +46,11 @@ export async function POST(req: Request) {
       },
       { status: 503 }
     );
+  }
+
+  const rate = await checkAndRecordAiUsage(supabase, user.id, "meal_photo");
+  if (!rate.allowed) {
+    return NextResponse.json({ error: rateLimitMessage(rate) }, { status: 429 });
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

@@ -15,6 +15,7 @@ export function RegisterForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -25,13 +26,19 @@ export function RegisterForm() {
       setError("Configure as variáveis do Supabase no .env.local.");
       return;
     }
+    if (!consent) {
+      setError("É necessário aceitar a Política de Privacidade para criar a conta.");
+      return;
+    }
     const supabase = createClient();
     if (!supabase) return;
     setLoading(true);
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName, privacy_consent_at: new Date().toISOString() },
+      },
     });
     setLoading(false);
     if (err) {
@@ -87,6 +94,22 @@ export function RegisterForm() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <label className="flex items-start gap-2 text-xs leading-5 text-zinc-400">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              required
+            />
+            <span>
+              Li e concordo com a{" "}
+              <Link href="/privacidade" target="_blank" className="text-emerald-400 hover:underline">
+                Política de Privacidade
+              </Link>{" "}
+              e consinto com o tratamento dos meus dados de saúde para uso no app (LGPD).
+            </span>
+          </label>
           <Button type="submit" disabled={loading}>
             {loading ? "Criando…" : "Registrar"}
           </Button>

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkAndRecordAiUsage, rateLimitMessage } from "@/lib/ai/rate-limit";
 import { interpretExamText } from "@/lib/exams/interpret";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +28,11 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
     .maybeSingle();
 
   if (fetchErr || !exam?.raw_text) return { error: "Exame não encontrado ou sem texto." };
+
+  const rate = await checkAndRecordAiUsage(supabase, user.id, "exam");
+  if (!rate.allowed) {
+    return { error: rateLimitMessage(rate) };
+  }
 
   const result = await interpretExamText(exam.raw_text);
 

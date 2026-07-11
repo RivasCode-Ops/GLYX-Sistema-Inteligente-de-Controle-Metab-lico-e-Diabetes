@@ -87,6 +87,10 @@ export function LoginForm() {
             Não tem conta?{" "}
             <Link href="/register" className="text-emerald-400 hover:underline">
               Criar conta
+            </Link>{" "}
+            ·{" "}
+            <Link href="/forgot-password" className="text-emerald-400 hover:underline">
+              Esqueci minha senha
             </Link>
           </p>
         </form>

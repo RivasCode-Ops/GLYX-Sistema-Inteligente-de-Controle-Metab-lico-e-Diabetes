@@ -135,7 +135,10 @@ export default function Home() {
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
                 <p className="text-sm leading-6 text-sky-100/80">
                   Demonstração para apresentação: os dados são fictícios, coerentes e não gravam
-                  informações reais quando Supabase não está configurado.
+                  informações reais quando Supabase não está configurado.{" "}
+                  <Link href="/privacidade" className="text-sky-300 underline-offset-2 hover:underline">
+                    Política de Privacidade
+                  </Link>
                 </p>
               </div>
             </CardContent>
