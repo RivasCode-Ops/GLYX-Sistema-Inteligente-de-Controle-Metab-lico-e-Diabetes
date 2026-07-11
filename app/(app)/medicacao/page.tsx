@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionCards } from "@/components/module/section-cards";
+import { AlarmSetup } from "@/components/push/alarm-setup";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
 
@@ -55,6 +56,8 @@ export default async function MedicacaoOverviewPage() {
         ]}
       />
 
+      {!demoMode ? <AlarmSetup /> : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Adicionar medicamento</CardTitle>
@@ -77,8 +80,15 @@ export default async function MedicacaoOverviewPage() {
               <Input id="dosage" name="dosage" placeholder="ex.: 500 mg" />
             </div>
             <div className="grid gap-1">
-              <Label htmlFor="schedule_hint">Horário / lembrete</Label>
+              <Label htmlFor="schedule_hint">Observação de horário</Label>
               <Input id="schedule_hint" name="schedule_hint" placeholder="ex.: café da manhã" />
+            </div>
+            <div className="grid gap-1 sm:col-span-2">
+              <Label htmlFor="reminder_times">Alarmes de dose (horários HH:MM, separados por vírgula)</Label>
+              <Input id="reminder_times" name="reminder_times" placeholder="ex.: 08:00, 20:00" />
+              <p className="text-[11px] text-zinc-600">
+                Nesses horários, os dispositivos com alarme ativado tocam com o nome e a dose.
+              </p>
             </div>
             <div className="sm:col-span-2">
               <Button type="submit">Salvar</Button>
@@ -101,6 +111,7 @@ export default async function MedicacaoOverviewPage() {
                       <p className="font-medium text-zinc-100">{m.name}</p>
                       <p className="text-sm text-zinc-500">
                         {m.dosage ?? "—"} · {m.schedule_hint ?? "sem horário"}
+                        {m.reminder_times?.length ? ` · ⏰ ${m.reminder_times.join(", ")}` : ""}
                       </p>
                     </div>
                     <form action={logMedicationTakenAction}>

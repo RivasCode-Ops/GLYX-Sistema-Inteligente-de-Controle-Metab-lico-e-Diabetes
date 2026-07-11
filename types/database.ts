@@ -36,6 +36,7 @@ export type Medication = {
   schedule_hint: string | null;
   active: boolean;
   notes: string | null;
+  reminder_times?: string[] | null;
   created_at: string;
 };
 

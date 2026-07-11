@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { PwaSetup } from "@/components/pwa/pwa-setup";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -39,6 +40,7 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
       >
         {children}
+        <PwaSetup />
       </body>
     </html>
   );
