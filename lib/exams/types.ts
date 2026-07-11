@@ -14,3 +14,11 @@ export const parsedExamSummarySchema = z.object({
 });
 
 export type ParsedExamSummary = z.infer<typeof parsedExamSummarySchema>;
+
+/** Resposta da análise por foto: transcrição do laudo + interpretação */
+export const examPhotoResultSchema = parsedExamSummarySchema.extend({
+  extractedText: z.string(),
+  suggestedTitle: z.string().optional(),
+});
+
+export type ExamPhotoResult = z.infer<typeof examPhotoResultSchema>;

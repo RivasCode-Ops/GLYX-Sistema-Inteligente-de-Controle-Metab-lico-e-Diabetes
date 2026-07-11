@@ -2,6 +2,7 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { saveExamDraft } from "@/app/actions/exams";
+import { ExamPhotoForm } from "@/components/exams/exam-photo-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,8 @@ export default async function ExamesPage() {
         Armazene texto de laudos para futura interpretação assistida (educativa). O GLYX não substitui
         o médico ou o laboratório.
       </p>
+
+      {!demoMode ? <ExamPhotoForm /> : null}
 
       <Card>
         <CardHeader>

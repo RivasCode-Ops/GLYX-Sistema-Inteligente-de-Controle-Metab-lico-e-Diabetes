@@ -1,0 +1,149 @@
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { providerErrorMessage } from "@/lib/ai/provider-error";
+import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
+import { examPhotoResultSchema } from "@/lib/exams/types";
+import { createClient } from "@/lib/supabase/server";
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+const PROMPT = `És um assistente clínico-educativo para leigos (Português do Brasil).
+A imagem é a foto de um exame laboratorial ou laudo médico.
+
+REGRAS OBRIGATÓRIAS:
+- NÃO faças diagnóstico nem conclusões médicas definitivas.
+- NÃO alteres doses nem recomendes medicamentos.
+- Se a imagem NÃO for um exame/laudo legível, devolve extractedText vazio e explica em limitations.
+- Resposta APENAS em JSON válido, sem markdown, com este schema:
+{
+  "extractedText": "transcrição fiel do texto/valores legíveis do exame",
+  "suggestedTitle": "título curto ex.: Hemograma jan/2026",
+  "summary": "parágrafo curto sobre o que o exame parece reportar (factual, sem diagnosticar)",
+  "terms": [{"term":"...", "plainLanguage":"..."}],
+  "questionsForDoctor": ["..."],
+  "limitations": "o que não podes concluir com esta imagem"
+}`;
+
+export async function POST(req: Request) {
+  const supabase = await createClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase não configurado." }, { status: 503 });
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
+  const formData = await req.formData();
+  const file = formData.get("image");
+  const titleInput = String(formData.get("title") ?? "").trim();
+
+  if (!(file instanceof Blob) || file.size === 0) {
+    return NextResponse.json({ error: "Imagem obrigatória." }, { status: 400 });
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      { error: "Imagem muito grande (máx. 4 MB). Reduza a resolução e tente de novo." },
+      { status: 413 }
+    );
+  }
+  if (file.type && !file.type.startsWith("image/")) {
+    return NextResponse.json({ error: "O arquivo precisa ser uma imagem." }, { status: 415 });
+  }
+
+  if (!isOpenAIConfigured()) {
+    return NextResponse.json(
+      { error: "Chave de IA não configurada no servidor.", demo: true },
+      { status: 503 }
+    );
+  }
+
+  const rate = await checkAndRecordAiUsage(supabase, user.id, "exam");
+  if (!rate.allowed) {
+    return NextResponse.json({ error: rateLimitMessage(rate) }, { status: 429 });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const base64 = buffer.toString("base64");
+  const mime = file.type || "image/jpeg";
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model: aiModel(),
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: PROMPT },
+            { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
+          ],
+        },
+      ],
+      max_tokens: 1600,
+      temperature: 0.3,
+    });
+  } catch (e) {
+    return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
+  }
+
+  await recordAiTokens(supabase, rate.usageId, completion.usage, aiModel());
+
+  const raw = completion.choices[0]?.message?.content ?? "";
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return NextResponse.json(
+      { error: "A resposta do modelo não era JSON válido. Tente novamente." },
+      { status: 502 }
+    );
+  }
+
+  const parsed = examPhotoResultSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "O modelo não devolveu o formato esperado. Tente novamente." },
+      { status: 502 }
+    );
+  }
+
+  if (!parsed.data.extractedText.trim()) {
+    return NextResponse.json(
+      { error: `Não consegui ler um exame nesta imagem. ${parsed.data.limitations}` },
+      { status: 422 }
+    );
+  }
+
+  const { extractedText, suggestedTitle, ...summary } = parsed.data;
+  const title =
+    titleInput ||
+    suggestedTitle ||
+    `Exame por foto ${new Date().toLocaleDateString("pt-BR")}`;
+
+  const { data: exam, error: insertErr } = await supabase
+    .from("exams")
+    .insert({
+      user_id: user.id,
+      title,
+      raw_text: extractedText,
+      parsed_summary: summary as unknown as Record<string, unknown>,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (insertErr) {
+    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ examId: exam?.id ?? null, title, summary });
+}
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
