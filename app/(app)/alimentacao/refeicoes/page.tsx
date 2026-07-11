@@ -114,7 +114,9 @@ export default async function AlimentacaoRefeicoesPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">
-                  {m.carbs_g != null ? `${m.carbs_g} g carb` : "—"} ·{" "}
+                  {m.carbs_g != null ? `${m.carbs_g}g carb` : "— carb"} ·{" "}
+                  {m.protein_g != null ? `${m.protein_g}g prot` : "— prot"} ·{" "}
+                  {m.fat_g != null ? `${m.fat_g}g gord` : "— gord"} ·{" "}
                   {m.calories != null ? `${m.calories} kcal` : "— kcal"}
                 </p>
               </li>
