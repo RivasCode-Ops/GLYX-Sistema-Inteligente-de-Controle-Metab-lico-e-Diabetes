@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { deleteGlucoseReading } from "@/app/actions/glucose";
 import { demoGlucoseReadings } from "@/lib/demo/data";
 
 type Props = { params: Promise<{ id: string }> };
@@ -59,19 +60,25 @@ export default async function GlicemiaDetailPage({ params }: Props) {
   } = await supabase.auth.getUser();
   if (!user) notFound();
 
-  let readings: { value_mg_dl: number; recorded_at: string; context: string | null }[] = [];
+  let readings: { id: string; value_mg_dl: number; recorded_at: string; context: string | null }[] =
+    [];
 
   if (DATE_RE.test(id)) {
     const start = `${id}T00:00:00.000Z`;
     const end = `${id}T23:59:59.999Z`;
     const { data } = await supabase
       .from("glucose_readings")
-      .select("value_mg_dl, recorded_at, context")
+      .select("id, value_mg_dl, recorded_at, context")
       .eq("user_id", user.id)
       .gte("recorded_at", start)
       .lte("recorded_at", end)
       .order("recorded_at", { ascending: true });
     readings = data ?? [];
+  }
+
+  async function deleteReadingAction(formData: FormData): Promise<void> {
+    "use server";
+    await deleteGlucoseReading(formData);
   }
 
   return (
@@ -94,15 +101,26 @@ export default async function GlicemiaDetailPage({ params }: Props) {
         <p className="text-sm text-zinc-500">Nenhuma leitura neste dia.</p>
       ) : DATE_RE.test(id) ? (
         <ul className="divide-y divide-zinc-800 rounded-2xl border border-zinc-800 bg-zinc-900/30">
-          {readings.map((r, i) => (
-            <li key={`${r.recorded_at}-${i}`} className="flex justify-between px-4 py-3 text-sm">
+          {readings.map((r) => (
+            <li key={r.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <span className="font-mono text-zinc-200">{r.value_mg_dl} mg/dL</span>
-              <span className="text-zinc-500">
+              <span className="flex items-center gap-3 text-zinc-500">
                 {new Date(r.recorded_at).toLocaleTimeString("pt-BR", {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
                 {r.context ? ` · ${r.context}` : ""}
+                <form action={deleteReadingAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <button
+                    type="submit"
+                    aria-label={`Excluir leitura de ${r.value_mg_dl} mg/dL`}
+                    title="Excluir"
+                    className="rounded-md px-1.5 py-0.5 text-xs text-zinc-600 transition hover:bg-red-950/50 hover:text-red-300"
+                  >
+                    ✕
+                  </button>
+                </form>
               </span>
             </li>
           ))}

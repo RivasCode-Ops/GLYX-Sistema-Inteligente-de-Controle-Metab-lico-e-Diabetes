@@ -35,18 +35,38 @@ export function IaChat() {
           messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
-      const data = (await res.json()) as { reply?: string; error?: string; demo?: boolean };
-      if (!res.ok) {
-        setError(data.error ?? "Falha na requisição.");
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      if (!res.ok || contentType.includes("application/json")) {
+        const data = (await res.json()) as { reply?: string; error?: string; demo?: boolean };
+        if (!res.ok) {
+          setError(data.error ?? "Falha na requisição.");
+          return;
+        }
+        setMessages((m) => [...m, { role: "assistant", content: data.reply ?? "(sem resposta)" }]);
         return;
       }
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: data.reply ?? "(sem resposta)",
-        },
-      ]);
+
+      // Resposta em streaming: mostra o texto conforme chega
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setError("Falha ao ler a resposta.");
+        return;
+      }
+      const decoder = new TextDecoder();
+      setMessages((m) => [...m, { role: "assistant", content: "" }]);
+      let acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        const current = acc;
+        setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: current }]);
+      }
+      if (!acc) {
+        setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: "(sem resposta)" }]);
+      }
     } catch {
       setError("Erro de rede.");
     } finally {

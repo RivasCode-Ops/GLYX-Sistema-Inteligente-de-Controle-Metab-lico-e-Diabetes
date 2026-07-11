@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const completion = await openai.chat.completions.create({
+  const stream = await openai.chat.completions.create({
     model: aiModel(),
     messages: [
       { role: "system", content: SYSTEM },
@@ -66,8 +66,25 @@ export async function POST(req: Request) {
       })),
     ],
     max_tokens: 800,
+    stream: true,
   });
 
-  const reply = completion.choices[0]?.message?.content ?? "";
-  return NextResponse.json({ reply, demo: false });
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (delta) controller.enqueue(encoder.encode(delta));
+        }
+      } catch {
+        // conexão com o provedor caiu no meio — encerra com o que já foi enviado
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(readable, {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+  });
 }

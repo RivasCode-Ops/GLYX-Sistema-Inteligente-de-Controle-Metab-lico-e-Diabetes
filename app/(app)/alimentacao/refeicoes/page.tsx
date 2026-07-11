@@ -1,6 +1,6 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { addMeal } from "@/app/actions/meals";
+import { addMeal, deleteMeal } from "@/app/actions/meals";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,11 @@ export default async function AlimentacaoRefeicoesPage() {
   async function addMealAction(formData: FormData): Promise<void> {
     "use server";
     await addMeal(formData);
+  }
+
+  async function deleteMealAction(formData: FormData): Promise<void> {
+    "use server";
+    await deleteMeal(formData);
   }
 
   if (demoMode) {
@@ -89,8 +94,23 @@ export default async function AlimentacaoRefeicoesPage() {
               <li key={m.id} className="px-4 py-3 text-sm">
                 <div className="flex justify-between gap-4">
                   <span className="font-medium text-zinc-200">{m.name}</span>
-                  <span className="font-mono text-xs text-zinc-500">
-                    {new Date(m.eaten_at).toLocaleString("pt-BR")}
+                  <span className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-zinc-500">
+                      {new Date(m.eaten_at).toLocaleString("pt-BR")}
+                    </span>
+                    {!demoMode ? (
+                      <form action={deleteMealAction}>
+                        <input type="hidden" name="id" value={m.id} />
+                        <button
+                          type="submit"
+                          aria-label={`Excluir refeição ${m.name}`}
+                          title="Excluir"
+                          className="rounded-md px-1.5 py-0.5 text-xs text-zinc-600 transition hover:bg-red-950/50 hover:text-red-300"
+                        >
+                          ✕
+                        </button>
+                      </form>
+                    ) : null}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">

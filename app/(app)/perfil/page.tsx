@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfile } from "@/app/actions/profile";
+import { DataPrivacySection } from "@/components/perfil/data-privacy-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,6 +92,7 @@ export default async function PerfilPage() {
           </form>
         </CardContent>
       </Card>
+      {!demoMode ? <DataPrivacySection /> : null}
     </div>
   );
 }

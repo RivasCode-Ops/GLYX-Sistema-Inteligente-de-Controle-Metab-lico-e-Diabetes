@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { parseMealJson } from "@/lib/ai/parse-meal";
 import { checkAndRecordAiUsage, rateLimitMessage } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -79,12 +80,7 @@ export async function POST(req: Request) {
   });
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, "").trim()) as Record<string, unknown>;
-  } catch {
-    parsed = { name: "análise pendente", notes: raw };
-  }
+  const parsed = parseMealJson(raw);
 
   const insert = await supabase.from("meals").insert({
     user_id: user.id,

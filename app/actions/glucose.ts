@@ -43,3 +43,29 @@ export async function addGlucoseReading(formData: FormData): Promise<ActionResul
   revalidatePath("/alertas");
   return { ok: true };
 }
+
+export async function deleteGlucoseReading(formData: FormData): Promise<ActionResult> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Registro inválido." };
+
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const { error } = await supabase
+    .from("glucose_readings")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/glicemia");
+  revalidatePath("/glicemia/historico");
+  revalidatePath("/glicemia/tendencias");
+  return { ok: true };
+}
