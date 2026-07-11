@@ -22,6 +22,8 @@ export default async function AlimentacaoRefeicoesPage() {
     await deleteMeal(formData);
   }
 
+  const photoUrls = new Map<string, string>();
+
   if (demoMode) {
     meals = demoMeals;
   } else {
@@ -38,6 +40,16 @@ export default async function AlimentacaoRefeicoesPage() {
           .order("eaten_at", { ascending: false })
           .limit(30);
         meals = (data ?? []) as Meal[];
+
+        const paths = meals.map((m) => m.photo_path).filter((p): p is string => Boolean(p));
+        if (paths.length) {
+          const { data: signed } = await supabase.storage
+            .from("meal-photos")
+            .createSignedUrls(paths, 3600);
+          for (const s of signed ?? []) {
+            if (s.signedUrl && s.path) photoUrls.set(s.path, s.signedUrl);
+          }
+        }
       }
     }
   }
@@ -91,7 +103,16 @@ export default async function AlimentacaoRefeicoesPage() {
         ) : (
           <ul className="divide-y divide-zinc-800 rounded-2xl border border-zinc-800 bg-zinc-900/30">
             {meals.map((m) => (
-              <li key={m.id} className="px-4 py-3 text-sm">
+              <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                {m.photo_path && photoUrls.get(m.photo_path) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photoUrls.get(m.photo_path)}
+                    alt={`Foto de ${m.name ?? "refeição"}`}
+                    className="h-12 w-12 shrink-0 rounded-lg border border-zinc-800 object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1">
                 <div className="flex justify-between gap-4">
                   <span className="font-medium text-zinc-200">{m.name}</span>
                   <span className="flex items-center gap-3">
@@ -119,6 +140,7 @@ export default async function AlimentacaoRefeicoesPage() {
                   {m.fat_g != null ? `${m.fat_g}g gord` : "— gord"} ·{" "}
                   {m.calories != null ? `${m.calories} kcal` : "— kcal"}
                 </p>
+                </div>
               </li>
             ))}
           </ul>

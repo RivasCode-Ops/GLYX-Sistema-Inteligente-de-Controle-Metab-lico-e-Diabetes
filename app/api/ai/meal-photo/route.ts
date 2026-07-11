@@ -90,6 +90,17 @@ export async function POST(req: Request) {
   const raw = completion.choices[0]?.message?.content ?? "{}";
   const parsed = parseMealJson(raw);
 
+  // Guarda a foto no bucket privado; falha de upload não bloqueia o registro.
+  let photoPath: string | null = null;
+  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+  const uploadPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+  const upload = await supabase.storage
+    .from("meal-photos")
+    .upload(uploadPath, buffer, { contentType: mime });
+  if (!upload.error) {
+    photoPath = uploadPath;
+  }
+
   const insert = await supabase.from("meals").insert({
     user_id: user.id,
     name: String(parsed.name ?? "Refeição"),
@@ -100,6 +111,7 @@ export async function POST(req: Request) {
     glycemic_load_estimate:
       typeof parsed.glycemic_load_estimate === "number" ? parsed.glycemic_load_estimate : null,
     notes: typeof parsed.notes === "string" ? parsed.notes : null,
+    photo_path: photoPath,
     eaten_at: new Date().toISOString(),
   });
 

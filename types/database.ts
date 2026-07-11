@@ -23,6 +23,7 @@ export type Meal = {
   fat_g: number | null;
   glycemic_load_estimate: number | null;
   notes: string | null;
+  photo_path: string | null;
   eaten_at: string;
   created_at: string;
 };

@@ -56,8 +56,20 @@ export async function deleteMeal(formData: FormData): Promise<ActionResult> {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
 
+  const { data: meal } = await supabase
+    .from("meals")
+    .select("photo_path")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   const { error } = await supabase.from("meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) return { error: error.message };
+
+  // Remove a foto do bucket (melhor esforço — registro já foi excluído)
+  if (meal?.photo_path) {
+    await supabase.storage.from("meal-photos").remove([meal.photo_path]);
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
