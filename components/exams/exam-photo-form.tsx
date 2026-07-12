@@ -12,32 +12,70 @@ type Result = { examId: string | null; title: string };
 
 export function ExamPhotoForm() {
   const router = useRouter();
-  const [preview, setPreview] = useState<string | null>(null);
+  const [pages, setPages] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [title, setTitle] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function resetPreviews(next: string[]) {
+    previews.forEach((p) => URL.revokeObjectURL(p));
+    setPreviews(next);
+  }
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     setResult(null);
     setStatus(null);
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(file ? URL.createObjectURL(file) : null);
+    if (!file) {
+      setPages([]);
+      resetPreviews([]);
+      return;
+    }
+
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      setStatus("Convertendo PDF em imagens…");
+      setLoading(true);
+      try {
+        const { pdfToImages } = await import("@/lib/pdf/pdf-to-images");
+        const imgs = await pdfToImages(file, 3);
+        if (!imgs.length) {
+          setStatus("Não consegui ler este PDF. Tente uma foto do exame.");
+          setPages([]);
+          resetPreviews([]);
+          return;
+        }
+        setPages(imgs);
+        resetPreviews(imgs.map((i) => URL.createObjectURL(i)));
+        setStatus(
+          imgs.length > 1 ? `PDF convertido: ${imgs.length} páginas prontas para análise.` : null
+        );
+      } catch {
+        setStatus("Falha ao converter o PDF. Tente uma foto do exame.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    setPages([file]);
+    resetPreviews([URL.createObjectURL(file)]);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus(null);
     setResult(null);
-    const form = e.currentTarget;
-    const fd = new FormData(form);
-    const file = fd.get("image");
-    if (!(file instanceof File) || file.size === 0) {
-      setStatus("Selecione a foto do exame.");
+    if (!pages.length) {
+      setStatus("Selecione a foto ou o PDF do exame.");
       return;
     }
     setLoading(true);
     try {
+      const fd = new FormData();
+      if (title.trim()) fd.set("title", title.trim());
+      for (const p of pages) fd.append("images", p);
       const res = await fetch("/api/ai/exam-photo", { method: "POST", body: fd });
       const data = (await res.json()) as Result & { error?: string };
       if (!res.ok) {
@@ -45,9 +83,9 @@ export function ExamPhotoForm() {
         return;
       }
       setResult(data);
-      form.reset();
-      if (preview) URL.revokeObjectURL(preview);
-      setPreview(null);
+      setPages([]);
+      resetPreviews([]);
+      setTitle("");
       router.refresh();
     } catch {
       setStatus("Erro de rede.");
@@ -59,34 +97,44 @@ export function ExamPhotoForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Novo registro por foto</CardTitle>
+        <CardTitle className="text-base">Novo registro por foto ou PDF</CardTitle>
         <CardDescription>
-          Envie a foto do laudo: o modelo transcreve, explica termos e gera perguntas para o médico.
+          Envie a foto ou o PDF do laudo: o modelo transcreve, explica termos e gera perguntas para
+          o médico.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
           <div className="grid gap-1">
             <Label htmlFor="photo-title">Título (opcional)</Label>
-            <Input id="photo-title" name="title" placeholder="ex.: Hemograma jul/2026" />
+            <Input
+              id="photo-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="ex.: Hemograma jul/2026"
+            />
           </div>
           <input
             type="file"
-            name="image"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={onFileChange}
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={(e) => void onFileChange(e)}
             className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
           />
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt="Pré-visualização do exame"
-              className="max-h-64 w-full rounded-xl border border-zinc-800 object-contain"
-            />
+          {previews.length ? (
+            <div className={previews.length > 1 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : ""}>
+              {previews.map((p, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={p}
+                  src={p}
+                  alt={`Página ${i + 1} do exame`}
+                  className="max-h-64 w-full rounded-xl border border-zinc-800 object-contain"
+                />
+              ))}
+            </div>
           ) : null}
           <Button type="submit" disabled={loading}>
-            {loading ? "Lendo e interpretando…" : "Analisar foto do exame"}
+            {loading ? "Lendo e interpretando…" : "Analisar exame"}
           </Button>
           {status ? <p className="text-xs text-amber-300">{status}</p> : null}
           {result ? (

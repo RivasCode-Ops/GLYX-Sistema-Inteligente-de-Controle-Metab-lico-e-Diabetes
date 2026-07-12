@@ -7,9 +7,10 @@ import { examPhotoResultSchema } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_PAGES = 3;
 
 const PROMPT = `És um assistente clínico-educativo para leigos (Português do Brasil).
-A imagem é a foto de um exame laboratorial ou laudo médico.
+As imagens são páginas do MESMO exame laboratorial ou laudo médico (foto ou PDF digitalizado).
 
 REGRAS OBRIGATÓRIAS:
 - NÃO faças diagnóstico nem conclusões médicas definitivas.
@@ -39,20 +40,30 @@ export async function POST(req: Request) {
   }
 
   const formData = await req.formData();
-  const file = formData.get("image");
   const titleInput = String(formData.get("title") ?? "").trim();
 
-  if (!(file instanceof Blob) || file.size === 0) {
+  // Aceita "image" (uma foto, compatibilidade) e "images" (páginas de PDF convertidas)
+  const single = formData.get("image");
+  const files = [
+    ...(single instanceof Blob && single.size > 0 ? [single] : []),
+    ...formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0),
+  ];
+
+  if (!files.length) {
     return NextResponse.json({ error: "Imagem obrigatória." }, { status: 400 });
   }
-  if (file.size > MAX_IMAGE_BYTES) {
+  if (files.length > MAX_PAGES) {
+    return NextResponse.json({ error: `Máximo de ${MAX_PAGES} páginas por análise.` }, { status: 400 });
+  }
+  const total = files.reduce((s, f) => s + f.size, 0);
+  if (total > MAX_IMAGE_BYTES) {
     return NextResponse.json(
-      { error: "Imagem muito grande (máx. 4 MB). Reduza a resolução e tente de novo." },
+      { error: "Arquivo muito grande (máx. 4 MB no total). Reduza a resolução e tente de novo." },
       { status: 413 }
     );
   }
-  if (file.type && !file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "O arquivo precisa ser uma imagem." }, { status: 415 });
+  if (files.some((f) => f.type && !f.type.startsWith("image/"))) {
+    return NextResponse.json({ error: "Os arquivos precisam ser imagens." }, { status: 415 });
   }
 
   if (!isOpenAIConfigured()) {
@@ -67,9 +78,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: rateLimitMessage(rate) }, { status: 429 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
-  const mime = file.type || "image/jpeg";
+  const imageParts = await Promise.all(
+    files.map(async (f) => {
+      const buffer = Buffer.from(await f.arrayBuffer());
+      return {
+        type: "image_url" as const,
+        image_url: { url: `data:${f.type || "image/jpeg"};base64,${buffer.toString("base64")}` },
+      };
+    })
+  );
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   let completion;
@@ -80,10 +97,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "user",
-          content: [
-            { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
-          ],
+          content: [{ type: "text", text: PROMPT }, ...imageParts],
         },
       ],
       max_tokens: 1600,
