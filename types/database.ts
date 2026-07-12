@@ -37,6 +37,8 @@ export type Medication = {
   active: boolean;
   notes: string | null;
   reminder_times?: string[] | null;
+  stock_units?: number | null;
+  stock_updated_on?: string | null;
   created_at: string;
 };
 

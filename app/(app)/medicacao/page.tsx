@@ -1,6 +1,11 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { addMedication, logMedicationTaken } from "@/app/actions/medications";
+import {
+  addMedication,
+  deactivateMedication,
+  logMedicationTaken,
+  updateMedicationStock,
+} from "@/app/actions/medications";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +27,27 @@ export default async function MedicacaoOverviewPage() {
   async function logMedicationTakenAction(formData: FormData): Promise<void> {
     "use server";
     await logMedicationTaken(formData);
+  }
+
+  async function updateStockAction(formData: FormData): Promise<void> {
+    "use server";
+    await updateMedicationStock(formData);
+  }
+
+  async function deactivateAction(formData: FormData): Promise<void> {
+    "use server";
+    await deactivateMedication(formData);
+  }
+
+  /** Dias de estoque restantes: consome doses/dia (nº de alarmes, mínimo 1) desde a última atualização. */
+  function stockDaysLeft(m: Medication): number | null {
+    if (m.stock_units == null || !m.stock_updated_on) return null;
+    const dpd = Math.max(m.reminder_times?.length ?? 1, 1);
+    const elapsed = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(m.stock_updated_on).getTime()) / 86_400_000)
+    );
+    return Math.floor((m.stock_units - elapsed * dpd) / dpd);
   }
 
   if (demoMode) {
@@ -83,11 +109,26 @@ export default async function MedicacaoOverviewPage() {
               <Label htmlFor="schedule_hint">Observação de horário</Label>
               <Input id="schedule_hint" name="schedule_hint" placeholder="ex.: café da manhã" />
             </div>
-            <div className="grid gap-1 sm:col-span-2">
+            <div className="grid gap-1">
               <Label htmlFor="reminder_times">Alarmes de dose (horários HH:MM, separados por vírgula)</Label>
               <Input id="reminder_times" name="reminder_times" placeholder="ex.: 08:00, 20:00" />
               <p className="text-[11px] text-zinc-600">
                 Nesses horários, os dispositivos com alarme ativado tocam com o nome e a dose.
+              </p>
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="stock_units">Comprimidos em estoque (opcional)</Label>
+              <Input
+                id="stock_units"
+                name="stock_units"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="ex.: 30"
+              />
+              <p className="text-[11px] text-zinc-600">
+                Com o estoque informado, o GLYX avisa por notificação quando faltar ~1 semana para
+                acabar.
               </p>
             </div>
             <div className="sm:col-span-2">
@@ -103,27 +144,76 @@ export default async function MedicacaoOverviewPage() {
           <p className="text-sm text-zinc-500">Nenhum medicamento cadastrado.</p>
         ) : (
           <ul className="space-y-3">
-            {meds.map((m) => (
-              <li key={m.id}>
-                <Card>
-                  <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
-                    <div>
-                      <p className="font-medium text-zinc-100">{m.name}</p>
-                      <p className="text-sm text-zinc-500">
-                        {m.dosage ?? "—"} · {m.schedule_hint ?? "sem horário"}
-                        {m.reminder_times?.length ? ` · ⏰ ${m.reminder_times.join(", ")}` : ""}
-                      </p>
-                    </div>
-                    <form action={logMedicationTakenAction}>
-                      <input type="hidden" name="medication_id" value={m.id} />
-                      <Button type="submit" variant="outline" size="sm">
-                        Registrar dose
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
+            {meds.map((m) => {
+              const daysLeft = stockDaysLeft(m);
+              return (
+                <li key={m.id}>
+                  <Card>
+                    <CardContent className="space-y-3 py-4">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-zinc-100">{m.name}</p>
+                          <p className="text-sm text-zinc-500">
+                            {m.dosage ?? "—"} · {m.schedule_hint ?? "sem horário"}
+                            {m.reminder_times?.length ? ` · ⏰ ${m.reminder_times.join(", ")}` : ""}
+                          </p>
+                          {daysLeft != null ? (
+                            <p
+                              className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] ${
+                                daysLeft <= 0
+                                  ? "border-red-500/40 bg-red-500/10 text-red-300"
+                                  : daysLeft <= 7
+                                    ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                                    : "border-zinc-700 bg-zinc-900 text-zinc-400"
+                              }`}
+                            >
+                              {daysLeft <= 0
+                                ? "💊 Estoque pode ter acabado — reponha e atualize"
+                                : `💊 Estoque para ~${daysLeft} dia(s)`}
+                            </p>
+                          ) : null}
+                        </div>
+                        <form action={logMedicationTakenAction}>
+                          <input type="hidden" name="medication_id" value={m.id} />
+                          <Button type="submit" variant="outline" size="sm">
+                            Registrar dose
+                          </Button>
+                        </form>
+                      </div>
+                      {!demoMode ? (
+                        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-3">
+                          <form action={updateStockAction} className="flex items-center gap-2">
+                            <input type="hidden" name="medication_id" value={m.id} />
+                            <Input
+                              name="stock_units"
+                              type="number"
+                              min={0}
+                              inputMode="numeric"
+                              placeholder="comprei mais: total atual"
+                              className="h-8 w-44 text-xs"
+                            />
+                            <Button type="submit" variant="outline" size="sm">
+                              Atualizar estoque
+                            </Button>
+                          </form>
+                          <form action={deactivateAction} className="ml-auto">
+                            <input type="hidden" name="medication_id" value={m.id} />
+                            <Button
+                              type="submit"
+                              variant="ghost"
+                              size="sm"
+                              className="text-zinc-500 hover:text-red-300"
+                            >
+                              Desativar
+                            </Button>
+                          </form>
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

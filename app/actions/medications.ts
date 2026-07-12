@@ -43,10 +43,74 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
   });
   if (!parsed.success) return { error: "Nome do medicamento é obrigatório." };
 
+  const stockRaw = Number.parseInt(String(formData.get("stock_units") ?? ""), 10);
+  const stock =
+    Number.isFinite(stockRaw) && stockRaw > 0 && stockRaw <= 100000
+      ? {
+          stock_units: stockRaw,
+          stock_updated_on: new Date().toISOString().slice(0, 10),
+        }
+      : {};
+
   const { error } = await supabase.from("medications").insert({
     user_id: user.id,
     ...parsed.data,
+    ...stock,
   });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/medicacao");
+  return { ok: true };
+}
+
+export async function updateMedicationStock(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const medicationId = formData.get("medication_id") as string | null;
+  const stock = Number.parseInt(String(formData.get("stock_units") ?? ""), 10);
+  if (!medicationId || !Number.isFinite(stock) || stock < 0 || stock > 100000) {
+    return { error: "Informe a quantidade em estoque." };
+  }
+
+  const { error } = await supabase
+    .from("medications")
+    .update({
+      stock_units: stock,
+      stock_updated_on: new Date().toISOString().slice(0, 10),
+    })
+    .eq("id", medicationId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/medicacao");
+  return { ok: true };
+}
+
+export async function deactivateMedication(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+
+  const { error } = await supabase
+    .from("medications")
+    .update({ active: false })
+    .eq("id", medicationId)
+    .eq("user_id", user.id);
 
   if (error) return { error: error.message };
 
