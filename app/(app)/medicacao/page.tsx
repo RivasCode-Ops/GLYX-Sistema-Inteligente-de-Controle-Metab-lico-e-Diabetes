@@ -137,14 +137,14 @@ export default async function MedicacaoOverviewPage() {
               </p>
             </div>
             <div className="grid gap-1">
-              <Label htmlFor="stock_units">Comprimidos em estoque (opcional)</Label>
+              <Label htmlFor="stock_units">Unidades em estoque (opcional)</Label>
               <Input
                 id="stock_units"
                 name="stock_units"
                 type="number"
                 min={0}
                 inputMode="numeric"
-                placeholder="ex.: 30"
+                placeholder="ex.: 30 comprimidos ou 60 scoops/colheres"
               />
               <p className="text-[11px] text-zinc-600">
                 Com o estoque informado, o GLYX avisa por notificação quando faltar ~1 semana para
@@ -193,9 +193,12 @@ export default async function MedicacaoOverviewPage() {
                                     : "border-zinc-700 bg-zinc-900 text-zinc-400"
                               }`}
                             >
-                              {daysLeft <= 0
-                                ? "💊 Estoque pode ter acabado — reponha e atualize"
-                                : `💊 Estoque para ~${daysLeft} dia(s)`}
+                              {(() => {
+                                const icon = m.kind === "supplement" ? "🥄" : "💊";
+                                return daysLeft <= 0
+                                  ? `${icon} Estoque pode ter acabado — reponha e atualize`
+                                  : `${icon} Estoque para ~${daysLeft} dia(s)`;
+                              })()}
                             </p>
                           ) : null}
                         </div>
