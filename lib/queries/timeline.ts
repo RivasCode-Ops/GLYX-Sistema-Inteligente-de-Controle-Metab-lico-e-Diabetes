@@ -1,20 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type TimelineItem =
-  | {
-      type: "glicemia";
-      id: string;
-      at: string;
-      label: string;
-      detail: string;
-    }
-  | {
-      type: "refeição";
-      id: string;
-      at: string;
-      label: string;
-      detail: string;
-    };
+export type TimelineItem = {
+  type: "glicemia" | "refeição" | "medicação" | "exercício";
+  id: string;
+  at: string;
+  label: string;
+  detail: string;
+};
 
 export async function getTimeline(): Promise<TimelineItem[]> {
   const supabase = await createClient();
@@ -25,7 +17,7 @@ export async function getTimeline(): Promise<TimelineItem[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const [gRes, mRes] = await Promise.all([
+  const [gRes, mRes, medRes, exRes] = await Promise.all([
     supabase
       .from("glucose_readings")
       .select("id, value_mg_dl, recorded_at")
@@ -37,6 +29,18 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       .select("id, name, eaten_at")
       .eq("user_id", user.id)
       .order("eaten_at", { ascending: false })
+      .limit(25),
+    supabase
+      .from("medication_logs")
+      .select("id, taken_at, medications(name)")
+      .eq("user_id", user.id)
+      .order("taken_at", { ascending: false })
+      .limit(25),
+    supabase
+      .from("exercise_sessions")
+      .select("id, label, started_at, duration_min")
+      .eq("user_id", user.id)
+      .order("started_at", { ascending: false })
       .limit(25),
   ]);
 
@@ -62,6 +66,27 @@ export async function getTimeline(): Promise<TimelineItem[]> {
     });
   }
 
+  for (const d of medRes.data ?? []) {
+    const medName = (d.medications as unknown as { name?: string } | null)?.name;
+    items.push({
+      type: "medicação",
+      id: d.id,
+      at: d.taken_at,
+      label: "Dose tomada",
+      detail: medName ?? "—",
+    });
+  }
+
+  for (const e of exRes.data ?? []) {
+    items.push({
+      type: "exercício",
+      id: e.id,
+      at: e.started_at,
+      label: "Exercício",
+      detail: e.duration_min != null ? `${e.label} · ${e.duration_min} min` : e.label,
+    });
+  }
+
   items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  return items.slice(0, 40);
+  return items.slice(0, 60);
 }

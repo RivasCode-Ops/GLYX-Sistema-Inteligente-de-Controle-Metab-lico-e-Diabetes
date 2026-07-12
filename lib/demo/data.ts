@@ -249,10 +249,10 @@ export const demoExams = [
 ];
 
 export const demoTimeline = [
-  { id: "tl-4", type: "glicemia" as const, label: "Exercício", detail: "Caminhada rápida - 38 min", at: at(0, 18, 10) },
+  { id: "tl-4", type: "exercício" as const, label: "Exercício", detail: "Caminhada rápida - 38 min", at: at(0, 18, 10) },
   { id: "tl-1", type: "glicemia" as const, label: "Glicemia", detail: "137 mg/dL - pós-prandial", at: at(0, 13, 20) },
   { id: "tl-2", type: "refeição" as const, label: "Refeição", detail: "Almoço mediterrâneo - 58 g carb", at: at(0, 12, 35) },
-  { id: "tl-3", type: "refeição" as const, label: "Medicação", detail: "Metformina confirmada", at: at(0, 7, 40) },
+  { id: "tl-3", type: "medicação" as const, label: "Medicação", detail: "Metformina confirmada", at: at(0, 7, 40) },
 ];
 
 export const demoGlucosePoints: GlucosePoint[] = demoGlucoseReadings.map((r) => ({

@@ -14,15 +14,18 @@ export default async function HistoricoGlobalPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <p className="text-sm text-zinc-400">
-        Linha do tempo unificada (glicemia e refeições). Expanda depois com doses e exercício.
+        Linha do tempo unificada — glicemia, refeições, medicação e exercício.
       </p>
       {items.length === 0 ? (
         <p className="text-sm text-zinc-500">Sem eventos ou configure o Supabase.</p>
       ) : (
         <ul className="divide-y divide-zinc-800 rounded-2xl border border-zinc-800 bg-zinc-900/30">
           {items.map((it) => (
-            <li key={`${it.type}-${it.id}`} className="px-4 py-3 text-sm">
-              <div className="flex flex-wrap justify-between gap-2">
+            <li key={`${it.type}-${it.id}`} className="flex items-center gap-3 px-4 py-3 text-sm">
+              <span className="text-base leading-none">
+                {{ glicemia: "🩸", refeição: "🍽️", medicação: "💊", exercício: "🏃" }[it.type]}
+              </span>
+              <div className="flex flex-1 flex-wrap justify-between gap-2">
                 <span className="font-medium text-zinc-200">
                   {it.label} · {it.detail}
                 </span>

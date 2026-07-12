@@ -127,7 +127,7 @@ Next.js 15 (App Router) + Tailwind + Supabase (PostgreSQL + Auth + RLS) + rotas 
 
 1. Copie `.env.example` para `.env.local`.
 2. Crie um projeto em [Supabase](https://supabase.com), copie **URL** e **anon key**.
-3. No SQL Editor do Supabase, execute o arquivo `supabase/migrations/20260109000000_init.sql` (schema + RLS + trigger de perfil).
+3. No SQL Editor do Supabase, execute **todos** os arquivos de `supabase/migrations/`, em ordem cronológica pelo nome (de `20260109000000_init.sql` até a mais recente). Cada um é incremental — pular algum deixa tabelas/colunas ausentes para funcionalidades como CGM, alarmes, objetivo corporal, onboarding e LibreLinkUp.
 4. (Opcional) Defina `OPENAI_API_KEY` para IA.
 
 Nesta raiz, **instalação + validação + servidor dev** num fluxo só (recomendado na tua máquina):
