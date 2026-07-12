@@ -106,6 +106,8 @@ export type Profile = {
   body_goal?: "lose" | "gain" | "maintain" | null;
   target_weight_kg?: number | null;
   family_history?: string | null;
+  primary_focus?: "diabetes" | "lose" | "gain" | null;
+  onboarding_done?: boolean;
   created_at: string;
   updated_at: string;
 };

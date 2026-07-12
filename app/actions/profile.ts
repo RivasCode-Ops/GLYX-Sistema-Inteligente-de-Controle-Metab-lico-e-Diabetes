@@ -59,6 +59,74 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+const onboardingSchema = z.object({
+  primary_focus: z.enum(["diabetes", "lose", "gain"]),
+  diabetes_type: z.string().max(60).optional(),
+  sex: z.enum(["m", "f"]).optional(),
+  birth_year: z.coerce.number().int().min(1900).max(2030).optional(),
+  height_cm: z.coerce.number().int().min(80).max(250).optional(),
+  activity_level: z.enum(["sedentary", "light", "moderate", "very"]).optional(),
+  weight_kg: z.coerce.number().min(20).max(400).optional(),
+  target_weight_kg: z.coerce.number().min(20).max(400).optional(),
+});
+
+export async function completeOnboarding(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const parsed = onboardingSchema.safeParse({
+    primary_focus: formData.get("primary_focus"),
+    diabetes_type: formData.get("diabetes_type") || undefined,
+    sex: formData.get("sex") || undefined,
+    birth_year: formData.get("birth_year") || undefined,
+    height_cm: formData.get("height_cm") || undefined,
+    activity_level: formData.get("activity_level") || undefined,
+    weight_kg: formData.get("weight_kg") || undefined,
+    target_weight_kg: formData.get("target_weight_kg") || undefined,
+  });
+  if (!parsed.success) return { error: "Escolha um foco para começar." };
+
+  const { weight_kg, ...profileData } = parsed.data;
+  const bodyGoal =
+    profileData.primary_focus === "lose"
+      ? "lose"
+      : profileData.primary_focus === "gain"
+        ? "gain"
+        : "maintain";
+
+  const { error } = await supabase.from("profiles").upsert(
+    {
+      id: user.id,
+      ...profileData,
+      body_goal: bodyGoal,
+      onboarding_done: true,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+  if (error) return { error: error.message };
+
+  if (weight_kg) {
+    await supabase.from("weight_logs").upsert(
+      {
+        user_id: user.id,
+        weight_kg,
+        logged_on: new Date().toISOString().slice(0, 10),
+      },
+      { onConflict: "user_id,logged_on" }
+    );
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/perfil");
+  return { ok: true };
+}
+
 export async function logWeight(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   if (!supabase) return { error: "Configure o Supabase (.env.local)." };
