@@ -93,6 +93,12 @@ export function LoginForm() {
               Esqueci minha senha
             </Link>
           </p>
+          <p className="text-center text-xs text-zinc-500">
+            📱{" "}
+            <Link href="/instalar" className="text-emerald-400 hover:underline">
+              Instalar o GLYX como aplicativo no celular
+            </Link>
+          </p>
         </form>
       </CardContent>
     </Card>

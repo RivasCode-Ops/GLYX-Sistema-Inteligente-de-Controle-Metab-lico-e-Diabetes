@@ -6,11 +6,17 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "GLYX",
     description:
       "Copiloto inteligente para glicemia, alimentação, exercício e medicação.",
+    id: "glyx-app",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#09090b",
     theme_color: "#09090b",
     orientation: "portrait-primary",
+    shortcuts: [
+      { name: "Registrar glicemia", url: "/glicemia", icons: [{ src: "/icon-192", sizes: "192x192" }] },
+      { name: "Medicação", url: "/medicacao", icons: [{ src: "/icon-192", sizes: "192x192" }] },
+      { name: "Foto da refeição", url: "/alimentacao/foto", icons: [{ src: "/icon-192", sizes: "192x192" }] },
+    ],
     icons: [
       {
         src: "/icon",

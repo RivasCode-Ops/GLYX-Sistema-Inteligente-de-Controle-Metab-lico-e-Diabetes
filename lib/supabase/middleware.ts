@@ -7,6 +7,7 @@ const PUBLIC_PREFIXES = [
   "/auth",
   "/forgot-password",
   "/privacidade",
+  "/instalar",
   // Recursos da PWA precisam ser públicos: navegador/instalador busca sem sessão
   "/icon",
   "/apple-icon",
