@@ -1,4 +1,5 @@
 import { SectionCards } from "@/components/module/section-cards";
+import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { addExerciseSession } from "@/app/actions/exercise";
@@ -12,6 +13,7 @@ import { demoExercises } from "@/lib/demo/data";
 
 export default async function ExerciciosOverviewPage() {
   let sessions: ExerciseSession[] = [];
+  let bodyGoal: "lose" | "gain" | "maintain" | null = null;
   const demoMode = !isSupabaseConfigured();
 
   async function addExerciseSessionAction(formData: FormData): Promise<void> {
@@ -35,6 +37,12 @@ export default async function ExerciciosOverviewPage() {
           .order("started_at", { ascending: false })
           .limit(8);
         sessions = (data ?? []) as ExerciseSession[];
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("body_goal")
+          .eq("id", user.id)
+          .maybeSingle();
+        bodyGoal = (p?.body_goal as typeof bodyGoal) ?? null;
       }
     }
   }
@@ -44,6 +52,7 @@ export default async function ExerciciosOverviewPage() {
       <p className="text-sm text-zinc-400">
         Treino e metabolismo — cada subárea tem página própria.
       </p>
+      {!demoMode ? <GoalTrainingCard goal={bodyGoal} /> : null}
       <SectionCards
         items={[
           {

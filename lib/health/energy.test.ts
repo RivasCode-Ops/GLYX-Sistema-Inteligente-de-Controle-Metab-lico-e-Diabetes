@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { bmr, dailyTargets, safeWeeklyRateKg, tdee } from "./energy";
+import {
+  adaptiveAdjustment,
+  bmr,
+  dailyTargets,
+  safeWeeklyRateKg,
+  smoothedWeight,
+  tdee,
+} from "./energy";
 
 const homem = { sex: "m" as const, age: 40, heightCm: 175, weightKg: 90, activity: "light" as const };
 const mulher = { sex: "f" as const, age: 55, heightCm: 160, weightKg: 70, activity: "sedentary" as const };
@@ -42,5 +49,49 @@ describe("safeWeeklyRateKg", () => {
   });
   it("manter = 0", () => {
     expect(safeWeeklyRateKg(90, "maintain")).toBe(0);
+  });
+});
+
+describe("smoothedWeight", () => {
+  it("pondera registros recentes mais fortemente", () => {
+    const v = smoothedWeight([
+      { weightKg: 92, loggedOn: "2026-07-01" },
+      { weightKg: 90, loggedOn: "2026-07-08" },
+    ]);
+    expect(v).toBeGreaterThan(90);
+    expect(v).toBeLessThan(92);
+    expect(v! - 90).toBeLessThan(92 - v!);
+  });
+  it("vazio retorna null", () => {
+    expect(smoothedWeight([])).toBeNull();
+  });
+});
+
+describe("adaptiveAdjustment", () => {
+  const logs = [
+    { weightKg: 90, loggedOn: "2026-06-01" },
+    { weightKg: 89.5, loggedOn: "2026-06-08" },
+    { weightKg: 89.4, loggedOn: "2026-06-15" },
+    { weightKg: 89.2, loggedOn: "2026-06-22" },
+  ];
+  it("exige pelo menos 4 pesagens e 14 dias", () => {
+    expect(adaptiveAdjustment(logs.slice(0, 3), "lose", 89)).toBeNull();
+  });
+  it("perda mais lenta que o plano sugere cortar calorias (com teto de 150)", () => {
+    const adj = adaptiveAdjustment(logs, "lose", 89.2);
+    expect(adj).not.toBeNull();
+    expect(adj!.observedWeeklyKg).toBeCloseTo(-0.27, 1);
+    expect(adj!.deltaKcal).toBeLessThan(0);
+    expect(adj!.deltaKcal).toBeGreaterThanOrEqual(-150);
+  });
+  it("nunca ultrapassa o guardrail de ±150 kcal", () => {
+    const parado = [
+      { weightKg: 90, loggedOn: "2026-06-01" },
+      { weightKg: 90.1, loggedOn: "2026-06-08" },
+      { weightKg: 90, loggedOn: "2026-06-15" },
+      { weightKg: 90.2, loggedOn: "2026-06-29" },
+    ];
+    const adj = adaptiveAdjustment(parado, "lose", 90);
+    expect(Math.abs(adj!.deltaKcal)).toBeLessThanOrEqual(150);
   });
 });

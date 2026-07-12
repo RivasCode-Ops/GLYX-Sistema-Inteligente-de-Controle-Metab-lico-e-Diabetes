@@ -39,6 +39,7 @@ export type Medication = {
   reminder_times?: string[] | null;
   stock_units?: number | null;
   stock_updated_on?: string | null;
+  kind?: "med" | "supplement";
   created_at: string;
 };
 

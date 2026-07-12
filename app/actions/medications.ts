@@ -11,6 +11,7 @@ const medSchema = z.object({
   dosage: z.string().optional(),
   schedule_hint: z.string().optional(),
   reminder_times: z.array(z.string().regex(TIME_RE)).optional(),
+  kind: z.enum(["med", "supplement"]).default("med"),
 });
 
 // "08:00, 20h30, 7:5" → ["08:00", "20:30"] (inválidos são descartados)
@@ -40,6 +41,7 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
     dosage: formData.get("dosage") || undefined,
     schedule_hint: formData.get("schedule_hint") || undefined,
     reminder_times: reminderTimes.length ? reminderTimes : undefined,
+    kind: formData.get("kind") === "supplement" ? "supplement" : "med",
   });
   if (!parsed.success) return { error: "Nome do medicamento é obrigatório." };
 

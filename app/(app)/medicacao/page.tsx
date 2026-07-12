@@ -97,9 +97,21 @@ export default async function MedicacaoOverviewPage() {
             </p>
           ) : null}
           <form action={addMedicationAction} className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1 sm:col-span-2">
+            <div className="grid gap-1">
               <Label htmlFor="name">Nome</Label>
-              <Input id="name" name="name" required placeholder="ex.: Metformina" />
+              <Input id="name" name="name" required placeholder="ex.: Metformina, Whey…" />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="kind">Tipo</Label>
+              <select
+                id="kind"
+                name="kind"
+                defaultValue="med"
+                className="h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100"
+              >
+                <option value="med">Medicamento</option>
+                <option value="supplement">Suplemento</option>
+              </select>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="dosage">Dosagem</Label>
@@ -138,13 +150,19 @@ export default async function MedicacaoOverviewPage() {
         </CardContent>
       </Card>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-zinc-100">Ativos</h2>
-        {meds.length === 0 ? (
+      {(["med", "supplement"] as const).map((section) => {
+        const items = meds.filter((m) => (m.kind ?? "med") === section);
+        if (section === "supplement" && items.length === 0) return null;
+        return (
+      <div key={section}>
+        <h2 className="mb-3 text-lg font-semibold text-zinc-100">
+          {section === "med" ? "Medicamentos ativos" : "💪 Suplementos"}
+        </h2>
+        {items.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhum medicamento cadastrado.</p>
         ) : (
           <ul className="space-y-3">
-            {meds.map((m) => {
+            {items.map((m) => {
               const daysLeft = stockDaysLeft(m);
               return (
                 <li key={m.id}>
@@ -217,6 +235,8 @@ export default async function MedicacaoOverviewPage() {
           </ul>
         )}
       </div>
+        );
+      })}
     </div>
   );
 }

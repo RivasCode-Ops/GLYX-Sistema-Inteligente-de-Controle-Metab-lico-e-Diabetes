@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GOAL_LABEL, ACTIVITY_LABEL } from "@/lib/health/energy";
+import { GOAL_LABEL, ACTIVITY_LABEL, adaptiveAdjustment, smoothedWeight } from "@/lib/health/energy";
 import type { Profile, WeightLog } from "@/types/database";
 import { demoProfile } from "@/lib/demo/data";
 
@@ -254,6 +254,31 @@ export default async function PerfilPage() {
           ) : (
             <p className="text-xs text-zinc-500">Nenhuma pesagem registrada ainda.</p>
           )}
+          {(() => {
+            if (!profile?.body_goal || profile.body_goal === "maintain" || weights.length < 4)
+              return null;
+            const points = weights.map((w) => ({
+              weightKg: Number(w.weight_kg),
+              loggedOn: w.logged_on,
+            }));
+            const adj = adaptiveAdjustment(points, profile.body_goal, points[0].weightKg);
+            const trend = smoothedWeight(points);
+            if (!adj) return null;
+            return (
+              <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-zinc-300">
+                <p className="font-medium text-sky-300">
+                  Check-in automático · tendência {trend} kg
+                </p>
+                <p className="mt-1">
+                  Ritmo real: {adj.observedWeeklyKg} kg/sem (plano: {adj.plannedWeeklyKg} kg/sem).{" "}
+                  {adj.reason}
+                  {adj.deltaKcal !== 0
+                    ? ` Sugestão: ${adj.deltaKcal > 0 ? "+" : ""}${adj.deltaKcal} kcal/dia.`
+                    : ""}
+                </p>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

@@ -93,3 +93,72 @@ export function safeWeeklyRateKg(weightKg: number, goal: BodyGoal): number {
   if (goal === "gain") return Math.round(weightKg * 0.0025 * 100) / 100;
   return 0;
 }
+
+export type WeightPoint = { weightKg: number; loggedOn: string };
+
+/**
+ * Tendência de peso suavizada: média ponderada com mais peso nos registros
+ * recentes, para ignorar flutuações de água (sal, carboidrato, creatina).
+ */
+export function smoothedWeight(points: WeightPoint[]): number | null {
+  if (!points.length) return null;
+  const sorted = [...points].sort((a, b) => (a.loggedOn < b.loggedOn ? 1 : -1));
+  let sum = 0;
+  let weightSum = 0;
+  sorted.slice(0, 8).forEach((p, i) => {
+    const w = 1 / (i + 1);
+    sum += p.weightKg * w;
+    weightSum += w;
+  });
+  return Math.round((sum / weightSum) * 10) / 10;
+}
+
+export type Adjustment = {
+  observedWeeklyKg: number;
+  plannedWeeklyKg: number;
+  deltaKcal: number;
+  reason: string;
+};
+
+/**
+ * Ajuste dinâmico semanal: compara o ritmo real de mudança de peso com o
+ * planejado e sugere correção calórica com guardrails (máx. ±150 kcal por
+ * ajuste — nunca reagir 1:1 a flutuações, padrão validado pelo MacroFactor).
+ * Exige >= 4 pesagens em >= 14 dias para não reagir a ruído.
+ */
+export function adaptiveAdjustment(
+  points: WeightPoint[],
+  goal: BodyGoal,
+  currentWeightKg: number
+): Adjustment | null {
+  if (points.length < 4) return null;
+  const sorted = [...points].sort((a, b) => (a.loggedOn < b.loggedOn ? -1 : 1));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const days =
+    (new Date(last.loggedOn).getTime() - new Date(first.loggedOn).getTime()) / 86_400_000;
+  if (days < 14) return null;
+
+  const observedWeekly = Math.round(((last.weightKg - first.weightKg) / days) * 7 * 100) / 100;
+  const plannedWeekly =
+    goal === "lose"
+      ? -safeWeeklyRateKg(currentWeightKg, goal)
+      : safeWeeklyRateKg(currentWeightKg, goal);
+
+  // ~7700 kcal por kg; convertido para desvio diário e limitado a ±150
+  const dailyGapKcal = ((plannedWeekly - observedWeekly) * 7700) / 7;
+  const deltaKcal = Math.max(-150, Math.min(150, Math.round(dailyGapKcal / 50) * 50));
+
+  const reason =
+    deltaKcal === 0
+      ? "Ritmo dentro do planejado — mantenha as metas atuais."
+      : goal === "lose"
+        ? deltaKcal < 0
+          ? "Perda mais lenta que o planejado — reduza levemente as calorias."
+          : "Perda mais rápida que o seguro — coma um pouco mais para proteger massa magra."
+        : deltaKcal > 0
+          ? "Ganho mais lento que o planejado — aumente levemente as calorias."
+          : "Ganho mais rápido que o ideal — reduza para priorizar músculo, não gordura.";
+
+  return { observedWeeklyKg: observedWeekly, plannedWeeklyKg: plannedWeekly, deltaKcal, reason };
+}
