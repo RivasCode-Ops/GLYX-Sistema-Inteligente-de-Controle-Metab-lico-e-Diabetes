@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
+import { LibreAutoSync } from "@/components/glicemia/libre-auto-sync";
 
 const FOCUS_STRIP: Record<
   "diabetes" | "lose" | "gain",
@@ -68,6 +69,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <LibreAutoSync />
       {strip ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <p className="text-sm font-medium text-emerald-200">{strip.label}</p>
