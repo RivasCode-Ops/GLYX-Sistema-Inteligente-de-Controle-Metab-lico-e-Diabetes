@@ -6,6 +6,8 @@ export type PushPayload = {
   body: string;
   url?: string;
   critical?: boolean;
+  /** ID do medicamento — habilita a ação "Já tomei" na notificação */
+  medId?: string | null;
 };
 
 export type StoredSubscription = {

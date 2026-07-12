@@ -66,6 +66,48 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function updateMedication(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+
+  const timesRaw = String(formData.get("reminder_times") ?? "").trim();
+  const reminderTimes = timesRaw ? parseReminderTimes(timesRaw) : [];
+
+  const parsed = medSchema.safeParse({
+    name: formData.get("name"),
+    dosage: formData.get("dosage") || undefined,
+    schedule_hint: formData.get("schedule_hint") || undefined,
+    reminder_times: reminderTimes,
+    kind: formData.get("kind") === "supplement" ? "supplement" : "med",
+  });
+  if (!parsed.success) return { error: "Nome do medicamento é obrigatório." };
+
+  const { error } = await supabase
+    .from("medications")
+    .update({
+      name: parsed.data.name,
+      dosage: parsed.data.dosage ?? null,
+      schedule_hint: parsed.data.schedule_hint ?? null,
+      reminder_times: reminderTimes.length ? reminderTimes : null,
+      kind: parsed.data.kind,
+    })
+    .eq("id", medicationId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/medicacao");
+  return { ok: true };
+}
+
 export async function updateMedicationStock(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   if (!supabase) return { error: "Configure o Supabase (.env.local)." };

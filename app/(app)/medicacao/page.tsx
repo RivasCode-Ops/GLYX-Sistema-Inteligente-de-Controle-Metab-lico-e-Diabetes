@@ -4,6 +4,7 @@ import {
   addMedication,
   deactivateMedication,
   logMedicationTaken,
+  updateMedication,
   updateMedicationStock,
 } from "@/app/actions/medications";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +38,11 @@ export default async function MedicacaoOverviewPage() {
   async function deactivateAction(formData: FormData): Promise<void> {
     "use server";
     await deactivateMedication(formData);
+  }
+
+  async function updateMedicationAction(formData: FormData): Promise<void> {
+    "use server";
+    await updateMedication(formData);
   }
 
   /** Dias de estoque restantes: consome doses/dia (nº de alarmes, mínimo 1) desde a última atualização. */
@@ -226,6 +232,60 @@ export default async function MedicacaoOverviewPage() {
                             </Button>
                           </form>
                         </div>
+                      ) : null}
+                      {!demoMode ? (
+                        <details className="group">
+                          <summary className="cursor-pointer list-none text-xs text-zinc-500 transition hover:text-emerald-300">
+                            ✏️ Editar nome, dose ou horários
+                          </summary>
+                          <form
+                            action={updateMedicationAction}
+                            className="mt-3 grid gap-3 rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-3 sm:grid-cols-2"
+                          >
+                            <input type="hidden" name="medication_id" value={m.id} />
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Nome</Label>
+                              <Input name="name" defaultValue={m.name} required className="h-8 text-sm" />
+                            </div>
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Dosagem</Label>
+                              <Input name="dosage" defaultValue={m.dosage ?? ""} className="h-8 text-sm" />
+                            </div>
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Observação de horário</Label>
+                              <Input
+                                name="schedule_hint"
+                                defaultValue={m.schedule_hint ?? ""}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Alarmes (HH:MM, vírgula)</Label>
+                              <Input
+                                name="reminder_times"
+                                defaultValue={m.reminder_times?.join(", ") ?? ""}
+                                placeholder="vazio = sem alarme"
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="grid gap-1">
+                              <Label className="text-xs">Tipo</Label>
+                              <select
+                                name="kind"
+                                defaultValue={m.kind ?? "med"}
+                                className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2 text-sm text-zinc-100"
+                              >
+                                <option value="med">Medicamento</option>
+                                <option value="supplement">Suplemento</option>
+                              </select>
+                            </div>
+                            <div className="flex items-end">
+                              <Button type="submit" size="sm">
+                                Salvar alterações
+                              </Button>
+                            </div>
+                          </form>
+                        </details>
                       ) : null}
                     </CardContent>
                   </Card>

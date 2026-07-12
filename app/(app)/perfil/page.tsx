@@ -4,6 +4,7 @@ import { logWeight, updateProfile } from "@/app/actions/profile";
 import { AiUsageCard } from "@/components/perfil/ai-usage-card";
 import { DataPrivacySection } from "@/components/perfil/data-privacy-section";
 import { GoalFeasibilityCard } from "@/components/perfil/goal-feasibility-card";
+import { WeightChart } from "@/components/perfil/weight-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,7 @@ export default async function PerfilPage() {
           .select("*")
           .eq("user_id", user.id)
           .order("logged_on", { ascending: false })
-          .limit(8);
+          .limit(20);
         weights = (w ?? []) as WeightLog[];
       }
     }
@@ -232,9 +233,10 @@ export default async function PerfilPage() {
               </Button>
             </form>
           ) : null}
+          <WeightChart logs={weights} targetKg={profile?.target_weight_kg} />
           {weights.length ? (
             <div className="flex flex-wrap gap-2">
-              {weights.map((w, i) => (
+              {weights.slice(0, 8).map((w, i) => (
                 <span
                   key={w.id}
                   className={`rounded-full border px-3 py-1 text-xs ${

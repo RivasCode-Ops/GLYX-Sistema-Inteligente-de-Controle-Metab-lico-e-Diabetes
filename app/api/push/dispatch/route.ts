@@ -13,6 +13,7 @@ const itemSchema = z.object({
   title: z.string().min(1),
   body: z.string(),
   critical: z.boolean().optional(),
+  medId: z.string().nullish(),
 });
 
 export async function POST(req: Request) {
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         body: item.body,
         url: "/medicacao",
         critical: item.critical ?? true,
+        medId: item.medId ?? null,
       }
     );
     if (alive) sent += 1;
