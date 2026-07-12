@@ -114,7 +114,7 @@ export async function lluFirstPatientId(session: LluSession): Promise<string> {
   const id = json?.data?.[0]?.patientId;
   if (!id) {
     throw new Error(
-      "Nenhum sensor conectado a esta conta LibreLinkUp. Aceite o convite no app LibreLinkUp primeiro."
+      "Esta conta não segue nenhum sensor. Causa comum: usar o MESMO e-mail do app LibreLink (o do seu sensor) também no LibreLinkUp faz a Abbott tratar a conta como paciente, não como seguidora. Solução: no LibreLink, convide um e-mail DIFERENTE para o LibreLinkUp, aceite o convite com esse outro e-mail, e conecte aqui com ele."
     );
   }
   return id;
