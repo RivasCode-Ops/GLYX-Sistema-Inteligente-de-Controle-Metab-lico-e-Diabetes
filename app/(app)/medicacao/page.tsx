@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionCards } from "@/components/module/section-cards";
 import { AlarmSetup } from "@/components/push/alarm-setup";
+import { SupplementCheckForm } from "@/components/medicacao/supplement-check-form";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
 
@@ -89,6 +90,7 @@ export default async function MedicacaoOverviewPage() {
       />
 
       {!demoMode ? <AlarmSetup /> : null}
+      {!demoMode ? <SupplementCheckForm /> : null}
 
       <Card>
         <CardHeader>
