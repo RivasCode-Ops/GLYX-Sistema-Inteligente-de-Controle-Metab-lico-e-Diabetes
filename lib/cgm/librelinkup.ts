@@ -126,10 +126,15 @@ export async function lluFirstPatientId(session: LluSession): Promise<string> {
     headers: authHeaders(session),
   });
   const json = (await res.json().catch(() => null)) as {
-    data?: { patientId?: string; glucoseMeasurement?: unknown; glucoseItem?: unknown }[];
+    data?: unknown;
   } | null;
 
-  const list = (json?.data ?? []).filter((c) => c.patientId);
+  // Defensivo: a Abbott já foi vista devolvendo `data` como objeto vazio
+  // (não array) quando não há conexão utilizável — nunca assumir array.
+  const rawList = Array.isArray(json?.data)
+    ? (json.data as { patientId?: string; glucoseMeasurement?: unknown; glucoseItem?: unknown }[])
+    : [];
+  const list = rawList.filter((c) => c.patientId);
   const withReading = list.find((c) => c.glucoseMeasurement != null || c.glucoseItem != null);
   const id = (withReading ?? list[0])?.patientId;
 
