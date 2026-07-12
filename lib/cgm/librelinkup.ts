@@ -115,15 +115,24 @@ function authHeaders(session: LluSession): Record<string, string> {
   };
 }
 
-/** Primeira conexão (paciente) visível para esta conta seguidora. */
+/**
+ * Paciente (conexão) desta conta seguidora. A lista pode conter mais de
+ * uma entrada — inclusive "fantasmas" sem sensor vinculado, sem leitura
+ * (visto em contas com convites duplicados). Preferimos sempre a que já
+ * tem leitura de glicose de verdade.
+ */
 export async function lluFirstPatientId(session: LluSession): Promise<string> {
   const res = await fetch(`${session.baseUrl}/llu/connections`, {
     headers: authHeaders(session),
   });
   const json = (await res.json().catch(() => null)) as {
-    data?: { patientId?: string }[];
+    data?: { patientId?: string; glucoseMeasurement?: unknown; glucoseItem?: unknown }[];
   } | null;
-  const id = json?.data?.[0]?.patientId;
+
+  const list = (json?.data ?? []).filter((c) => c.patientId);
+  const withReading = list.find((c) => c.glucoseMeasurement != null || c.glucoseItem != null);
+  const id = (withReading ?? list[0])?.patientId;
+
   if (!id) {
     throw new Error(
       "Esta conta não segue nenhum sensor. Causa comum: usar o MESMO e-mail do app LibreLink (o do seu sensor) também no LibreLinkUp faz a Abbott tratar a conta como paciente, não como seguidora. Solução: no LibreLink, convide um e-mail DIFERENTE para o LibreLinkUp, aceite o convite com esse outro e-mail, e conecte aqui com ele."
