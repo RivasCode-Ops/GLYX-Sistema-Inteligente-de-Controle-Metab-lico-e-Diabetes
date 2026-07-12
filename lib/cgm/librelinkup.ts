@@ -11,7 +11,8 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 const LLU_HEADERS: Record<string, string> = {
   "content-type": "application/json",
   product: "llu.android",
-  version: "4.12.0",
+  // Abbott rejeita clientes abaixo desta versão (HTTP 403, status 920).
+  version: "4.16.0",
 };
 
 export type LluSession = {
@@ -143,13 +144,26 @@ export async function lluFirstPatientId(session: LluSession): Promise<string> {
   const id = (withReading ?? list[0])?.patientId;
 
   if (!id) {
-    // Diagnóstico temporário: mostra região/status/corpo bruto para
-    // localizar por que a conta some da lista aqui mas aparece no app.
+    let parsed: { status?: number; data?: { minimumVersion?: string } } | null = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      /* ignora */
+    }
+    if (parsed?.status === 920) {
+      const min = parsed.data?.minimumVersion ?? "mais recente";
+      throw new Error(
+        `A Abbott exige uma versão mais nova do cliente LibreLinkUp (mínimo ${min}). ` +
+          "O GLYX foi atualizado — tente conectar de novo. Se o erro persistir após o deploy, avise o suporte."
+      );
+    }
+    // Diagnóstico: mostra região/status/corpo bruto para localizar por que a
+    // conta some da lista aqui mas aparece no app LibreLinkUp no celular.
     throw new Error(
       `Esta conta não segue nenhum sensor (diagnóstico: baseUrl=${session.baseUrl} ` +
         `httpStatus=${res.status} corpo=${rawText.slice(0, 500)}). ` +
         "Causa comum: usar o MESMO e-mail do app LibreLink também no LibreLinkUp. " +
-        "Se o app LibreLinkUp no celular já mostra a leitura, envie este diagnóstico completo."
+        "Use uma conta LibreLinkUp separada (convidada pelo app LibreLink) e tente de novo."
     );
   }
   return id;
