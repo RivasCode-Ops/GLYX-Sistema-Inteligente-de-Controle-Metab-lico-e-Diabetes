@@ -125,9 +125,13 @@ export async function lluFirstPatientId(session: LluSession): Promise<string> {
   const res = await fetch(`${session.baseUrl}/llu/connections`, {
     headers: authHeaders(session),
   });
-  const json = (await res.json().catch(() => null)) as {
-    data?: unknown;
-  } | null;
+  const rawText = await res.text();
+  let json: { data?: unknown } | null = null;
+  try {
+    json = JSON.parse(rawText);
+  } catch {
+    /* json permanece null; rawText vai para o diagnóstico abaixo */
+  }
 
   // Defensivo: a Abbott já foi vista devolvendo `data` como objeto vazio
   // (não array) quando não há conexão utilizável — nunca assumir array.
@@ -139,8 +143,13 @@ export async function lluFirstPatientId(session: LluSession): Promise<string> {
   const id = (withReading ?? list[0])?.patientId;
 
   if (!id) {
+    // Diagnóstico temporário: mostra região/status/corpo bruto para
+    // localizar por que a conta some da lista aqui mas aparece no app.
     throw new Error(
-      "Esta conta não segue nenhum sensor. Causa comum: usar o MESMO e-mail do app LibreLink (o do seu sensor) também no LibreLinkUp faz a Abbott tratar a conta como paciente, não como seguidora. Solução: no LibreLink, convide um e-mail DIFERENTE para o LibreLinkUp, aceite o convite com esse outro e-mail, e conecte aqui com ele."
+      `Esta conta não segue nenhum sensor (diagnóstico: baseUrl=${session.baseUrl} ` +
+        `httpStatus=${res.status} corpo=${rawText.slice(0, 500)}). ` +
+        "Causa comum: usar o MESMO e-mail do app LibreLink também no LibreLinkUp. " +
+        "Se o app LibreLinkUp no celular já mostra a leitura, envie este diagnóstico completo."
     );
   }
   return id;
