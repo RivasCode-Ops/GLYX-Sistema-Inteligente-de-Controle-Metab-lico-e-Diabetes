@@ -62,29 +62,41 @@ export async function lluLogin(
     throw new Error("A Abbott limitou as tentativas por alguns minutos. Aguarde e tente de novo.");
   }
   if (!res.ok || !json) throw new Error(`LibreLinkUp indisponível (HTTP ${res.status}).`);
+
+  // Só a resposta ORIGINAL do login indica credencial errada. Falhas nos
+  // passos seguintes (termos/privacidade) não podem virar esse mesmo erro,
+  // senão uma senha certa aparenta estar errada numa conta nova.
+  if (json.status === 2) {
+    throw new Error("E-mail ou senha do LibreLinkUp incorretos.");
+  }
   if (json.data?.redirect && json.data.region) {
     return lluLogin(email, password, `https://api-${json.data.region}.libreview.io`, depth + 1);
   }
 
-  // Primeiro acesso via API pode exigir aceite de termos/privacidade
-  // (passo "tou"/"pp"): confirmamos automaticamente, como o app faria.
-  if (json.data?.step?.type && json.data.authTicket?.token) {
-    const cont = await fetch(`${baseUrl}/auth/continue/${json.data.step.type}`, {
+  // Conta nova costuma exigir aceitar termos/privacidade — às vezes em mais
+  // de um passo em sequência. Confirmamos automaticamente, como o app faria.
+  let stepGuard = 0;
+  while (json?.data?.step?.type && json.data.authTicket?.token && stepGuard < 3) {
+    const stepType = json.data.step.type;
+    const cont = await fetch(`${baseUrl}/auth/continue/${stepType}`, {
       method: "POST",
       headers: { ...LLU_HEADERS, authorization: `Bearer ${json.data.authTicket.token}` },
+      body: JSON.stringify({}),
     });
     json = (await cont.json().catch(() => null)) as LluLoginResponse | null;
-    if (!json) throw new Error("Falha ao confirmar os termos no LibreLinkUp.");
+    if (!json) {
+      throw new Error(
+        `Falha ao confirmar automaticamente o passo "${stepType}" do LibreLinkUp. Abra o app LibreLinkUp no celular, aceite qualquer termo/aviso pendente, e tente de novo no GLYX.`
+      );
+    }
+    stepGuard++;
   }
 
-  if (json.status === 2) {
-    throw new Error("E-mail ou senha do LibreLinkUp incorretos.");
-  }
-  if (json.status !== 0 || !json.data?.authTicket?.token || !json.data.user?.id) {
+  if (json?.status !== 0 || !json.data?.authTicket?.token || !json.data.user?.id) {
     throw new Error(
-      json.error?.message
+      json?.error?.message
         ? `LibreLinkUp: ${json.error.message}`
-        : `LibreLinkUp recusou o login (código ${json.status ?? "?"}). Abra o app LibreLinkUp no celular, confirme que ele mostra sua glicemia, e tente de novo.`
+        : `LibreLinkUp recusou o login depois da senha ser aceita (código ${json?.status ?? "?"}). Abra o app LibreLinkUp no celular, confirme que não há avisos pendentes, e tente de novo.`
     );
   }
 
