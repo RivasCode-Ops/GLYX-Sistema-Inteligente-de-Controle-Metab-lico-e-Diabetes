@@ -31,6 +31,18 @@ function sha256Hex(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
+type LluLoginResponse = {
+  status?: number;
+  error?: { message?: string };
+  data?: {
+    redirect?: boolean;
+    region?: string;
+    authTicket?: { token?: string };
+    user?: { id?: string };
+    step?: { type?: string };
+  };
+};
+
 export async function lluLogin(
   email: string,
   password: string,
@@ -44,22 +56,36 @@ export async function lluLogin(
     headers: LLU_HEADERS,
     body: JSON.stringify({ email, password }),
   });
-  const json = (await res.json().catch(() => null)) as {
-    status?: number;
-    data?: {
-      redirect?: boolean;
-      region?: string;
-      authTicket?: { token?: string };
-      user?: { id?: string };
-    };
-  } | null;
+  let json = (await res.json().catch(() => null)) as LluLoginResponse | null;
 
+  if (res.status === 429) {
+    throw new Error("A Abbott limitou as tentativas por alguns minutos. Aguarde e tente de novo.");
+  }
   if (!res.ok || !json) throw new Error(`LibreLinkUp indisponível (HTTP ${res.status}).`);
   if (json.data?.redirect && json.data.region) {
     return lluLogin(email, password, `https://api-${json.data.region}.libreview.io`, depth + 1);
   }
-  if (json.status !== 0 || !json.data?.authTicket?.token || !json.data.user?.id) {
+
+  // Primeiro acesso via API pode exigir aceite de termos/privacidade
+  // (passo "tou"/"pp"): confirmamos automaticamente, como o app faria.
+  if (json.data?.step?.type && json.data.authTicket?.token) {
+    const cont = await fetch(`${baseUrl}/auth/continue/${json.data.step.type}`, {
+      method: "POST",
+      headers: { ...LLU_HEADERS, authorization: `Bearer ${json.data.authTicket.token}` },
+    });
+    json = (await cont.json().catch(() => null)) as LluLoginResponse | null;
+    if (!json) throw new Error("Falha ao confirmar os termos no LibreLinkUp.");
+  }
+
+  if (json.status === 2) {
     throw new Error("E-mail ou senha do LibreLinkUp incorretos.");
+  }
+  if (json.status !== 0 || !json.data?.authTicket?.token || !json.data.user?.id) {
+    throw new Error(
+      json.error?.message
+        ? `LibreLinkUp: ${json.error.message}`
+        : `LibreLinkUp recusou o login (código ${json.status ?? "?"}). Abra o app LibreLinkUp no celular, confirme que ele mostra sua glicemia, e tente de novo.`
+    );
   }
 
   return {
