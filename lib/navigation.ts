@@ -54,6 +54,7 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Refeições", href: "/alimentacao/refeicoes" },
     { title: "Plano", href: "/alimentacao/plano" },
     { title: "Por foto", href: "/alimentacao/foto" },
+    { title: "Montar prato", href: "/alimentacao/montar-prato" },
   ],
   "/exercicios": [
     { title: "Visão geral", href: "/exercicios" },
