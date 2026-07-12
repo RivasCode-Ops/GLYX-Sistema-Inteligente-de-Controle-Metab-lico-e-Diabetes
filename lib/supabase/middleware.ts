@@ -42,7 +42,9 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     PUBLIC_PREFIXES.some((p) => path.startsWith(p)) || path.startsWith("/auth");
 
-  if (!user && !isPublic && path !== "/") {
+  // Rotas de API fazem a própria autenticação (sessão ou segredo) e devolvem
+  // 401 JSON — redirecionar POST para /login quebra chamadas de máquina (cron).
+  if (!user && !isPublic && path !== "/" && !path.startsWith("/api/")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("next", path);
