@@ -15,6 +15,7 @@ export function RegisterForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,9 +31,26 @@ export function RegisterForm() {
       setError("É necessário aceitar a Política de Privacidade para criar a conta.");
       return;
     }
+    setLoading(true);
+    try {
+      const inviteRes = await fetch("/api/auth/verify-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: inviteCode }),
+      });
+      const inviteData = (await inviteRes.json()) as { ok: boolean; error?: string };
+      if (!inviteRes.ok || !inviteData.ok) {
+        setError(inviteData.error ?? "Código de convite inválido.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Não foi possível validar o convite. Tente novamente.");
+      setLoading(false);
+      return;
+    }
     const supabase = createClient();
     if (!supabase) return;
-    setLoading(true);
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
@@ -53,7 +71,7 @@ export function RegisterForm() {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Criar conta</CardTitle>
-        <CardDescription>Registro via Supabase Auth (e-mail + senha).</CardDescription>
+        <CardDescription>Cadastro por convite — peça o código a quem administra o GLYX.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-4">
@@ -92,6 +110,16 @@ export function RegisterForm() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="inviteCode">Código de convite</Label>
+            <Input
+              id="inviteCode"
+              required
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              placeholder="peça ao administrador"
             />
           </div>
           <label className="flex items-start gap-2 text-xs leading-5 text-zinc-400">

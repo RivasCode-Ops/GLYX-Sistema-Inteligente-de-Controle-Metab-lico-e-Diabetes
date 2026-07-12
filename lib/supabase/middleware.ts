@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   "/privacidade",
   "/instalar",
   "/risco",
+  "/conta-desativada",
   // Recursos da PWA precisam ser públicos: navegador/instalador busca sem sessão
   "/icon",
   "/apple-icon",
@@ -64,6 +65,22 @@ export async function updateSession(request: NextRequest) {
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("next", path);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && !isPublic) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("disabled")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.disabled) {
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Conta desativada." }, { status: 403 });
+      }
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/conta-desativada";
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   if (user && (path === "/login" || path === "/register")) {

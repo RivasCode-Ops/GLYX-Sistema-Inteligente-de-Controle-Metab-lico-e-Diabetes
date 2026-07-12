@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity } from "lucide-react";
+import { Activity, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mainNav } from "@/lib/navigation";
 import { SignOutButton } from "@/components/shell/sign-out-button";
 
-export function AppSidebar({ className }: { className?: string }) {
+export function AppSidebar({ className, isAdmin }: { className?: string; isAdmin?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -48,6 +48,20 @@ export function AppSidebar({ className }: { className?: string }) {
             </Link>
           );
         })}
+        {isAdmin ? (
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+              pathname.startsWith("/admin")
+                ? "bg-zinc-800/90 text-white shadow-sm shadow-black/30"
+                : "text-amber-400/90 hover:bg-zinc-900 hover:text-amber-300"
+            )}
+          >
+            <ShieldCheck className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <span>Admin</span>
+          </Link>
+        ) : null}
       </nav>
       <div className="mt-auto space-y-3 border-t border-zinc-800/80 p-3">
         <SignOutButton />
