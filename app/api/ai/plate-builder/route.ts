@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   // Contexto metabólico para personalizar a sugestão
   const { data: profile } = await supabase
     .from("profiles")
-    .select("target_glucose_min, target_glucose_max, diabetes_type")
+    .select("target_glucose_min, target_glucose_max, diabetes_type, body_goal")
     .eq("id", user.id)
     .maybeSingle();
   const { data: lastReading } = await supabase
@@ -79,9 +79,17 @@ export async function POST(req: Request) {
     .limit(1)
     .maybeSingle();
 
+  const goalLine =
+    profile?.body_goal === "lose"
+      ? "Objetivo corporal: EMAGRECER — porções menores de carboidrato, mais vegetais e proteína para saciedade."
+      : profile?.body_goal === "gain"
+        ? "Objetivo corporal: GANHAR MASSA MUSCULAR — priorizar proteína generosa e carboidrato de baixo IG em porção adequada."
+        : "";
+
   const contextLines = [
     profile?.diabetes_type ? `Contexto do usuário: ${profile.diabetes_type}.` : "",
     profile ? `Meta glicêmica: ${profile.target_glucose_min}-${profile.target_glucose_max} mg/dL.` : "",
+    goalLine,
     lastReading
       ? `Última glicemia: ${lastReading.value_mg_dl} mg/dL em ${lastReading.recorded_at}.`
       : "",

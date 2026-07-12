@@ -1,7 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/login", "/register", "/auth", "/forgot-password", "/privacidade"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/register",
+  "/auth",
+  "/forgot-password",
+  "/privacidade",
+  // Recursos da PWA precisam ser públicos: navegador/instalador busca sem sessão
+  "/icon",
+  "/apple-icon",
+  "/icon-192",
+  "/icon-512",
+  "/manifest",
+  "/sw.js",
+];
 
 export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

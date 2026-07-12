@@ -98,6 +98,21 @@ export type Profile = {
   target_glucose_min: number | null;
   target_glucose_max: number | null;
   timezone: string | null;
+  sex?: "m" | "f" | null;
+  birth_year?: number | null;
+  height_cm?: number | null;
+  activity_level?: "sedentary" | "light" | "moderate" | "very" | null;
+  body_goal?: "lose" | "gain" | "maintain" | null;
+  target_weight_kg?: number | null;
+  family_history?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type WeightLog = {
+  id: string;
+  user_id: string;
+  weight_kg: number;
+  logged_on: string;
+  created_at: string;
 };
