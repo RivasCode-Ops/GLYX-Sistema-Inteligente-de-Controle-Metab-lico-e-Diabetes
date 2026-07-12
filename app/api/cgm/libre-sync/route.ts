@@ -3,6 +3,7 @@ import { decryptCredential, lluFetchMeasurements, lluFirstPatientId, lluLogin } 
 import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
 import { normalizeLibreMeasurements } from "@/lib/cgm/normalize/libre";
 import { sendPushToUser } from "@/lib/push/send";
+import { isPredictedHypo, predictTrend } from "@/lib/cgm/trend";
 import { createClient } from "@/lib/supabase/server";
 
 const HYPO_MG_DL = 70;
@@ -73,6 +74,33 @@ export async function POST() {
         await sendPushToUser(supabase, user.id, {
           title: "🚨 Glicemia baixa no sensor",
           body: `${latest.valueMgDl} mg/dL agora. Corrija com carboidrato rápido e meça de novo em 15 min.`,
+          url: "/glicemia",
+          critical: true,
+        });
+      }
+    }
+
+    // Alerta PREDITIVO: ainda acima de 70, mas em queda que cruza a hipo
+    // em ~30 min (regressão sobre a janela recente do sensor). Dedupe por
+    // leitura para não repetir a cada sync.
+    const trend = predictTrend(
+      readings.map((r) => ({ valueMgDl: r.valueMgDl, recordedAt: r.recordedAt }))
+    );
+    if (isPredictedHypo(trend)) {
+      const { data: freshTrend } = await supabase
+        .from("push_dispatch_log")
+        .insert({
+          user_id: user.id,
+          kind: "hypo",
+          ref: `trend@${latest?.recordedAt ?? new Date().toISOString()}`,
+          sent_on: new Date().toISOString().slice(0, 10),
+        })
+        .select("id")
+        .maybeSingle();
+      if (freshTrend) {
+        await sendPushToUser(supabase, user.id, {
+          title: "📉 Glicemia caindo rápido",
+          body: `${trend!.currentMgDl} mg/dL agora, podendo chegar a ~${Math.max(trend!.projectedMgDl, 40)} em 30 min. Considere um carboidrato rápido e fique atento.`,
           url: "/glicemia",
           critical: true,
         });
