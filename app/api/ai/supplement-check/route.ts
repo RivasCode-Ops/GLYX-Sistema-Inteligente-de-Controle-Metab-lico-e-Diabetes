@@ -185,7 +185,11 @@ export async function POST(req: Request) {
   }
   if (!parsed.data.productName.trim()) {
     return NextResponse.json(
-      { error: `Não consegui ler um rótulo de suplemento nesta foto. ${parsed.data.limitations}` },
+      {
+        error:
+          `Não consegui ler um rótulo de suplemento nesta foto. ${parsed.data.limitations} ` +
+          "Dica: fotografe de perto, só o painel de ingredientes/tabela nutricional, com boa luz e sem reflexo.",
+      },
       { status: 422 }
     );
   }

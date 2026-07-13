@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { compressImageFile } from "@/lib/images/compress";
 
 type PlateResult = {
   plate: { item: string; portion: string }[];
@@ -13,22 +14,6 @@ type PlateResult = {
 };
 
 const MAX_PHOTOS = 4;
-const TARGET_MAX_DIM = 1280;
-
-/** Reduz a foto no navegador (bancadas fotografadas em alta resolução estouram o limite do servidor). */
-async function compressImage(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, TARGET_MAX_DIM / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.82)
-  );
-}
 
 export function PlateBuilderForm() {
   const [previews, setPreviews] = useState<string[]>([]);
@@ -62,8 +47,7 @@ export function PlateBuilderForm() {
     try {
       const fd = new FormData();
       for (const f of files) {
-        const compressed = await compressImage(f);
-        fd.append("images", compressed, f.name.replace(/\.\w+$/, ".jpg"));
+        fd.append("images", await compressImageFile(f));
       }
       setStatus("Analisando a bancada…");
       const res = await fetch("/api/ai/plate-builder", { method: "POST", body: fd });

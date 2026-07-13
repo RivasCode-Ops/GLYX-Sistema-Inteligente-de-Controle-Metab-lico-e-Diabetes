@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { compressImageFile } from "@/lib/images/compress";
 
 type Result = { examId: string | null; title: string };
 
@@ -59,8 +60,16 @@ export function ExamPhotoForm() {
       return;
     }
 
-    setPages([file]);
-    resetPreviews([URL.createObjectURL(file)]);
+    setStatus("Comprimindo foto…");
+    setLoading(true);
+    try {
+      const compressed = await compressImageFile(file);
+      setPages([compressed]);
+      resetPreviews([URL.createObjectURL(compressed)]);
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {

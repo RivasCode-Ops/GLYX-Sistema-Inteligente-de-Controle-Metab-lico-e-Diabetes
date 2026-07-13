@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { compressImageFile } from "@/lib/images/compress";
 
 type Result = {
   productName: string;
@@ -61,8 +62,16 @@ export function SupplementCheckForm() {
       }
       return;
     }
-    setPages([file]);
-    resetPreviews([URL.createObjectURL(file)]);
+    setStatus("Comprimindo foto…");
+    setLoading(true);
+    try {
+      const compressed = await compressImageFile(file);
+      setPages([compressed]);
+      resetPreviews([URL.createObjectURL(compressed)]);
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
