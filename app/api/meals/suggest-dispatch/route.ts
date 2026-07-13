@@ -38,6 +38,8 @@ const itemSchema = z.object({
   auth: z.string().min(1),
 });
 
+type SuggestItem = z.infer<typeof itemSchema>;
+
 export async function POST(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("x-cron-secret") !== secret) {
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const supabase = await createClient();
 
-  async function processItem(item: (typeof parsed.data)[number]): Promise<boolean> {
+  async function processItem(item: SuggestItem): Promise<boolean> {
     const mealLabel = MEAL_LABEL[item.mealType];
     const goalLine =
       item.bodyGoal === "lose"
