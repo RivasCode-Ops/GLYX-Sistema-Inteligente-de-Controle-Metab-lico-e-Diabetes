@@ -2,8 +2,10 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import {
   addMedication,
+  attachMedicationLabel,
   deactivateMedication,
   logMedicationTaken,
+  removeMedicationLabel,
   updateMedication,
   updateMedicationStock,
 } from "@/app/actions/medications";
@@ -46,6 +48,16 @@ export default async function MedicacaoOverviewPage() {
     await updateMedication(formData);
   }
 
+  async function attachLabelAction(formData: FormData): Promise<void> {
+    "use server";
+    await attachMedicationLabel(formData);
+  }
+
+  async function removeLabelAction(formData: FormData): Promise<void> {
+    "use server";
+    await removeMedicationLabel(formData);
+  }
+
   /** Dias de estoque restantes: consome doses/dia (nº de alarmes, mínimo 1) desde a última atualização. */
   function stockDaysLeft(m: Medication): number | null {
     if (m.stock_units == null || !m.stock_updated_on) return null;
@@ -56,6 +68,8 @@ export default async function MedicacaoOverviewPage() {
     );
     return Math.floor((m.stock_units - elapsed * dpd) / dpd);
   }
+
+  const labelUrls = new Map<string, string>();
 
   if (demoMode) {
     meds = demoMedications;
@@ -73,6 +87,18 @@ export default async function MedicacaoOverviewPage() {
           .eq("active", true)
           .order("created_at", { ascending: false });
         meds = (data ?? []) as Medication[];
+
+        const paths = meds
+          .map((m) => m.label_photo_path)
+          .filter((p): p is string => Boolean(p));
+        if (paths.length) {
+          const { data: signed } = await supabase.storage
+            .from("medication-labels")
+            .createSignedUrls(paths, 3600);
+          for (const s of signed ?? []) {
+            if (s.signedUrl && s.path) labelUrls.set(s.path, s.signedUrl);
+          }
+        }
       }
     }
   }
@@ -151,6 +177,20 @@ export default async function MedicacaoOverviewPage() {
                 acabar.
               </p>
             </div>
+            <div className="grid gap-1 sm:col-span-2">
+              <Label htmlFor="label_photo">Foto do rótulo (opcional)</Label>
+              <input
+                id="label_photo"
+                name="label_photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-sm file:text-zinc-200"
+              />
+              <p className="text-[11px] text-zinc-600">
+                Anexar ou não é opcional — guarda o rótulo para consulta rápida depois. Para a
+                análise de segurança por IA, use o card acima.
+              </p>
+            </div>
             <div className="sm:col-span-2">
               <Button type="submit">Salvar</Button>
             </div>
@@ -177,7 +217,16 @@ export default async function MedicacaoOverviewPage() {
                   <Card>
                     <CardContent className="space-y-3 py-4">
                       <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
+                        <div className="flex items-center gap-3">
+                          {m.label_photo_path && labelUrls.get(m.label_photo_path) ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={labelUrls.get(m.label_photo_path)}
+                              alt={`Rótulo de ${m.name}`}
+                              className="h-12 w-12 shrink-0 rounded-lg border border-zinc-800 object-cover"
+                            />
+                          ) : null}
+                          <div>
                           <p className="font-medium text-zinc-100">{m.name}</p>
                           <p className="text-sm text-zinc-500">
                             {m.dosage ?? "—"} · {m.schedule_hint ?? "sem horário"}
@@ -201,6 +250,7 @@ export default async function MedicacaoOverviewPage() {
                               })()}
                             </p>
                           ) : null}
+                          </div>
                         </div>
                         <form action={logMedicationTakenAction}>
                           <input type="hidden" name="medication_id" value={m.id} />
@@ -236,6 +286,36 @@ export default async function MedicacaoOverviewPage() {
                               Desativar
                             </Button>
                           </form>
+                        </div>
+                      ) : null}
+                      {!demoMode ? (
+                        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-3">
+                          <form action={attachLabelAction} className="flex items-center gap-2">
+                            <input type="hidden" name="medication_id" value={m.id} />
+                            <input
+                              type="file"
+                              name="label_photo"
+                              accept="image/jpeg,image/png,image/webp"
+                              required
+                              className="text-xs text-zinc-500 file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-2 file:py-1.5 file:text-xs file:text-zinc-200"
+                            />
+                            <Button type="submit" variant="outline" size="sm">
+                              {m.label_photo_path ? "Trocar foto" : "Anexar foto"}
+                            </Button>
+                          </form>
+                          {m.label_photo_path ? (
+                            <form action={removeLabelAction} className="ml-auto">
+                              <input type="hidden" name="medication_id" value={m.id} />
+                              <Button
+                                type="submit"
+                                variant="ghost"
+                                size="sm"
+                                className="text-zinc-500 hover:text-red-300"
+                              >
+                                Remover foto
+                              </Button>
+                            </form>
+                          ) : null}
                         </div>
                       ) : null}
                       {!demoMode ? (

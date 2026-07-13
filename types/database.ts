@@ -40,6 +40,7 @@ export type Medication = {
   stock_units?: number | null;
   stock_updated_on?: string | null;
   kind?: "med" | "supplement";
+  label_photo_path?: string | null;
   created_at: string;
 };
 

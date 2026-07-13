@@ -3,8 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const LABEL_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+
+/** Envia a foto do rótulo ao bucket privado; retorna o caminho ou null se não houver arquivo/erro. */
+async function uploadLabelPhoto(
+  supabase: SupabaseClient,
+  userId: string,
+  file: FormDataEntryValue | null
+): Promise<string | null> {
+  if (!(file instanceof File) || file.size === 0) return null;
+  if (file.size > LABEL_PHOTO_MAX_BYTES) return null;
+  if (file.type && !file.type.startsWith("image/")) return null;
+
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const upload = await supabase.storage
+    .from("medication-labels")
+    .upload(path, buffer, { contentType: file.type || "image/jpeg" });
+  return upload.error ? null : path;
+}
 
 const medSchema = z.object({
   name: z.string().min(1),
@@ -54,13 +75,90 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
         }
       : {};
 
+  const labelPhotoPath = await uploadLabelPhoto(supabase, user.id, formData.get("label_photo"));
+
   const { error } = await supabase.from("medications").insert({
     user_id: user.id,
     ...parsed.data,
     ...stock,
+    ...(labelPhotoPath ? { label_photo_path: labelPhotoPath } : {}),
   });
 
   if (error) return { error: error.message };
+
+  revalidatePath("/medicacao");
+  return { ok: true };
+}
+
+export async function attachMedicationLabel(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+
+  const path = await uploadLabelPhoto(supabase, user.id, formData.get("label_photo"));
+  if (!path) return { error: "Selecione uma foto (JPEG/PNG/WebP, até 4 MB)." };
+
+  // Remove a foto anterior, se houver, antes de trocar a referência.
+  const { data: current } = await supabase
+    .from("medications")
+    .select("label_photo_path")
+    .eq("id", medicationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("medications")
+    .update({ label_photo_path: path })
+    .eq("id", medicationId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  if (current?.label_photo_path) {
+    await supabase.storage.from("medication-labels").remove([current.label_photo_path]);
+  }
+
+  revalidatePath("/medicacao");
+  return { ok: true };
+}
+
+export async function removeMedicationLabel(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+
+  const { data: current } = await supabase
+    .from("medications")
+    .select("label_photo_path")
+    .eq("id", medicationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("medications")
+    .update({ label_photo_path: null })
+    .eq("id", medicationId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  if (current?.label_photo_path) {
+    await supabase.storage.from("medication-labels").remove([current.label_photo_path]);
+  }
 
   revalidatePath("/medicacao");
   return { ok: true };
