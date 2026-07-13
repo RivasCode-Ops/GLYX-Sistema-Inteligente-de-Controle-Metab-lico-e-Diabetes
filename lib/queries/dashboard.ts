@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTodayHealthBest } from "@/lib/queries/health-today";
+import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { MetabolicAlert } from "@/types/database";
 
 export type DashboardSummary = {
@@ -21,8 +22,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+  const startOfDayISO = startOfLocalDayISO(profile?.timezone);
 
   const [glucoseRes, mealsRes, exercisesRes, alertsRes] = await Promise.all([
     supabase
@@ -36,12 +41,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       .from("meals")
       .select("carbs_g")
       .eq("user_id", user.id)
-      .gte("eaten_at", startOfDay.toISOString()),
+      .gte("eaten_at", startOfDayISO),
     supabase
       .from("exercise_sessions")
       .select("duration_min")
       .eq("user_id", user.id)
-      .gte("started_at", startOfDay.toISOString()),
+      .gte("started_at", startOfDayISO),
     supabase
       .from("metabolic_alerts")
       .select("*")

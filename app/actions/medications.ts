@@ -3,28 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const LABEL_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
 
-/** Envia a foto do rótulo ao bucket privado; retorna o caminho ou null se não houver arquivo/erro. */
-async function uploadLabelPhoto(
+function uploadLabelPhoto(
   supabase: SupabaseClient,
   userId: string,
   file: FormDataEntryValue | null
 ): Promise<string | null> {
-  if (!(file instanceof File) || file.size === 0) return null;
-  if (file.size > LABEL_PHOTO_MAX_BYTES) return null;
-  if (file.type && !file.type.startsWith("image/")) return null;
-
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const upload = await supabase.storage
-    .from("medication-labels")
-    .upload(path, buffer, { contentType: file.type || "image/jpeg" });
-  return upload.error ? null : path;
+  return uploadPrivatePhoto(supabase, "medication-labels", userId, file, LABEL_PHOTO_MAX_BYTES);
 }
 
 const medSchema = z.object({

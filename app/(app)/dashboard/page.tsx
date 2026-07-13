@@ -3,6 +3,7 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
+import { startOfLocalDayISO } from "@/lib/time/local-day";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { LibreAutoSync } from "@/components/glicemia/libre-auto-sync";
@@ -61,27 +62,26 @@ export default async function DashboardPage() {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const { data: p } = await supabase
+        .from("profiles")
+        .select(
+          "onboarding_done, primary_focus, sex, birth_year, height_cm, activity_level, body_goal, timezone"
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+      const startOfDayISO = startOfLocalDayISO(p?.timezone);
 
-      const [profileRes, waterRes, mealsRes, weightRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select(
-            "onboarding_done, primary_focus, sex, birth_year, height_cm, activity_level, body_goal"
-          )
-          .eq("id", user.id)
-          .maybeSingle(),
+      const [waterRes, mealsRes, weightRes] = await Promise.all([
         supabase
           .from("water_logs")
           .select("amount_ml")
           .eq("user_id", user.id)
-          .gte("logged_at", startOfDay.toISOString()),
+          .gte("logged_at", startOfDayISO),
         supabase
           .from("meals")
           .select("calories, carbs_g, protein_g, fat_g")
           .eq("user_id", user.id)
-          .gte("eaten_at", startOfDay.toISOString()),
+          .gte("eaten_at", startOfDayISO),
         supabase
           .from("weight_logs")
           .select("weight_kg")
@@ -91,7 +91,6 @@ export default async function DashboardPage() {
           .maybeSingle(),
       ]);
 
-      const p = profileRes.data;
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
 

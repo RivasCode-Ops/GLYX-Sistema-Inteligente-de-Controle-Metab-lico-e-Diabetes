@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -77,18 +78,13 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
   });
   if (!parsed.success) return { error: "Preencha pelo menos o nome da refeição." };
 
-  let photoPath: string | null = null;
-  const file = formData.get("image");
-  if (file instanceof File && file.size > 0 && file.size <= MAX_PHOTO_BYTES) {
-    const mime = file.type || "image/jpeg";
-    const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-    const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const upload = await supabase.storage
-      .from("meal-photos")
-      .upload(path, buffer, { contentType: mime });
-    if (!upload.error) photoPath = path;
-  }
+  const photoPath = await uploadPrivatePhoto(
+    supabase,
+    "meal-photos",
+    user.id,
+    formData.get("image"),
+    MAX_PHOTO_BYTES
+  );
 
   const { error } = await supabase.from("meals").insert({
     user_id: user.id,
