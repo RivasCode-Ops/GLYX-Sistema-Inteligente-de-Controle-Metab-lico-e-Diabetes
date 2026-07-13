@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveMealPhoto } from "@/app/actions/meals";
+import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
 type Draft = {
   name: string;
@@ -18,24 +19,20 @@ type Draft = {
 };
 
 export default function AlimentacaoFotoPage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const { files, previews, status, setStatus, loading, setLoading, selectSingle, clear } =
+    usePhotoSelection();
+  const file = files[0] ?? null;
+  const preview = previews[0] ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [eatingOrderTip, setEatingOrderTip] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setDraft(null);
     setEatingOrderTip(null);
     setSaved(false);
-    setStatus(null);
-    setFile(f);
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(f ? URL.createObjectURL(f) : null);
+    await selectSingle(e.target.files?.[0]);
   }
 
   async function onAnalyze(e: React.FormEvent<HTMLFormElement>) {
@@ -103,9 +100,7 @@ export default function AlimentacaoFotoPage() {
       }
       setSaved(true);
       setDraft(null);
-      setFile(null);
-      if (preview) URL.revokeObjectURL(preview);
-      setPreview(null);
+      clear();
     } finally {
       setSaving(false);
     }
@@ -114,9 +109,7 @@ export default function AlimentacaoFotoPage() {
   function onDiscard() {
     setDraft(null);
     setEatingOrderTip(null);
-    setFile(null);
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(null);
+    clear();
     setStatus(null);
   }
 
@@ -138,7 +131,7 @@ export default function AlimentacaoFotoPage() {
               name="image"
               accept="image/jpeg,image/png,image/webp"
               capture="environment"
-              onChange={onFileChange}
+              onChange={(e) => void onFileChange(e)}
               className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
             />
             {preview ? (

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { compressImageFile } from "@/lib/images/compress";
+import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
 type PlateResult = {
   plate: { item: string; portion: string }[];
@@ -17,23 +17,13 @@ type PlateResult = {
 const MAX_PHOTOS = 4;
 
 export function PlateBuilderForm() {
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
-  const [status, setStatus] = useState<string | null>(null);
+  const { files, previews, status, setStatus, loading, setLoading, selectMultiple } =
+    usePhotoSelection();
   const [result, setResult] = useState<PlateResult | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files ?? []).slice(0, MAX_PHOTOS);
-    previews.forEach((p) => URL.revokeObjectURL(p));
-    setFiles(selected);
-    setPreviews(selected.map((f) => URL.createObjectURL(f)));
+  async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     setResult(null);
-    setStatus(
-      selected.length > 0
-        ? `${selected.length} foto(s) selecionada(s).`
-        : null
-    );
+    await selectMultiple(e.target.files, MAX_PHOTOS);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -43,14 +33,11 @@ export function PlateBuilderForm() {
       return;
     }
     setLoading(true);
-    setStatus("Comprimindo fotos…");
+    setStatus("Analisando a bancada…");
     setResult(null);
     try {
       const fd = new FormData();
-      for (const f of files) {
-        fd.append("images", await compressImageFile(f));
-      }
-      setStatus("Analisando a bancada…");
+      for (const f of files) fd.append("images", f);
       const res = await fetch("/api/ai/plate-builder", { method: "POST", body: fd });
       const data = (await res.json()) as PlateResult & { error?: string };
       if (!res.ok) {
@@ -82,7 +69,7 @@ export function PlateBuilderForm() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
-              onChange={onFilesChange}
+              onChange={(e) => void onFilesChange(e)}
               className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
             />
             {previews.length ? (

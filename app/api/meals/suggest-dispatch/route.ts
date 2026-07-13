@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { z } from "zod";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import { sendToSubscription } from "@/lib/push/send";
 import { createClient } from "@/lib/supabase/server";
+
+// Quantas sugestões processamos ao mesmo tempo. Sequencial (1 por vez)
+// arrisca estourar o timeout de 60s da function quando muitos usuários
+// vencem a janela do mesmo horário de refeição; concorrência alta demais
+// arrisca rate limit da OpenAI. 5 é um meio-termo seguro para o volume
+// atual de usuários.
+const CONCURRENCY = 5;
 
 // Chamado pelo pg_cron do Supabase (dispatch_meal_suggestions, a cada
 // 15 min) com a lista de usuários que não registraram a refeição do
@@ -48,8 +56,7 @@ export async function POST(req: Request) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const supabase = await createClient();
 
-  let sent = 0;
-  for (const item of parsed.data) {
+  async function processItem(item: (typeof parsed.data)[number]): Promise<boolean> {
     const mealLabel = MEAL_LABEL[item.mealType];
     const goalLine =
       item.bodyGoal === "lose"
@@ -74,11 +81,11 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
         temperature: 0.5,
       });
     } catch {
-      continue; // um usuário falhar não deve travar os demais
+      return false; // um usuário falhar não deve travar os demais
     }
 
     const suggestion = completion.choices[0]?.message?.content?.trim();
-    if (!suggestion) continue;
+    if (!suggestion) return false;
 
     const alive = await sendToSubscription(
       { endpoint: item.endpoint, p256dh: item.p256dh, auth: item.auth },
@@ -89,7 +96,6 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
         critical: false,
       }
     );
-    if (alive) sent += 1;
 
     if (supabase && completion.usage) {
       await supabase.rpc("record_system_ai_usage", {
@@ -101,7 +107,12 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
         p_secret: secret,
       });
     }
+
+    return alive;
   }
+
+  const results = await mapWithConcurrency(parsed.data, CONCURRENCY, processItem);
+  const sent = results.filter((r) => r.status === "fulfilled" && r.value).length;
 
   return NextResponse.json({ ok: true, sent });
 }

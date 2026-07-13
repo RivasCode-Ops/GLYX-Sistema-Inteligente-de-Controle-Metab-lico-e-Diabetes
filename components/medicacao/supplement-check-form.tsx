@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { compressImageFile } from "@/lib/images/compress";
+import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
 type Result = {
   productName: string;
@@ -22,56 +22,13 @@ const VERDICT_STYLE: Record<Result["verdict"], { box: string; label: string }> =
 };
 
 export function SupplementCheckForm() {
-  const [pages, setPages] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [status, setStatus] = useState<string | null>(null);
+  const { files: pages, previews, status, setStatus, loading, setLoading, selectSingle, reset } =
+    usePhotoSelection({ allowPdf: true });
   const [result, setResult] = useState<Result | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  function resetPreviews(next: string[]) {
-    previews.forEach((p) => URL.revokeObjectURL(p));
-    setPreviews(next);
-  }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
     setResult(null);
-    setStatus(null);
-    if (!file) {
-      setPages([]);
-      resetPreviews([]);
-      return;
-    }
-    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-      setStatus("Convertendo PDF em imagens…");
-      setLoading(true);
-      try {
-        const { pdfToImages } = await import("@/lib/pdf/pdf-to-images");
-        const imgs = await pdfToImages(file, 3);
-        if (!imgs.length) {
-          setStatus("Não consegui ler este PDF. Tente uma foto do rótulo.");
-          return;
-        }
-        setPages(imgs);
-        resetPreviews(imgs.map((i) => URL.createObjectURL(i)));
-        setStatus(null);
-      } catch {
-        setStatus("Falha ao converter o PDF. Tente uma foto do rótulo.");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-    setStatus("Comprimindo foto…");
-    setLoading(true);
-    try {
-      const compressed = await compressImageFile(file);
-      setPages([compressed]);
-      resetPreviews([URL.createObjectURL(compressed)]);
-      setStatus(null);
-    } finally {
-      setLoading(false);
-    }
+    await selectSingle(e.target.files?.[0]);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -94,8 +51,7 @@ export function SupplementCheckForm() {
       }
       setResult(data);
       setStatus(null);
-      setPages([]);
-      resetPreviews([]);
+      reset();
     } catch {
       setStatus("Erro de rede.");
     } finally {

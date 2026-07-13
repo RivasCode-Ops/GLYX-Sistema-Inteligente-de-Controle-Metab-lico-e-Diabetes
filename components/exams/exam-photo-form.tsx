@@ -7,69 +7,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { compressImageFile } from "@/lib/images/compress";
+import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
 type Result = { examId: string | null; title: string };
 
 export function ExamPhotoForm() {
   const router = useRouter();
-  const [pages, setPages] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const { files: pages, previews, status, setStatus, loading, setLoading, selectSingle, reset } =
+    usePhotoSelection({ allowPdf: true });
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  function resetPreviews(next: string[]) {
-    previews.forEach((p) => URL.revokeObjectURL(p));
-    setPreviews(next);
-  }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
     setResult(null);
-    setStatus(null);
-    if (!file) {
-      setPages([]);
-      resetPreviews([]);
-      return;
-    }
-
-    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-      setStatus("Convertendo PDF em imagens…");
-      setLoading(true);
-      try {
-        const { pdfToImages } = await import("@/lib/pdf/pdf-to-images");
-        const imgs = await pdfToImages(file, 3);
-        if (!imgs.length) {
-          setStatus("Não consegui ler este PDF. Tente uma foto do exame.");
-          setPages([]);
-          resetPreviews([]);
-          return;
-        }
-        setPages(imgs);
-        resetPreviews(imgs.map((i) => URL.createObjectURL(i)));
-        setStatus(
-          imgs.length > 1 ? `PDF convertido: ${imgs.length} páginas prontas para análise.` : null
-        );
-      } catch {
-        setStatus("Falha ao converter o PDF. Tente uma foto do exame.");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    setStatus("Comprimindo foto…");
-    setLoading(true);
-    try {
-      const compressed = await compressImageFile(file);
-      setPages([compressed]);
-      resetPreviews([URL.createObjectURL(compressed)]);
-      setStatus(null);
-    } finally {
-      setLoading(false);
-    }
+    await selectSingle(e.target.files?.[0]);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -92,8 +43,7 @@ export function ExamPhotoForm() {
         return;
       }
       setResult(data);
-      setPages([]);
-      resetPreviews([]);
+      reset();
       setTitle("");
       router.refresh();
     } catch {
