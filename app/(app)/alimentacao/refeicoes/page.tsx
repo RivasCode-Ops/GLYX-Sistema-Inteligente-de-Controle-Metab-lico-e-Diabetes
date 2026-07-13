@@ -114,7 +114,17 @@ export default async function AlimentacaoRefeicoesPage() {
                 ) : null}
                 <div className="min-w-0 flex-1">
                 <div className="flex justify-between gap-4">
-                  <span className="font-medium text-zinc-200">{m.name}</span>
+                  <span className="flex items-center gap-2 font-medium text-zinc-200">
+                    {m.name}
+                    {m.glucose_spike ? (
+                      <span
+                        title="Glicemia subiu bastante nas 2h após esta refeição"
+                        className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-normal text-amber-300"
+                      >
+                        ⚡ pico glicêmico
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="flex items-center gap-3">
                     <span className="font-mono text-xs text-zinc-500">
                       {new Date(m.eaten_at).toLocaleString("pt-BR")}

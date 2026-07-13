@@ -24,8 +24,16 @@ export type Meal = {
   glycemic_load_estimate: number | null;
   notes: string | null;
   photo_path: string | null;
+  glucose_spike?: boolean | null;
   eaten_at: string;
   created_at: string;
+};
+
+export type WaterLog = {
+  id: string;
+  user_id: string;
+  amount_ml: number;
+  logged_at: string;
 };
 
 export type Medication = {

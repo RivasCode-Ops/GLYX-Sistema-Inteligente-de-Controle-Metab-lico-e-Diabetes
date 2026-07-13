@@ -22,6 +22,7 @@ export default function AlimentacaoFotoPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [eatingOrderTip, setEatingOrderTip] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -29,6 +30,7 @@ export default function AlimentacaoFotoPage() {
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     setDraft(null);
+    setEatingOrderTip(null);
     setSaved(false);
     setStatus(null);
     setFile(f);
@@ -51,7 +53,7 @@ export default function AlimentacaoFotoPage() {
       fd.set("image", file);
       const res = await fetch("/api/ai/meal-photo", { method: "POST", body: fd });
       const data = (await res.json()) as {
-        meal?: Partial<Record<keyof Draft, string | number>>;
+        meal?: Partial<Record<keyof Draft, string | number>> & { eating_order_tip?: string };
         error?: string;
         demo?: boolean;
       };
@@ -74,6 +76,7 @@ export default function AlimentacaoFotoPage() {
           m.glycemic_load_estimate != null ? String(m.glycemic_load_estimate) : "",
         notes: m.notes != null ? String(m.notes) : "",
       });
+      setEatingOrderTip(m.eating_order_tip ? String(m.eating_order_tip) : null);
     } catch {
       setStatus("Erro de rede.");
     } finally {
@@ -110,6 +113,7 @@ export default function AlimentacaoFotoPage() {
 
   function onDiscard() {
     setDraft(null);
+    setEatingOrderTip(null);
     setFile(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
@@ -165,6 +169,11 @@ export default function AlimentacaoFotoPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {eatingOrderTip ? (
+              <p className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-sky-200">
+                🍽️ {eatingOrderTip}
+              </p>
+            ) : null}
             <div className="grid gap-1">
               <Label htmlFor="draft_name">Nome</Label>
               <Input

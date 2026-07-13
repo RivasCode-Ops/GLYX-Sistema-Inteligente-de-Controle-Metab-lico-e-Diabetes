@@ -68,7 +68,7 @@ export async function POST(req: Request) {
             {
               type: "text",
               text:
-                "Analise esta foto de refeição. Responda APENAS um JSON válido com chaves: name (string curta), calories (int estimado), carbs_g, protein_g, fat_g, glycemic_load_estimate (0-100), notes (string breve em pt-BR). Se não for comida, use name: \"indefinido\" e zeros.",
+                "Analise esta foto de refeição. Responda APENAS um JSON válido com chaves: name (string curta), calories (int estimado), carbs_g, protein_g, fat_g, glycemic_load_estimate (0-100), notes (string breve em pt-BR), eating_order_tip (string curta em pt-BR sugerindo a ordem de comer os itens visíveis no prato para reduzir pico glicêmico — ex.: comer a salada e a proteína antes do arroz/carboidrato; se não houver itens distintos para ordenar, use string vazia). Se não for comida, use name: \"indefinido\" e zeros.",
             },
             {
               type: "image_url",

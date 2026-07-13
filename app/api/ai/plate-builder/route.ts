@@ -12,6 +12,7 @@ const MAX_TOTAL_BYTES = 3.5 * 1024 * 1024; // corpo da request na Vercel ~4.5MB
 const resultSchema = z.object({
   plate: z.array(z.object({ item: z.string(), portion: z.string() })),
   rationale: z.string(),
+  eatingOrder: z.array(z.string()).optional(),
   estimated: z.object({
     calories: z.number(),
     carbs_g: z.number(),
@@ -107,10 +108,13 @@ TAREFA: montar UM prato equilibrado usando APENAS o que aparece nas fotos, favor
 REGRAS OBRIGATÓRIAS:
 - NÃO prescrever dieta médica nem prometer efeito terapêutico; é sugestão educativa.
 - Se as fotos não mostrarem comida, devolve plate vazio e explica em limitations.
+- Inclui eatingOrder: a ORDEM recomendada de comer os itens do prato (ciência de ordem alimentar —
+  fibra/vegetais e proteína antes do carboidrato reduzem o pico glicêmico). 2-4 passos curtos.
 - Resposta APENAS em JSON válido, sem markdown:
 {
   "plate": [{"item":"alimento visto na foto","portion":"porção caseira ex.: 4 colheres de sopa"}],
   "rationale": "por que essa combinação é boa para o controle glicêmico (curto)",
+  "eatingOrder": ["1. Comece pela salada/vegetais", "2. Depois a proteína", "3. Por último o arroz/carboidrato"],
   "estimated": {"calories":0,"carbs_g":0,"protein_g":0,"fat_g":0},
   "tips": ["dica curta de preparo/substituição usando só o que há na foto"],
   "limitations": "o que não dá para saber pelas fotos"

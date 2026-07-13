@@ -56,31 +56,43 @@ export function tdee(profile: BodyProfile): number {
 export type DailyTargets = {
   calories: number;
   protein_g: number;
+  carbs_g: number;
+  fat_g: number;
   deficitOrSurplus: number;
 };
+
+/**
+ * Divide as calorias restantes (após a proteína) entre carboidrato e
+ * gordura, 50/50 em calorias — padrão educativo simples e neutro para
+ * controle glicêmico. 4 kcal/g carboidrato, 9 kcal/g gordura.
+ */
+function splitCarbsFat(calories: number, proteinG: number): { carbs_g: number; fat_g: number } {
+  const remaining = Math.max(0, calories - proteinG * 4);
+  return {
+    carbs_g: Math.round(remaining * 0.5 / 4),
+    fat_g: Math.round(remaining * 0.5 / 9),
+  };
+}
 
 /** Metas diárias por objetivo. Piso de 1200 kcal (nunca sugerir menos). */
 export function dailyTargets(profile: BodyProfile, goal: BodyGoal): DailyTargets {
   const expenditure = tdee(profile);
   switch (goal) {
-    case "lose":
-      return {
-        calories: Math.max(1200, expenditure - 500),
-        protein_g: Math.round(1.6 * profile.weightKg),
-        deficitOrSurplus: -500,
-      };
-    case "gain":
-      return {
-        calories: expenditure + 300,
-        protein_g: Math.round(1.8 * profile.weightKg),
-        deficitOrSurplus: 300,
-      };
-    case "maintain":
-      return {
-        calories: expenditure,
-        protein_g: Math.round(1.2 * profile.weightKg),
-        deficitOrSurplus: 0,
-      };
+    case "lose": {
+      const calories = Math.max(1200, expenditure - 500);
+      const protein_g = Math.round(1.6 * profile.weightKg);
+      return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: -500 };
+    }
+    case "gain": {
+      const calories = expenditure + 300;
+      const protein_g = Math.round(1.8 * profile.weightKg);
+      return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: 300 };
+    }
+    case "maintain": {
+      const calories = expenditure;
+      const protein_g = Math.round(1.2 * profile.weightKg);
+      return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: 0 };
+    }
   }
 }
 

@@ -8,6 +8,7 @@ import { compressImageFile } from "@/lib/images/compress";
 type PlateResult = {
   plate: { item: string; portion: string }[];
   rationale: string;
+  eatingOrder?: string[];
   estimated: { calories: number; carbs_g: number; protein_g: number; fat_g: number };
   tips: string[];
   limitations: string;
@@ -143,6 +144,16 @@ export function PlateBuilderForm() {
               ))}
             </div>
 
+            {result.eatingOrder?.length ? (
+              <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
+                <p className="mb-1 text-xs font-medium text-sky-300">🍽️ Ordem de consumo sugerida</p>
+                <ol className="space-y-1 text-xs text-zinc-300">
+                  {result.eatingOrder.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
             {result.tips.length ? (
               <ul className="space-y-1 text-xs text-zinc-400">
                 {result.tips.map((t) => (

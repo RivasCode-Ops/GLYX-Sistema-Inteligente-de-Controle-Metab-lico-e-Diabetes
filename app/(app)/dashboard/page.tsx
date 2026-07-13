@@ -6,6 +6,10 @@ import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { LibreAutoSync } from "@/components/glicemia/libre-auto-sync";
+import { WaterCard } from "@/components/dashboard/water-card";
+import { MacroGaugesCard } from "@/components/alimentacao/macro-gauge";
+import { dailyTargets } from "@/lib/health/energy";
+import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
 
 const FOCUS_STRIP: Record<
   "diabetes" | "lose" | "gain",
@@ -44,19 +48,80 @@ export default async function DashboardPage() {
 
   type Focus = "diabetes" | "lose" | "gain";
   let focus: Focus | null = null;
+  let waterMl = 0;
+  let waterGoalMl = 2000;
+  let macroConsumed: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
+    null;
+  let macroTargets: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
+    null;
+
   const supabase = await createClient();
   if (supabase) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("onboarding_done, primary_focus")
-        .eq("id", user.id)
-        .maybeSingle();
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const [profileRes, waterRes, mealsRes, weightRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "onboarding_done, primary_focus, sex, birth_year, height_cm, activity_level, body_goal"
+          )
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("water_logs")
+          .select("amount_ml")
+          .eq("user_id", user.id)
+          .gte("logged_at", startOfDay.toISOString()),
+        supabase
+          .from("meals")
+          .select("calories, carbs_g, protein_g, fat_g")
+          .eq("user_id", user.id)
+          .gte("eaten_at", startOfDay.toISOString()),
+        supabase
+          .from("weight_logs")
+          .select("weight_kg")
+          .eq("user_id", user.id)
+          .order("logged_on", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const p = profileRes.data;
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
+
+      waterMl = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml ?? 0), 0);
+      const weightKg = weightRes.data?.weight_kg ? Number(weightRes.data.weight_kg) : null;
+      if (weightKg) waterGoalMl = Math.round(weightKg * 35);
+
+      macroConsumed = (mealsRes.data ?? []).reduce(
+        (acc, m) => ({
+          calories: acc.calories + (m.calories ?? 0),
+          carbs_g: acc.carbs_g + (m.carbs_g ?? 0),
+          protein_g: acc.protein_g + (m.protein_g ?? 0),
+          fat_g: acc.fat_g + (m.fat_g ?? 0),
+        }),
+        { calories: 0, carbs_g: 0, protein_g: 0, fat_g: 0 }
+      );
+
+      if (p?.sex && p.birth_year && p.height_cm && p.activity_level && weightKg) {
+        const targets = dailyTargets(
+          {
+            sex: p.sex as Sex,
+            age: new Date().getFullYear() - p.birth_year,
+            heightCm: p.height_cm,
+            weightKg,
+            activity: p.activity_level as ActivityLevel,
+          },
+          (p.body_goal as BodyGoal | null) ?? "maintain"
+        );
+        macroTargets = targets;
+      }
     }
   }
 
@@ -95,6 +160,12 @@ export default async function DashboardPage() {
         stepsToday={summary.stepsToday}
         sleepHoursToday={summary.sleepHoursToday}
       />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <WaterCard todayMl={waterMl} goalMl={waterGoalMl} />
+        {macroConsumed && macroTargets ? (
+          <MacroGaugesCard consumed={macroConsumed} targets={macroTargets} />
+        ) : null}
+      </div>
     </div>
   );
 }

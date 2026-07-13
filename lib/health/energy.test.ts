@@ -32,6 +32,12 @@ describe("dailyTargets", () => {
     expect(t.calories).toBe(tdee(homem) - 500);
     expect(t.protein_g).toBe(144);
   });
+  it("divide as calorias restantes 50/50 entre carboidrato e gordura", () => {
+    const t = dailyTargets(homem, "lose");
+    const remaining = t.calories - t.protein_g * 4;
+    expect(t.carbs_g * 4).toBeCloseTo(remaining * 0.5, -1);
+    expect(t.fat_g * 9).toBeCloseTo(remaining * 0.5, -1);
+  });
   it("nunca sugere menos de 1200 kcal", () => {
     const pequena = { sex: "f" as const, age: 70, heightCm: 150, weightKg: 45, activity: "sedentary" as const };
     expect(dailyTargets(pequena, "lose").calories).toBe(1200);
