@@ -27,3 +27,26 @@ export async function getLastTrainedByMuscleGroup(): Promise<Partial<Record<Musc
   }
   return result;
 }
+
+/** Grupos com pausa manual ativa (id -> motivo, ou null se não informado). */
+export async function getActiveMusclePauses(): Promise<Partial<Record<MuscleGroupId, string | null>>> {
+  const supabase = await createClient();
+  if (!supabase) return {};
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+
+  const { data } = await supabase
+    .from("muscle_pauses")
+    .select("muscle_group, reason")
+    .eq("user_id", user.id)
+    .is("resumed_at", null);
+
+  const result: Partial<Record<MuscleGroupId, string | null>> = {};
+  for (const row of (data ?? []) as { muscle_group: string; reason: string | null }[]) {
+    if (isMuscleGroupId(row.muscle_group)) result[row.muscle_group] = row.reason;
+  }
+  return result;
+}

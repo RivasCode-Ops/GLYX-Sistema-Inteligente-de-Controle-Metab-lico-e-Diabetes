@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
-import { getLastTrainedByMuscleGroup } from "@/lib/queries/muscle-recovery";
+import { getLastTrainedByMuscleGroup, getActiveMusclePauses } from "@/lib/queries/muscle-recovery";
 import { computeMuscleRecovery, suggestMuscleFocus } from "@/lib/exercicios/muscle-recovery";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
         .maybeSingle();
       const startOfDayISO = startOfLocalDayISO(p?.timezone);
 
-      const [waterRes, mealsRes, weightRes, lastTrainedByGroup] = await Promise.all([
+      const [waterRes, mealsRes, weightRes, lastTrainedByGroup, pausedGroups] = await Promise.all([
         supabase
           .from("water_logs")
           .select("amount_ml")
@@ -93,9 +93,10 @@ export default async function DashboardPage() {
           .limit(1)
           .maybeSingle(),
         getLastTrainedByMuscleGroup(),
+        getActiveMusclePauses(),
       ]);
 
-      const muscleFocus = suggestMuscleFocus(computeMuscleRecovery(lastTrainedByGroup));
+      const muscleFocus = suggestMuscleFocus(computeMuscleRecovery(lastTrainedByGroup, pausedGroups));
       if (muscleFocus) {
         muscleFocusLabel =
           muscleFocus.status === "never" ? `Comece: ${muscleFocus.label}` : `${muscleFocus.label} pronto(a)`;

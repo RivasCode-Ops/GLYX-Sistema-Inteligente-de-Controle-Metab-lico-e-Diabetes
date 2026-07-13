@@ -1,5 +1,6 @@
 import { SectionCards } from "@/components/module/section-cards";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { QuickExtrasCard } from "@/components/alimentacao/quick-extras-card";
 import { demoMeals } from "@/lib/demo/data";
 
 export default function AlimentacaoOverviewPage() {
@@ -10,6 +11,7 @@ export default function AlimentacaoOverviewPage() {
       <p className="text-sm text-zinc-400">
         Domínio dedicado à alimentação — dashboard só antecipa resumo; aqui está o trabalho fino.
       </p>
+      <QuickExtrasCard />
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="border-emerald-500/20">
           <CardHeader className="pb-2">

@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { GlucoseHeroCard } from "@/components/dashboard/glucose-hero-card";
 import { NextStepCard } from "@/components/dashboard/next-step-card";
 import { ModuleRow } from "@/components/dashboard/module-row";
-import { QuickExtrasCard } from "@/components/alimentacao/quick-extras-card";
 import type { MetabolicAlert } from "@/types/database";
 
 type Props = {
@@ -63,7 +62,6 @@ export function DashboardShell({
             carbsToday={carbsToday}
             activeMinutes={activeMinutes}
           />
-          <QuickExtrasCard />
           {(stepsToday != null || sleepHoursToday != null) && (
             <Card>
               <CardContent className="grid grid-cols-2 gap-3 p-4">
