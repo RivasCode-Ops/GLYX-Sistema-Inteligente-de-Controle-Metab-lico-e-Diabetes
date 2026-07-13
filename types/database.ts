@@ -25,6 +25,8 @@ export type Meal = {
   notes: string | null;
   photo_path: string | null;
   glucose_spike?: boolean | null;
+  /** Usuário ajustou algum valor estimado pela IA antes de salvar. */
+  ai_corrected?: boolean | null;
   eaten_at: string;
   created_at: string;
 };

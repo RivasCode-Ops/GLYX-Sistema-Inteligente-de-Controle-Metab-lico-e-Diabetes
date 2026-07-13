@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { PenLine } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveMealPhoto } from "@/app/actions/meals";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
+import { GlycemicImpactRing } from "@/components/alimentacao/glycemic-impact-ring";
+import { MacroGrid, type MacroField } from "@/components/alimentacao/macro-grid";
 
 type Draft = {
   name: string;
@@ -18,18 +21,24 @@ type Draft = {
   notes: string;
 };
 
+const MACRO_FIELDS: MacroField[] = ["calories", "carbs_g", "protein_g", "fat_g"];
+
 export default function AlimentacaoFotoPage() {
   const { files, previews, status, setStatus, loading, setLoading, selectSingle, clear } =
     usePhotoSelection();
   const file = files[0] ?? null;
   const preview = previews[0] ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
+  /** Snapshot da estimativa original da IA, para detectar ajustes do usuário. */
+  const [aiDraft, setAiDraft] = useState<Draft | null>(null);
   const [eatingOrderTip, setEatingOrderTip] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const firstMacroInputRef = useRef<HTMLInputElement>(null);
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setDraft(null);
+    setAiDraft(null);
     setEatingOrderTip(null);
     setSaved(false);
     await selectSingle(e.target.files?.[0]);
@@ -39,6 +48,7 @@ export default function AlimentacaoFotoPage() {
     e.preventDefault();
     setStatus(null);
     setDraft(null);
+    setAiDraft(null);
     setSaved(false);
     if (!file) {
       setStatus("Selecione uma imagem.");
@@ -63,7 +73,7 @@ export default function AlimentacaoFotoPage() {
         return;
       }
       const m = data.meal ?? {};
-      setDraft({
+      const parsed: Draft = {
         name: String(m.name ?? ""),
         calories: m.calories != null ? String(m.calories) : "",
         carbs_g: m.carbs_g != null ? String(m.carbs_g) : "",
@@ -72,7 +82,9 @@ export default function AlimentacaoFotoPage() {
         glycemic_load_estimate:
           m.glycemic_load_estimate != null ? String(m.glycemic_load_estimate) : "",
         notes: m.notes != null ? String(m.notes) : "",
-      });
+      };
+      setDraft(parsed);
+      setAiDraft(parsed);
       setEatingOrderTip(m.eating_order_tip ? String(m.eating_order_tip) : null);
     } catch {
       setStatus("Erro de rede.");
@@ -85,13 +97,24 @@ export default function AlimentacaoFotoPage() {
     setDraft((d) => (d ? { ...d, [field]: value } : d));
   }
 
+  function focusFirstMacro() {
+    firstMacroInputRef.current?.focus();
+    firstMacroInputRef.current?.select();
+  }
+
   async function onSave() {
     if (!draft) return;
     setSaving(true);
     setStatus(null);
     try {
+      const aiCorrected = aiDraft
+        ? MACRO_FIELDS.some((f) => draft[f] !== aiDraft[f]) ||
+          draft.glycemic_load_estimate !== aiDraft.glycemic_load_estimate
+        : false;
+
       const fd = new FormData();
       Object.entries(draft).forEach(([k, v]) => fd.set(k, v));
+      fd.set("ai_corrected", String(aiCorrected));
       if (file) fd.set("image", file);
       const res = await saveMealPhoto(fd);
       if (res.error) {
@@ -100,6 +123,7 @@ export default function AlimentacaoFotoPage() {
       }
       setSaved(true);
       setDraft(null);
+      setAiDraft(null);
       clear();
     } finally {
       setSaving(false);
@@ -108,10 +132,15 @@ export default function AlimentacaoFotoPage() {
 
   function onDiscard() {
     setDraft(null);
+    setAiDraft(null);
     setEatingOrderTip(null);
     clear();
     setStatus(null);
   }
+
+  const changedMacros = draft && aiDraft
+    ? Object.fromEntries(MACRO_FIELDS.map((f) => [f, draft[f] !== aiDraft[f]]))
+    : undefined;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -167,6 +196,24 @@ export default function AlimentacaoFotoPage() {
                 🍽️ {eatingOrderTip}
               </p>
             ) : null}
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+              <GlycemicImpactRing
+                score={draft.glycemic_load_estimate ? Number(draft.glycemic_load_estimate) : null}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={focusFirstMacro}
+              className="flex w-full items-center gap-2.5 rounded-xl bg-amber-500 px-3.5 py-2.5 text-left text-amber-950 transition hover:bg-amber-400"
+            >
+              <PenLine className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="text-xs font-medium">
+                Os números não bateram? Ajuste abaixo — isso ajuda a IA a acertar mais da próxima vez.
+              </span>
+            </button>
+
             <div className="grid gap-1">
               <Label htmlFor="draft_name">Nome</Label>
               <Input
@@ -175,29 +222,14 @@ export default function AlimentacaoFotoPage() {
                 onChange={(e) => setField("name", e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(
-                [
-                  ["calories", "Kcal"],
-                  ["carbs_g", "Carbo (g)"],
-                  ["protein_g", "Proteína (g)"],
-                  ["fat_g", "Gordura (g)"],
-                ] as const
-              ).map(([field, label]) => (
-                <div key={field} className="grid gap-1">
-                  <Label htmlFor={field} className="text-xs">
-                    {label}
-                  </Label>
-                  <Input
-                    id={field}
-                    type="number"
-                    value={draft[field]}
-                    onChange={(e) => setField(field, e.target.value)}
-                    className="h-9 text-sm"
-                  />
-                </div>
-              ))}
-            </div>
+
+            <MacroGrid
+              ref={firstMacroInputRef}
+              values={draft}
+              changed={changedMacros}
+              onChange={setField}
+            />
+
             <div className="flex gap-2">
               <Button type="button" onClick={() => void onSave()} disabled={saving}>
                 {saving ? "Salvando…" : "Salvar no consumo de hoje"}

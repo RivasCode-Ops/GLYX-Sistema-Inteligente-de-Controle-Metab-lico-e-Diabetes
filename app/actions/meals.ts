@@ -53,6 +53,9 @@ const photoSchema = z.object({
   fat_g: z.coerce.number().optional(),
   glycemic_load_estimate: z.coerce.number().optional(),
   notes: z.string().optional(),
+  // z.coerce.boolean() trata qualquer string não-vazia (inclusive "false")
+  // como true — comparamos o valor literal em vez de usar coerce.
+  ai_corrected: z.preprocess((v) => v === "true", z.boolean()).default(false),
 });
 
 const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
@@ -75,6 +78,7 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
     fat_g: formData.get("fat_g") || undefined,
     glycemic_load_estimate: formData.get("glycemic_load_estimate") || undefined,
     notes: formData.get("notes") || undefined,
+    ai_corrected: formData.get("ai_corrected"),
   });
   if (!parsed.success) return { error: "Preencha pelo menos o nome da refeição." };
 
