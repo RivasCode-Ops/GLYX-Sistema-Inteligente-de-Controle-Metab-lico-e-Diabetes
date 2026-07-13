@@ -19,19 +19,19 @@ describe("computeMuscleRecovery", () => {
   });
 
   it("marca como pronto quando a janela já passou", () => {
-    // core: janela de 24h, treinado há 30h
+    // abdomen: janela de 24h, treinado há 30h
     const trainedAt = new Date(NOW.getTime() - 30 * 3_600_000).toISOString();
-    const result = computeMuscleRecovery({ core: trainedAt }, NOW);
-    const core = result.find((r) => r.id === "core")!;
-    expect(core.status).toBe("ready");
-    expect(core.hoursReady).toBe(6);
+    const result = computeMuscleRecovery({ abdomen: trainedAt }, NOW);
+    const abdomen = result.find((r) => r.id === "abdomen")!;
+    expect(abdomen.status).toBe("ready");
+    expect(abdomen.hoursReady).toBe(6);
   });
 
-  it("respeita janelas diferentes por grupo (pernas 72h vs braços 24h)", () => {
+  it("respeita janelas diferentes por grupo (pernas 72h vs abdômen 24h)", () => {
     const trainedAt = new Date(NOW.getTime() - 30 * 3_600_000).toISOString();
-    const result = computeMuscleRecovery({ pernas: trainedAt, bracos: trainedAt }, NOW);
+    const result = computeMuscleRecovery({ pernas: trainedAt, abdomen: trainedAt }, NOW);
     expect(result.find((r) => r.id === "pernas")!.status).toBe("recovering");
-    expect(result.find((r) => r.id === "bracos")!.status).toBe("ready");
+    expect(result.find((r) => r.id === "abdomen")!.status).toBe("ready");
   });
 });
 
@@ -49,10 +49,9 @@ describe("suggestMuscleFocus", () => {
     const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const recent = new Date(NOW.getTime() - 100 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(
-      ["peito", "costas", "pernas", "ombros", "bracos", "core"].map((id) => [
-        id,
-        id === "pernas" ? longAgo : recent,
-      ])
+      ["peito", "costas", "pernas", "ombros", "biceps", "triceps", "abdomen", "panturrilhas", "antebracos"].map(
+        (id) => [id, id === "pernas" ? longAgo : recent]
+      )
     );
     const statuses = computeMuscleRecovery(lastTrained, NOW);
     const suggestion = suggestMuscleFocus(statuses);
@@ -62,7 +61,9 @@ describe("suggestMuscleFocus", () => {
   it("retorna null quando tudo ainda está recuperando", () => {
     const justTrained = new Date(NOW.getTime() - 1 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(
-      ["peito", "costas", "pernas", "ombros", "bracos", "core"].map((id) => [id, justTrained])
+      ["peito", "costas", "pernas", "ombros", "biceps", "triceps", "abdomen", "panturrilhas", "antebracos"].map(
+        (id) => [id, justTrained]
+      )
     );
     const statuses = computeMuscleRecovery(lastTrained, NOW);
     expect(suggestMuscleFocus(statuses)).toBeNull();
