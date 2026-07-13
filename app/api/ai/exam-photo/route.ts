@@ -16,11 +16,15 @@ REGRAS OBRIGATÓRIAS:
 - NÃO faças diagnóstico nem conclusões médicas definitivas.
 - NÃO alteres doses nem recomendes medicamentos.
 - Se a imagem NÃO for um exame/laudo legível, devolve extractedText vazio e explica em limitations.
+- Se houver valores numéricos com faixa de referência na imagem, classifica cada um como "normal" (dentro
+  da faixa), "atencao" (borderline / levemente fora) ou "alterado" (claramente fora) — só quando a faixa de
+  referência estiver visível ou for um valor amplamente padronizado; senão, omite esse item.
 - Resposta APENAS em JSON válido, sem markdown, com este schema:
 {
   "extractedText": "transcrição fiel do texto/valores legíveis do exame",
   "suggestedTitle": "título curto ex.: Hemograma jan/2026",
   "summary": "parágrafo curto sobre o que o exame parece reportar (factual, sem diagnosticar)",
+  "values": [{"parameter":"ex.: Glicose em jejum","value":"126 mg/dL","referenceRange":"70-99 mg/dL","status":"alterado"}],
   "terms": [{"term":"...", "plainLanguage":"..."}],
   "questionsForDoctor": ["..."],
   "limitations": "o que não podes concluir com esta imagem"

@@ -20,9 +20,11 @@ self.addEventListener("push", (event) => {
   };
 
   if (data.medId) {
+    // Navegadores costumam exibir só 2 ações — tocar no corpo já abre o
+    // app, então priorizamos "Já tomei" e "Adiar" aqui.
     options.actions = [
       { action: "taken", title: "✅ Já tomei" },
-      { action: "open", title: "Abrir app" },
+      { action: "snooze", title: "⏰ Adiar 15min" },
     ];
   }
 
@@ -53,6 +55,31 @@ self.addEventListener("notificationclick", (event) => {
           // sessão expirada neste aparelho: abre o app para registrar
           return clients.openWindow("/medicacao");
         })
+        .catch(() => clients.openWindow("/medicacao"))
+    );
+    return;
+  }
+
+  if (event.action === "snooze" && info.medId) {
+    event.waitUntil(
+      fetch("/api/medications/snooze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ medication_id: info.medId, minutes: 15 }),
+      })
+        .then((res) =>
+          self.registration.showNotification(
+            res.ok ? "⏰ Adiado por 15 min" : "Não consegui adiar",
+            {
+              body: res.ok
+                ? "Vamos lembrar você de novo em 15 minutos."
+                : "Abra o app para tentar de novo.",
+              icon: "/icon-192",
+              vibrate: [100],
+            }
+          )
+        )
         .catch(() => clients.openWindow("/medicacao"))
     );
     return;

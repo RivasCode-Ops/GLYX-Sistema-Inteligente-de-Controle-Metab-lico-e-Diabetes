@@ -90,38 +90,11 @@ export async function POST(req: Request) {
   const raw = completion.choices[0]?.message?.content ?? "{}";
   const parsed = parseMealJson(raw);
 
-  // Guarda a foto no bucket privado; falha de upload não bloqueia o registro.
-  let photoPath: string | null = null;
-  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-  const uploadPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
-  const upload = await supabase.storage
-    .from("meal-photos")
-    .upload(uploadPath, buffer, { contentType: mime });
-  if (!upload.error) {
-    photoPath = uploadPath;
-  }
-
-  const insert = await supabase.from("meals").insert({
-    user_id: user.id,
-    name: String(parsed.name ?? "Refeição"),
-    calories: typeof parsed.calories === "number" ? parsed.calories : null,
-    carbs_g: typeof parsed.carbs_g === "number" ? parsed.carbs_g : null,
-    protein_g: typeof parsed.protein_g === "number" ? parsed.protein_g : null,
-    fat_g: typeof parsed.fat_g === "number" ? parsed.fat_g : null,
-    glycemic_load_estimate:
-      typeof parsed.glycemic_load_estimate === "number" ? parsed.glycemic_load_estimate : null,
-    notes: typeof parsed.notes === "string" ? parsed.notes : null,
-    photo_path: photoPath,
-    eaten_at: new Date().toISOString(),
-  });
-
-  if (insert.error) {
-    return NextResponse.json({ error: insert.error.message }, { status: 500 });
-  }
-
+  // Só analisa — o usuário revisa e decide se conta no consumo diário
+  // (ação separada salva, com a mesma foto reenviada pelo cliente).
   return NextResponse.json({
     meal: parsed,
-    saved: true,
+    saved: false,
   });
 }
 

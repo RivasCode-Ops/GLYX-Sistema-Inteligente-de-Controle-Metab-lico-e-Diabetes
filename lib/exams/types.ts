@@ -1,8 +1,21 @@
 import { z } from "zod";
 
 /** Resposta estruturada da interpretação assistida (educativa, não diagnóstico) */
+export const examValueStatusSchema = z.enum(["normal", "atencao", "alterado"]);
+export type ExamValueStatus = z.infer<typeof examValueStatusSchema>;
+
 export const parsedExamSummarySchema = z.object({
   summary: z.string(),
+  values: z
+    .array(
+      z.object({
+        parameter: z.string(),
+        value: z.string(),
+        referenceRange: z.string().optional(),
+        status: examValueStatusSchema,
+      })
+    )
+    .optional(),
   terms: z.array(
     z.object({
       term: z.string(),

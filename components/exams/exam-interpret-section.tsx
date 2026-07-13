@@ -63,6 +63,35 @@ export function ExamInterpretSection({ examId, initialSummary, openAiConfigured 
           </CardHeader>
           <CardContent className="space-y-4 text-sm leading-relaxed text-zinc-300">
             <p>{summary.summary}</p>
+            {summary.values?.length ? (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Valores identificados
+                </p>
+                <ul className="space-y-1.5">
+                  {summary.values.map((v) => {
+                    const style =
+                      v.status === "alterado"
+                        ? "border-red-500/40 bg-red-500/10 text-red-300"
+                        : v.status === "atencao"
+                          ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                          : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+                    return (
+                      <li
+                        key={v.parameter}
+                        className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 ${style}`}
+                      >
+                        <span className="font-medium">{v.parameter}</span>
+                        <span className="font-mono text-xs">
+                          {v.value}
+                          {v.referenceRange ? ` (ref.: ${v.referenceRange})` : ""}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
             <div>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                 Termos
