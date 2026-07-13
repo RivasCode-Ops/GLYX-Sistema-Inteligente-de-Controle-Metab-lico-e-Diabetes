@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { GlucoseHeroCard } from "@/components/dashboard/glucose-hero-card";
 import { NextStepCard } from "@/components/dashboard/next-step-card";
 import { ModuleRow } from "@/components/dashboard/module-row";
+import { QuickExtrasCard } from "@/components/alimentacao/quick-extras-card";
 import type { MetabolicAlert } from "@/types/database";
 
 type Props = {
@@ -26,6 +27,7 @@ type Props = {
   alerts: MetabolicAlert[];
   stepsToday?: number | null;
   sleepHoursToday?: number | null;
+  muscleFocusLabel?: string | null;
 };
 
 export function DashboardShell({
@@ -39,6 +41,7 @@ export function DashboardShell({
   alerts,
   stepsToday = null,
   sleepHoursToday = null,
+  muscleFocusLabel = null,
 }: Props) {
   const glucoseLabel = latestGlucose != null ? `${latestGlucose} mg/dL` : "— sem leituras";
 
@@ -60,6 +63,7 @@ export function DashboardShell({
             carbsToday={carbsToday}
             activeMinutes={activeMinutes}
           />
+          <QuickExtrasCard />
           {(stepsToday != null || sleepHoursToday != null) && (
             <Card>
               <CardContent className="grid grid-cols-2 gap-3 p-4">
@@ -105,9 +109,9 @@ export function DashboardShell({
             />
             <ModuleRow
               title="Exercícios"
-              href="/exercicios"
+              href="/exercicios/recuperacao"
               icon={Dumbbell}
-              metric={`${activeMinutes} min · hoje`}
+              metric={muscleFocusLabel ?? `${activeMinutes} min · hoje`}
             />
             <ModuleRow title="Medicação" href="/medicacao" icon={Pill} metric="Ver agenda" />
             <ModuleRow

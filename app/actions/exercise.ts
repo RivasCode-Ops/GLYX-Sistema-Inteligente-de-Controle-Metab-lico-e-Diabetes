@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { MUSCLE_GROUP_IDS } from "@/lib/data/muscle-groups";
 
 const schema = z.object({
   label: z.string().min(1),
@@ -12,6 +13,35 @@ const schema = z.object({
 });
 
 export type ActionResult = { ok?: true; error?: string };
+
+const muscleGroupsSchema = z.array(z.enum(MUSCLE_GROUP_IDS as [string, ...string[]])).min(1);
+
+/** Registro rápido do painel de recuperação: "malhei hoje" com os grupos marcados. */
+export async function logMuscleTraining(muscleGroups: string[]): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const parsed = muscleGroupsSchema.safeParse(muscleGroups);
+  if (!parsed.success) return { error: "Selecione pelo menos um grupo muscular." };
+
+  const { error } = await supabase.from("exercise_sessions").insert({
+    user_id: user.id,
+    label: "Treino de força",
+    muscle_groups: parsed.data,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/exercicios");
+  revalidatePath("/exercicios/recuperacao");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
 
 export async function addExerciseSession(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();

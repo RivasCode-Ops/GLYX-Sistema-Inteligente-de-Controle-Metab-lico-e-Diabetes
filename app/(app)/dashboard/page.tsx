@@ -4,6 +4,8 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
+import { getLastTrainedByMuscleGroup } from "@/lib/queries/muscle-recovery";
+import { computeMuscleRecovery, suggestMuscleFocus } from "@/lib/exercicios/muscle-recovery";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { LibreAutoSync } from "@/components/glicemia/libre-auto-sync";
@@ -55,6 +57,7 @@ export default async function DashboardPage() {
     null;
   let macroTargets: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
     null;
+  let muscleFocusLabel: string | null = null;
 
   const supabase = await createClient();
   if (supabase) {
@@ -71,7 +74,7 @@ export default async function DashboardPage() {
         .maybeSingle();
       const startOfDayISO = startOfLocalDayISO(p?.timezone);
 
-      const [waterRes, mealsRes, weightRes] = await Promise.all([
+      const [waterRes, mealsRes, weightRes, lastTrainedByGroup] = await Promise.all([
         supabase
           .from("water_logs")
           .select("amount_ml")
@@ -89,7 +92,14 @@ export default async function DashboardPage() {
           .order("logged_on", { ascending: false })
           .limit(1)
           .maybeSingle(),
+        getLastTrainedByMuscleGroup(),
       ]);
+
+      const muscleFocus = suggestMuscleFocus(computeMuscleRecovery(lastTrainedByGroup));
+      if (muscleFocus) {
+        muscleFocusLabel =
+          muscleFocus.status === "never" ? `Comece: ${muscleFocus.label}` : `${muscleFocus.label} pronto(a)`;
+      }
 
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
@@ -161,6 +171,7 @@ export default async function DashboardPage() {
         alerts={summary.alerts}
         stepsToday={summary.stepsToday}
         sleepHoursToday={summary.sleepHoursToday}
+        muscleFocusLabel={muscleFocusLabel}
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <WaterCard todayMl={waterMl} goalMl={waterGoalMl} />

@@ -65,6 +65,11 @@ export default async function ExerciciosOverviewPage() {
             description: "Histórico e drill-down por sessão.",
             href: "/exercicios/sessoes",
           },
+          {
+            title: "Recuperação muscular",
+            description: "O que já pode treinar de novo e o que ainda está descansando.",
+            href: "/exercicios/recuperacao",
+          },
         ]}
       />
 

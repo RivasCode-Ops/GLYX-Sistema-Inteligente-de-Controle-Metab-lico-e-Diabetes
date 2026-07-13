@@ -64,6 +64,7 @@ export type ExerciseSession = {
   started_at: string;
   notes: string | null;
   created_at: string;
+  muscle_groups?: string[] | null;
 };
 
 export type MetabolicAlert = {
