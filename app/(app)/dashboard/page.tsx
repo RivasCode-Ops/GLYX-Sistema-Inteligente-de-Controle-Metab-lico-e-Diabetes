@@ -152,8 +152,11 @@ export default async function DashboardPage() {
       ) : null}
       <DashboardShell
         latestGlucose={summary.latestGlucose}
+        glucoseSeries={summary.glucoseSeries}
         carbsToday={summary.carbsToday}
         activeMinutes={summary.activeMinutes}
+        waterMl={waterMl}
+        waterGoalMl={waterGoalMl}
         riskLabel={summary.riskLabel}
         alerts={summary.alerts}
         stepsToday={summary.stepsToday}

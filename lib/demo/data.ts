@@ -263,6 +263,10 @@ export const demoGlucosePoints: GlucosePoint[] = demoGlucoseReadings.map((r) => 
 
 export const demoSummary = {
   latestGlucose: demoGlucoseReadings[0]?.value_mg_dl ?? null,
+  glucoseSeries: demoGlucoseReadings
+    .slice(0, 8)
+    .map((r) => r.value_mg_dl)
+    .reverse(),
   carbsToday: demoMeals
     .filter((meal) => meal.eaten_at.slice(0, 10) === day(0))
     .reduce((sum, meal) => sum + (meal.carbs_g ?? 0), 0),

@@ -23,7 +23,7 @@ export type NavItem = {
 };
 
 export const mainNav: NavItem[] = [
-  { title: "Painel", href: "/dashboard", icon: LayoutDashboard, mobile: true },
+  { title: "Hoje", href: "/dashboard", icon: LayoutDashboard, mobile: true },
   { title: "Glicemia", href: "/glicemia", icon: Droplets, mobile: true },
   { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true },
   { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true },

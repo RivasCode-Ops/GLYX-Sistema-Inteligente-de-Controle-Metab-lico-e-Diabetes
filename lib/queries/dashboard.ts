@@ -5,6 +5,8 @@ import type { MetabolicAlert } from "@/types/database";
 
 export type DashboardSummary = {
   latestGlucose: number | null;
+  /** Últimas leituras (ordem cronológica), para o sparkline do card de glicemia. */
+  glucoseSeries: number[];
   carbsToday: number;
   activeMinutes: number;
   alerts: MetabolicAlert[];
@@ -35,8 +37,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       .select("value_mg_dl")
       .eq("user_id", user.id)
       .order("recorded_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(8),
     supabase
       .from("meals")
       .select("carbs_g")
@@ -56,7 +57,11 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       .limit(5),
   ]);
 
-  const latestGlucose = glucoseRes.data?.value_mg_dl ?? null;
+  const recentGlucose = (glucoseRes.data ?? []) as { value_mg_dl: number }[];
+  const latestGlucose = recentGlucose[0]?.value_mg_dl ?? null;
+  const glucoseSeries = recentGlucose
+    .map((r) => r.value_mg_dl)
+    .reverse();
   const carbsSum =
     mealsRes.data?.reduce(
       (acc: number, m: { carbs_g: number | null }) =>
@@ -90,6 +95,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
 
   return {
     latestGlucose,
+    glucoseSeries,
     carbsToday: Math.round(carbsSum * 10) / 10,
     activeMinutes: activeMin,
     alerts: (alertsRes.data ?? []) as MetabolicAlert[],
