@@ -21,6 +21,14 @@ type Draft = {
   notes: string;
 };
 
+type DetectedItem = {
+  name: string;
+  calories: number;
+  carbs_g: number;
+  protein_g: number;
+  fat_g: number;
+};
+
 const MACRO_FIELDS: MacroField[] = ["calories", "carbs_g", "protein_g", "fat_g"];
 
 export default function AlimentacaoFotoPage() {
@@ -31,6 +39,7 @@ export default function AlimentacaoFotoPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   /** Snapshot da estimativa original da IA, para detectar ajustes do usuário. */
   const [aiDraft, setAiDraft] = useState<Draft | null>(null);
+  const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
   const [eatingOrderTip, setEatingOrderTip] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -39,6 +48,7 @@ export default function AlimentacaoFotoPage() {
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setDraft(null);
     setAiDraft(null);
+    setDetectedItems([]);
     setEatingOrderTip(null);
     setSaved(false);
     await selectSingle(e.target.files?.[0]);
@@ -49,6 +59,7 @@ export default function AlimentacaoFotoPage() {
     setStatus(null);
     setDraft(null);
     setAiDraft(null);
+    setDetectedItems([]);
     setSaved(false);
     if (!file) {
       setStatus("Selecione uma imagem.");
@@ -60,7 +71,10 @@ export default function AlimentacaoFotoPage() {
       fd.set("image", file);
       const res = await fetch("/api/ai/meal-photo", { method: "POST", body: fd });
       const data = (await res.json()) as {
-        meal?: Partial<Record<keyof Draft, string | number>> & { eating_order_tip?: string };
+        meal?: Partial<Record<keyof Draft, string | number>> & {
+          eating_order_tip?: string;
+          items?: DetectedItem[];
+        };
         error?: string;
         demo?: boolean;
       };
@@ -85,6 +99,7 @@ export default function AlimentacaoFotoPage() {
       };
       setDraft(parsed);
       setAiDraft(parsed);
+      setDetectedItems(Array.isArray(m.items) ? m.items : []);
       setEatingOrderTip(m.eating_order_tip ? String(m.eating_order_tip) : null);
     } catch {
       setStatus("Erro de rede.");
@@ -124,6 +139,7 @@ export default function AlimentacaoFotoPage() {
       setSaved(true);
       setDraft(null);
       setAiDraft(null);
+      setDetectedItems([]);
       clear();
     } finally {
       setSaving(false);
@@ -133,6 +149,7 @@ export default function AlimentacaoFotoPage() {
   function onDiscard() {
     setDraft(null);
     setAiDraft(null);
+    setDetectedItems([]);
     setEatingOrderTip(null);
     clear();
     setStatus(null);
@@ -195,6 +212,26 @@ export default function AlimentacaoFotoPage() {
               <p className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-sky-200">
                 🍽️ {eatingOrderTip}
               </p>
+            ) : null}
+
+            {detectedItems.length > 0 ? (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+                <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
+                  Itens identificados na foto
+                </p>
+                <ul className="space-y-1 text-xs text-zinc-300">
+                  {detectedItems.map((it, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2">
+                      <span className="truncate">{it.name}</span>
+                      <span className="shrink-0 font-mono text-zinc-400">{Math.round(it.calories)} kcal</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[10px] text-zinc-500">
+                  Faltou algum item ou a divisão ficou errada? Ajuste os totais abaixo — os itens acima são
+                  só pra conferência, o que é salvo são os totais.
+                </p>
+              </div>
             ) : null}
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">

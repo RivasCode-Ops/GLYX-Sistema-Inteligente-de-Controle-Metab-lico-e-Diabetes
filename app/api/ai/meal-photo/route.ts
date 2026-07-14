@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
-import { parseMealJson } from "@/lib/ai/parse-meal";
+import { parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -68,7 +68,12 @@ export async function POST(req: Request) {
             {
               type: "text",
               text:
-                "Analise esta foto de refeição. Responda APENAS um JSON válido com chaves: name (string curta), calories (int estimado), carbs_g, protein_g, fat_g, glycemic_load_estimate (0-100), notes (string breve em pt-BR), eating_order_tip (string curta em pt-BR sugerindo a ordem de comer os itens visíveis no prato para reduzir pico glicêmico — ex.: comer a salada e a proteína antes do arroz/carboidrato; se não houver itens distintos para ordenar, use string vazia). Se não for comida, use name: \"indefinido\" e zeros.",
+                "Analise esta foto de refeição com atenção a TODOS os itens distintos visíveis — inclua caldos, molhos, acompanhamentos pequenos e bebidas, não apenas o prato principal. Não ignore nenhum item só porque é pequeno ou está num recipiente separado.\n\n" +
+                "Responda APENAS um JSON válido com as chaves:\n" +
+                "- items: array com um objeto por item de comida/bebida distinto identificado na foto, cada um com name (string curta), calories (int estimado), carbs_g, protein_g, fat_g. Se a foto não tiver comida, use items: [].\n" +
+                "- glycemic_load_estimate (0-100, considerando o conjunto de todos os itens)\n" +
+                "- notes (string breve em pt-BR)\n" +
+                "- eating_order_tip (string curta em pt-BR sugerindo a ordem de comer os itens visíveis para reduzir pico glicêmico — ex.: comer a salada e a proteína antes do arroz/carboidrato; se não houver itens distintos para ordenar, use string vazia).",
             },
             {
               type: "image_url",
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
           ],
         },
       ],
-      max_tokens: 400,
+      max_tokens: 700,
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
@@ -89,11 +94,17 @@ export async function POST(req: Request) {
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
   const parsed = parseMealJson(raw);
+  const totals = sumMealItems(parsed);
 
   // Só analisa — o usuário revisa e decide se conta no consumo diário
   // (ação separada salva, com a mesma foto reenviada pelo cliente).
   return NextResponse.json({
-    meal: parsed,
+    meal: {
+      ...totals,
+      glycemic_load_estimate: parsed.glycemic_load_estimate ?? 0,
+      notes: parsed.notes ?? "",
+      eating_order_tip: parsed.eating_order_tip ?? "",
+    },
     saved: false,
   });
 }
