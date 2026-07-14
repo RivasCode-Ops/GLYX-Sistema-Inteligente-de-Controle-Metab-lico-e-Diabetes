@@ -5,6 +5,7 @@ import {
   getGlucoseReadingsSince,
 } from "@/lib/queries/glucose-series";
 import { demoGlucosePoints } from "@/lib/demo/data";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function GlicemiaHistoricoPage() {
   let days: ReturnType<typeof aggregateGlucoseByDay> = [];
@@ -12,8 +13,16 @@ export default async function GlicemiaHistoricoPage() {
   if (!isSupabaseConfigured()) {
     days = aggregateGlucoseByDay(demoGlucosePoints);
   } else {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = (await supabase?.auth.getUser()) ?? { data: { user: null } };
+    const { data: profile } = user
+      ? await supabase!.from("profiles").select("timezone").eq("id", user.id).maybeSingle()
+      : { data: null };
+
     const readings = await getGlucoseReadingsSince(120);
-    days = aggregateGlucoseByDay(readings);
+    days = aggregateGlucoseByDay(readings, profile?.timezone);
   }
 
   return (

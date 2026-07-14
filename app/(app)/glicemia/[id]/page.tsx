@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { deleteGlucoseReading } from "@/app/actions/glucose";
 import { demoGlucoseReadings } from "@/lib/demo/data";
+import { localDayRangeUTC } from "@/lib/time/local-day";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -64,14 +65,18 @@ export default async function GlicemiaDetailPage({ params }: Props) {
     [];
 
   if (DATE_RE.test(id)) {
-    const start = `${id}T00:00:00.000Z`;
-    const end = `${id}T23:59:59.999Z`;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("timezone")
+      .eq("id", user.id)
+      .maybeSingle();
+    const { startISO, endISO } = localDayRangeUTC(id, profile?.timezone);
     const { data } = await supabase
       .from("glucose_readings")
       .select("id, value_mg_dl, recorded_at, context")
       .eq("user_id", user.id)
-      .gte("recorded_at", start)
-      .lte("recorded_at", end)
+      .gte("recorded_at", startISO)
+      .lt("recorded_at", endISO)
       .order("recorded_at", { ascending: true });
     readings = data ?? [];
   }

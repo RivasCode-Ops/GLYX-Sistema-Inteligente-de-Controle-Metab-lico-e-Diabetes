@@ -76,11 +76,18 @@ export async function POST(req: Request) {
     case "dexcom":
       readings = normalizeDexcomEgvs(parsed.data.egvs as Parameters<typeof normalizeDexcomEgvs>[0]);
       break;
-    case "libre":
+    case "libre": {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("timezone")
+        .eq("id", user.id)
+        .maybeSingle();
       readings = normalizeLibreMeasurements(
-        parsed.data.measurements as Parameters<typeof normalizeLibreMeasurements>[0]
+        parsed.data.measurements as Parameters<typeof normalizeLibreMeasurements>[0],
+        profile?.timezone
       );
       break;
+    }
     case "mock":
       readings = generateMockCgmSeries(parsed.data.points ?? 36, 5);
       break;

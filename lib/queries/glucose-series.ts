@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { localDateKey } from "@/lib/time/local-day";
 
 export type GlucosePoint = {
   id: string;
@@ -30,10 +31,13 @@ export async function getGlucoseReadingsSince(days: number): Promise<GlucosePoin
 
 export type DailyAgg = { day: string; avg: number; count: number; min: number; max: number };
 
-export function aggregateGlucoseByDay(readings: GlucosePoint[]): DailyAgg[] {
+export function aggregateGlucoseByDay(
+  readings: GlucosePoint[],
+  timezone?: string | null
+): DailyAgg[] {
   const map = new Map<string, number[]>();
   for (const r of readings) {
-    const day = r.recorded_at.slice(0, 10);
+    const day = localDateKey(r.recorded_at, timezone);
     if (!map.has(day)) map.set(day, []);
     map.get(day)!.push(r.value_mg_dl);
   }
