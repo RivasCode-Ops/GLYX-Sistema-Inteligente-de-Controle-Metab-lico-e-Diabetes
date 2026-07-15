@@ -24,10 +24,21 @@ export async function syncLibreConnection(
   conn: CgmConnectionRow,
   timezone: string | null | undefined
 ): Promise<{ inserted: number; skipped: number; patientId: string }> {
-  const creds = JSON.parse(decryptCredential(conn.credentials_enc)) as {
-    email: string;
-    password: string;
-  };
+  let creds: { email: string; password: string };
+  try {
+    creds = JSON.parse(decryptCredential(conn.credentials_enc)) as {
+      email: string;
+      password: string;
+    };
+  } catch {
+    // Chave de criptografia rotacionada (ou payload corrompido): impossível
+    // recuperar a senha — só reconectar resolve. A mensagem crua do crypto
+    // ("Unsupported state...") não orienta ninguém.
+    throw new Error(
+      "A senha guardada ficou inválida após uma atualização de segurança do app. " +
+        "Reconecte o sensor informando a senha do LibreLinkUp de novo."
+    );
+  }
   const session = await lluLogin(creds.email, creds.password);
   const patientId = conn.patient_id ?? (await lluFirstPatientId(session));
   const measurements = await lluFetchMeasurements(session, patientId);

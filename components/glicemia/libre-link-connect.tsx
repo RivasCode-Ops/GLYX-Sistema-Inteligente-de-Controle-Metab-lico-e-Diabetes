@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { friendlyCgmError } from "@/lib/cgm/friendly-error";
 
 type ConnectionInfo = {
   email: string;
@@ -15,12 +16,17 @@ type ConnectionInfo = {
 
 export function LibreLinkConnect({ connection }: { connection: ConnectionInfo }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(connection?.email ?? "");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  /** Mostra o formulário de credenciais mesmo já conectado (reconexão). */
-  const [reconnecting, setReconnecting] = useState(false);
+  /**
+   * Mostra o formulário de credenciais mesmo já conectado (reconexão).
+   * Com erro de sincronização registrado, já abre direto no formulário —
+   * "Sincronizar agora" não conserta credencial inválida, e deixá-lo como
+   * botão principal induzia ao caminho errado.
+   */
+  const [reconnecting, setReconnecting] = useState(() => Boolean(connection?.lastError));
 
   async function connect(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -59,7 +65,10 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
         error?: string;
       };
       if (!res.ok) {
-        setStatus(data.error ?? "Falha na sincronização.");
+        // Falhou de novo: abre o formulário de reconexão com a explicação —
+        // repetir "Sincronizar" não conserta credencial inválida.
+        setStatus(friendlyCgmError(data.error ?? "Falha na sincronização."));
+        setReconnecting(true);
         return;
       }
       setStatus(
@@ -104,11 +113,7 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
           </p>
           {connection.lastError ? (
             <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
-              <p className="text-xs text-red-300">Último erro: {connection.lastError}</p>
-              <p className="text-xs text-zinc-400">
-                Se o erro persistir após sincronizar, reconecte informando a senha de novo — é o
-                que resolve credencial expirada ou inválida.
-              </p>
+              <p className="text-xs text-red-300">{friendlyCgmError(connection.lastError)}</p>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -153,6 +158,11 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {connection?.lastError ? (
+          <p className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-300">
+            {friendlyCgmError(connection.lastError)}
+          </p>
+        ) : null}
         {!connection ? (
           <ol className="space-y-1.5 text-sm text-zinc-400">
             <li>

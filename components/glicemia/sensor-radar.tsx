@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { friendlyCgmError } from "@/lib/cgm/friendly-error";
 
 const POLL_MS = 60 * 1000;
 /** Sensor conectado sem leitura nova há mais que isto → aviso âmbar. */
@@ -66,9 +67,7 @@ export function SensorRadar() {
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
         <span aria-hidden>📡</span>
-        <span className="min-w-0 flex-1">
-          Sensor com falha na sincronização: {health.lastError}
-        </span>
+        <span className="min-w-0 flex-1">{friendlyCgmError(health.lastError)}</span>
         <Link
           href="/glicemia/sensor"
           className="shrink-0 rounded-lg border border-red-400/40 px-2 py-1 font-medium transition hover:bg-red-500/20"
