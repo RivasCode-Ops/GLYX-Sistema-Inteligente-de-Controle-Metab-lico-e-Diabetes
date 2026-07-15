@@ -8,7 +8,8 @@ import { getLastTrainedByMuscleGroup, getActiveMusclePauses } from "@/lib/querie
 import { computeMuscleRecovery, suggestMuscleFocus } from "@/lib/exercicios/muscle-recovery";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
-import { LibreAutoSync } from "@/components/glicemia/libre-auto-sync";
+import { DashboardAutoRefresh } from "@/components/dashboard/auto-refresh";
+import { SensorRadar } from "@/components/glicemia/sensor-radar";
 import { WaterCard } from "@/components/dashboard/water-card";
 import { MacroGaugesCard } from "@/components/alimentacao/macro-gauge";
 import { dailyTargets } from "@/lib/health/energy";
@@ -144,7 +145,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <LibreAutoSync />
+      <DashboardAutoRefresh />
+      <SensorRadar />
       {strip ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <p className="text-sm font-medium text-emerald-200">{strip.label}</p>
