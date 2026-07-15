@@ -19,6 +19,8 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** Mostra o formulário de credenciais mesmo já conectado (reconexão). */
+  const [reconnecting, setReconnecting] = useState(false);
 
   async function connect(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -37,6 +39,7 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
       }
       setPassword("");
       setStatus(null);
+      setReconnecting(false);
       router.refresh();
     } catch {
       setStatus("Erro de rede.");
@@ -82,7 +85,7 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
     }
   }
 
-  if (connection) {
+  if (connection && !reconnecting) {
     return (
       <Card className="border-emerald-500/25">
         <CardHeader>
@@ -100,13 +103,27 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
             você abre o app (e pelo botão abaixo). Alerta de hipoglicemia dispara automaticamente.
           </p>
           {connection.lastError ? (
-            <p className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-300">
-              Último erro: {connection.lastError}
-            </p>
+            <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+              <p className="text-xs text-red-300">Último erro: {connection.lastError}</p>
+              <p className="text-xs text-zinc-400">
+                Se o erro persistir após sincronizar, reconecte informando a senha de novo — é o
+                que resolve credencial expirada ou inválida.
+              </p>
+            </div>
           ) : null}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={() => void syncNow()} disabled={loading}>
               {loading ? "Sincronizando…" : "Sincronizar agora"}
+            </Button>
+            <Button
+              variant={connection.lastError ? "default" : "ghost"}
+              onClick={() => {
+                setStatus(null);
+                setReconnecting(true);
+              }}
+              disabled={loading}
+            >
+              Reconectar (informar senha de novo)
             </Button>
             <Button
               variant="ghost"
@@ -126,25 +143,31 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
   return (
     <Card className="border-emerald-500/20">
       <CardHeader>
-        <CardTitle className="text-base">🔗 Conectar o FreeStyle Libre 2 (automático)</CardTitle>
+        <CardTitle className="text-base">
+          {connection ? "🔗 Reconectar o FreeStyle Libre 2" : "🔗 Conectar o FreeStyle Libre 2 (automático)"}
+        </CardTitle>
         <CardDescription>
-          O mesmo acompanhamento que seu médico tem — o GLYX vira um seguidor do seu sensor.
+          {connection
+            ? `Informe de novo o e-mail e a senha da conta LibreLinkUp (atual: ${connection.email}) — a credencial salva será substituída.`
+            : "O mesmo acompanhamento que seu médico tem — o GLYX vira um seguidor do seu sensor."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ol className="space-y-1.5 text-sm text-zinc-400">
-          <li>
-            1. No app <strong className="text-zinc-200">LibreLink</strong> do celular: menu →{" "}
-            <strong className="text-zinc-200">Aplicativos conectados</strong> →{" "}
-            <strong className="text-zinc-200">LibreLinkUp</strong> → convide um e-mail seu (pode
-            ser um segundo e-mail)
-          </li>
-          <li>
-            2. Baixe o app <strong className="text-zinc-200">LibreLinkUp</strong>, crie a conta com
-            esse e-mail e aceite o convite
-          </li>
-          <li>3. Informe aqui o e-mail e a senha dessa conta LibreLinkUp:</li>
-        </ol>
+        {!connection ? (
+          <ol className="space-y-1.5 text-sm text-zinc-400">
+            <li>
+              1. No app <strong className="text-zinc-200">LibreLink</strong> do celular: menu →{" "}
+              <strong className="text-zinc-200">Aplicativos conectados</strong> →{" "}
+              <strong className="text-zinc-200">LibreLinkUp</strong> → convide um e-mail seu (pode
+              ser um segundo e-mail)
+            </li>
+            <li>
+              2. Baixe o app <strong className="text-zinc-200">LibreLinkUp</strong>, crie a conta com
+              esse e-mail e aceite o convite
+            </li>
+            <li>3. Informe aqui o e-mail e a senha dessa conta LibreLinkUp:</li>
+          </ol>
+        ) : null}
         <form onSubmit={(e) => void connect(e)} className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1">
             <Label htmlFor="llu-email">E-mail do LibreLinkUp</Label>
@@ -166,10 +189,23 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
               required
             />
           </div>
-          <div className="sm:col-span-2">
+          <div className="flex gap-2 sm:col-span-2">
             <Button type="submit" disabled={loading}>
-              {loading ? "Validando com a Abbott…" : "Conectar sensor"}
+              {loading ? "Validando com a Abbott…" : connection ? "Reconectar sensor" : "Conectar sensor"}
             </Button>
+            {connection ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={loading}
+                onClick={() => {
+                  setStatus(null);
+                  setReconnecting(false);
+                }}
+              >
+                Cancelar
+              </Button>
+            ) : null}
           </div>
         </form>
         {status ? <p className="text-xs text-amber-300">{status}</p> : null}

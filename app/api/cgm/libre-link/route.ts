@@ -74,3 +74,6 @@ export async function DELETE() {
 }
 
 export const runtime = "nodejs";
+// Login na Abbott pode passar de 10s (redirect de região + passos de
+// termos) — sem isso a Vercel corta a função e o app mostra "Erro de rede".
+export const maxDuration = 60;
