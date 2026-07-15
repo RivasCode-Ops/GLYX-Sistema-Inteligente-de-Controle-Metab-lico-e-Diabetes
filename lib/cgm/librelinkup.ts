@@ -32,6 +32,24 @@ function sha256Hex(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
+const LLU_FETCH_MS = 20_000;
+
+async function lluFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const signal =
+    init.signal ??
+    (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(LLU_FETCH_MS)
+      : undefined);
+  try {
+    return await fetch(url, { ...init, signal });
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new Error("LibreLinkUp: timeout ao contactar a Abbott. Tente de novo em instantes.");
+    }
+    throw e;
+  }
+}
+
 type LluLoginResponse = {
   status?: number;
   error?: { message?: string };
@@ -52,7 +70,7 @@ export async function lluLogin(
 ): Promise<LluSession> {
   if (depth > 2) throw new Error("Muitos redirecionamentos de região.");
 
-  const res = await fetch(`${baseUrl}/llu/auth/login`, {
+  const res = await lluFetch(`${baseUrl}/llu/auth/login`, {
     method: "POST",
     headers: LLU_HEADERS,
     body: JSON.stringify({ email, password }),
@@ -79,7 +97,7 @@ export async function lluLogin(
   let stepGuard = 0;
   while (json?.data?.step?.type && json.data.authTicket?.token && stepGuard < 3) {
     const stepType = json.data.step.type;
-    const cont = await fetch(`${baseUrl}/auth/continue/${stepType}`, {
+    const cont = await lluFetch(`${baseUrl}/auth/continue/${stepType}`, {
       method: "POST",
       headers: { ...LLU_HEADERS, authorization: `Bearer ${json.data.authTicket.token}` },
       body: JSON.stringify({}),
@@ -123,7 +141,7 @@ function authHeaders(session: LluSession): Record<string, string> {
  * tem leitura de glicose de verdade.
  */
 export async function lluFirstPatientId(session: LluSession): Promise<string> {
-  const res = await fetch(`${session.baseUrl}/llu/connections`, {
+  const res = await lluFetch(`${session.baseUrl}/llu/connections`, {
     headers: authHeaders(session),
   });
   const rawText = await res.text();
@@ -174,7 +192,7 @@ export async function lluFetchMeasurements(
   session: LluSession,
   patientId: string
 ): Promise<LluMeasurement[]> {
-  const res = await fetch(`${session.baseUrl}/llu/connections/${patientId}/graph`, {
+  const res = await lluFetch(`${session.baseUrl}/llu/connections/${patientId}/graph`, {
     headers: authHeaders(session),
   });
   const json = (await res.json().catch(() => null)) as {
@@ -191,26 +209,71 @@ export async function lluFetchMeasurements(
 }
 
 // ---------- criptografia das credenciais (AES-256-GCM) ----------
+// Preferir CGM_CREDENTIALS_SECRET (dedicada). CRON_SECRET fica só como legado
+// de leitura enquanto conexões antigas são re-criptografadas no próximo sync.
 
-function credKey(): Buffer {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) throw new Error("CRON_SECRET ausente no servidor.");
+function deriveCredKey(secret: string): Buffer {
   return createHash("sha256").update(`${secret}:libre-cred-v1`).digest();
 }
 
-export function encryptCredential(plain: string): string {
+function primaryCredSecret(): string {
+  const dedicated = process.env.CGM_CREDENTIALS_SECRET?.trim();
+  if (dedicated) return dedicated;
+  const cron = process.env.CRON_SECRET?.trim();
+  if (cron) return cron;
+  throw new Error("CGM_CREDENTIALS_SECRET (ou CRON_SECRET legado) ausente no servidor.");
+}
+
+function legacyCredSecret(): string | null {
+  const dedicated = process.env.CGM_CREDENTIALS_SECRET?.trim();
+  const cron = process.env.CRON_SECRET?.trim();
+  if (dedicated && cron && dedicated !== cron) return cron;
+  return null;
+}
+
+function encryptWithKey(key: Buffer, plain: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", credKey(), iv);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
   const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), enc]).toString("base64");
 }
 
-export function decryptCredential(payload: string): string {
+function decryptWithKey(key: Buffer, payload: string): string {
   const raw = Buffer.from(payload, "base64");
   const iv = raw.subarray(0, 12);
   const tag = raw.subarray(12, 28);
   const enc = raw.subarray(28);
-  const decipher = createDecipheriv("aes-256-gcm", credKey(), iv);
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
+}
+
+export function encryptCredential(plain: string): string {
+  return encryptWithKey(deriveCredKey(primaryCredSecret()), plain);
+}
+
+export type DecryptCredentialResult = {
+  plain: string;
+  /** True se a leitura usou CRON_SECRET legado — o caller deve re-criptografar. */
+  usedLegacyKey: boolean;
+};
+
+export function decryptCredentialDetailed(payload: string): DecryptCredentialResult {
+  try {
+    return {
+      plain: decryptWithKey(deriveCredKey(primaryCredSecret()), payload),
+      usedLegacyKey: false,
+    };
+  } catch (primaryError) {
+    const legacy = legacyCredSecret();
+    if (!legacy) throw primaryError;
+    return {
+      plain: decryptWithKey(deriveCredKey(legacy), payload),
+      usedLegacyKey: true,
+    };
+  }
+}
+
+export function decryptCredential(payload: string): string {
+  return decryptCredentialDetailed(payload).plain;
 }

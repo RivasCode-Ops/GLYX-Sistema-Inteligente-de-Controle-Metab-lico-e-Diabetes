@@ -3,7 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkAndRecordAiUsage } from "./rate-limit";
 
 // Stub encadeável mínimo do supabase-js: select(count) e insert.
-function fakeSupabase(opts: { count: number; oldestCreatedAt?: string }) {
+function fakeSupabase(opts: {
+  count: number;
+  oldestCreatedAt?: string;
+  countError?: { message: string };
+}) {
   const inserts: unknown[] = [];
 
   function builder(kind: "count" | "rows") {
@@ -16,8 +20,9 @@ function fakeSupabase(opts: { count: number; oldestCreatedAt?: string }) {
         data: opts.oldestCreatedAt ? { created_at: opts.oldestCreatedAt } : null,
         error: null,
       }),
-      then: (resolve: (v: { count: number; error: null }) => void) =>
-        resolve({ count: opts.count, error: null }),
+      then: (
+        resolve: (v: { count: number; error: { message: string } | null }) => void
+      ) => resolve({ count: opts.count, error: opts.countError ?? null }),
     };
     void kind;
     return chain;
@@ -71,6 +76,16 @@ describe("checkAndRecordAiUsage", () => {
   it("limites diferentes por tipo: foto bloqueia com 10", async () => {
     const { client, inserts } = fakeSupabase({ count: 10 });
     const result = await checkAndRecordAiUsage(client, "user-1", "meal_photo");
+    expect(result.allowed).toBe(false);
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("fail-closed quando a contagem falha", async () => {
+    const { client, inserts } = fakeSupabase({
+      count: 0,
+      countError: { message: "db down" },
+    });
+    const result = await checkAndRecordAiUsage(client, "user-1", "chat");
     expect(result.allowed).toBe(false);
     expect(inserts).toHaveLength(0);
   });

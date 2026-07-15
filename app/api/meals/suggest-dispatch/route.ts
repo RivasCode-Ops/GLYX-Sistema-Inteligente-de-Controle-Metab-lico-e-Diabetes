@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
+import { reportCronOutcome, reportException } from "@/lib/observability";
 import { sendToSubscription } from "@/lib/push/send";
 import { createClient } from "@/lib/supabase/server";
 
@@ -82,7 +83,12 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
         max_tokens: 80,
         temperature: 0.5,
       });
-    } catch {
+    } catch (e) {
+      reportException(e, {
+        tags: { job: "meal-suggest", surface: "cron" },
+        extra: { userIdPrefix: item.userId.slice(0, 8), mealType: item.mealType },
+        level: "warning",
+      });
       return false; // um usuário falhar não deve travar os demais
     }
 
@@ -115,7 +121,13 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
 
   const results = await mapWithConcurrency(parsed.data, CONCURRENCY, processItem);
   const sent = results.filter((r) => r.status === "fulfilled" && r.value).length;
+  const failed = parsed.data.length - sent;
 
+  await reportCronOutcome("meal-suggest", {
+    sent,
+    failed: parsed.data.length > 0 && sent === 0 ? failed : 0,
+    total: parsed.data.length,
+  });
   return NextResponse.json({ ok: true, sent });
 }
 

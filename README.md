@@ -8,6 +8,8 @@ Storage + cron).
 **Raiz única do repositório:**
 `C:\_PROJETOS\GLYX — Sistema Inteligente de Controle Metabólico e Diabetes`
 
+**Planejamento:** [ROADMAP.md](ROADMAP.md) · **DPIA (LGPD):** [docs/DPIA.md](docs/DPIA.md) · **Produção:** [docs/PRODUCAO.md](docs/PRODUCAO.md) (`npm run check:prod`)
+
 ## Stack
 
 - **Next.js 15** (App Router, React 19, Server Actions, Route Handlers), TypeScript, Tailwind.
@@ -17,8 +19,10 @@ Storage + cron).
   `OPENAI_BASE_URL`/`AI_MODEL` para usar OpenRouter etc.) — chat, visão (foto de refeição/exame/
   rótulo/bancada) e geração de sugestões.
 - **Web Push** (VAPID) para alarmes e lembretes, com Service Worker (`public/sw.js`).
-- **CGM**: FreeStyle Libre 2 via LibreLinkUp (sincronização automática) ou importação de CSV do
-  LibreView; modelo normalizado também aceita Dexcom.
+- **CGM**: FreeStyle Libre 2 via LibreLinkUp e/ou Dexcom OAuth (sync automático com circuit
+  breaker / backoff + timeout); importação CSV LibreView; multi-provider em `cgm_connections`.
+- **Observabilidade**: Sentry (`@sentry/nextjs`) + alertas de falha em cron CGM/push/meal-suggest
+  (e webhook opcional `OPS_ALERT_WEBHOOK_URL`).
 - Testes: **Vitest** (unitário) + **Playwright** (E2E/smoke).
 
 ## Funcionalidades
@@ -54,10 +58,11 @@ Storage + cron).
 - **Copiloto de IA metabólica**: chat com streaming, com contexto dos dados do usuário.
 
 ### Conta, dados e administração
-- Login/registro com **código de convite** obrigatório (`SIGNUP_INVITE_CODE`), fluxo de
-  esqueci/redefinir senha.
-- **LGPD**: página de privacidade/consentimento, exportar meus dados, apagar minha conta e dados,
-  exclusão de registros individuais (refeições, glicemia).
+- Login/registro com **código de convite** obrigatório (`SIGNUP_INVITE_CODE` +
+  `SUPABASE_SERVICE_ROLE_KEY` em `/api/auth/register`), fluxo de esqueci/redefinir senha.
+- **LGPD**: página de privacidade/consentimento, exportar meus dados (JSON completo com redação
+  de segredos CGM), apagar registros + fotos no Storage + limpeza do perfil; a conta Auth permanece
+  até contato do responsável.
 - **Rate limiting** e limites de tamanho/tipo de arquivo nas rotas de IA, com contador de tokens por
   usuário.
 - **Painel `/admin`**: estatísticas de uso e "relógio de gastos" de IA (por dia/mês, com metas
@@ -70,7 +75,8 @@ Storage + cron).
 2. Crie um projeto em [Supabase](https://supabase.com), copie **URL** e **anon key**.
 3. No SQL Editor do Supabase (ou `supabase db push` com o CLI), execute **todos** os arquivos de
    `supabase/migrations/` em ordem cronológica pelo nome. São incrementais — pular algum deixa
-   tabelas/colunas/funções ausentes.
+   tabelas/colunas/funções ausentes. Inclui o circuit breaker do CGM
+   (`*_cgm_circuit_breaker.sql`).
 4. Gere as chaves VAPID: `npx web-push generate-vapid-keys`.
 5. Gere um `CRON_SECRET` aleatório próprio e configure o **mesmo valor** nas funções SQL de cron
    (procure `x-cron-secret` e `p_secret` em `supabase/migrations/*.sql`) — nunca reutilize um valor
@@ -87,10 +93,18 @@ Abra `http://localhost:3000`.
 ## Testes
 
 ```bash
-npm run test        # Vitest — normalizadores, agregações, rate limit, parser de refeição
+npm run test        # Vitest — normalizadores, agregações, rate limit, parser de refeição, RLS/LGPD
 npm run test:watch
-npm run test:e2e     # Playwright — sobe `npm run dev` automaticamente
+npm run test:e2e     # Playwright — smoke + portões de auth; sobe `npm run dev` automaticamente
 ```
+
+E2E clínico autenticado (`e2e/clinical-path.spec.ts`): defina `E2E_USER_EMAIL` e
+`E2E_USER_PASSWORD` (conta real do projeto Supabase). Sem isso, o spec é ignorado — o CI ainda
+valida redirects, 401 de export/cron e convite inválido.
+
+Cobertura RLS negativa (estática): `lib/privacy/rls-coverage.test.ts` exige que cada tabela clínica
+nas migrations tenha `ENABLE ROW LEVEL SECURITY` + policy com `auth.uid()`, e que o inventário
+LGPD de wipe/export acompanhe o schema.
 
 As funções SQL de despacho (`dispatch_*`, `evaluate_meal_glucose_spikes`) não têm cobertura de teste
 automatizado no Postgres — a lógica de janela de horário/fuso que pode ser expressa em TypeScript
@@ -108,9 +122,14 @@ Playwright e corre `npm run test:e2e`, com variáveis públicas de exemplo para 
   cliente.
 - **Supabase Auth** → *URL Configuration*: **Site URL** com o domínio público e **Redirect URLs**
   incluindo `https://…/auth/callback` e `http://localhost:3000/auth/callback` para desenvolvimento.
-- **Supabase Auth** → *Providers/Settings*: desative "Allow new users to sign up" se o convite deve
-  ser o único caminho de cadastro (o código de convite roda na camada da aplicação, não na API);
-  ative "Leaked password protection".
+- **Supabase Auth** → *Providers/Settings*: **desative "Allow new users to sign up"** — o cadastro
+  do GLYX usa Admin API (`/api/auth/register`) após validar o convite, então o signup público
+  anônimo fica bloqueado na API Auth; ative "Leaked password protection".
+- Defina `SIGNUP_INVITE_CODE`, `SUPABASE_SERVICE_ROLE_KEY` e, para CGM, `CGM_CREDENTIALS_SECRET`
+  (diferente do `CRON_SECRET`) no ambiente de produção.
+- **Sentry**: configure `SENTRY_DSN` e `NEXT_PUBLIC_SENTRY_DSN` (mesmo valor) para capturar erros
+  de UI e falhas de sync/push; opcionalmente `OPS_ALERT_WEBHOOK_URL` para ping em Slack/Discord
+  quando um cron agrega falhas.
 - **Cabeçalhos HTTP**: ver `next.config.ts` (`X-Frame-Options`, `Referrer-Policy` etc.).
 - **`pg_cron`**: cada função de despacho chama `net.http_post` para uma rota `/api/.../dispatch` com
   o domínio de produção hardcoded na função SQL — se o domínio mudar, atualize as funções.

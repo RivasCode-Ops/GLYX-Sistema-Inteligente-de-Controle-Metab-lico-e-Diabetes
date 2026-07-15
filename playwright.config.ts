@@ -18,5 +18,11 @@ export default defineConfig({
     timeout: 180_000,
     stdout: "pipe",
     stderr: "pipe",
+    env: {
+      ...process.env,
+      // Garante fail-closed do convite nos testes de API mesmo sem .env.local
+      SIGNUP_INVITE_CODE: process.env.SIGNUP_INVITE_CODE || "e2e-invite-gate",
+    },
   },
 });
+

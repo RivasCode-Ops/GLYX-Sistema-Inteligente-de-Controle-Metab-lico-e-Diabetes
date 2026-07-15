@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { decryptCredential, lluFetchMeasurements, lluFirstPatientId, lluLogin } from "@/lib/cgm/librelinkup";
+import { breakerAfterSuccess } from "@/lib/cgm/circuit-breaker";
+import {
+  decryptCredentialDetailed,
+  encryptCredential,
+  lluFetchMeasurements,
+  lluFirstPatientId,
+  lluLogin,
+} from "@/lib/cgm/librelinkup";
 import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
 import { normalizeLibreMeasurements } from "@/lib/cgm/normalize/libre";
 import { sendPushToUser } from "@/lib/push/send";
@@ -11,6 +18,10 @@ export type CgmConnectionRow = {
   user_id: string;
   credentials_enc: string;
   patient_id: string | null;
+  last_sync_at?: string | null;
+  consecutive_failures?: number | null;
+  circuit_open_until?: string | null;
+  last_error_kind?: string | null;
 };
 
 /**
@@ -25,8 +36,11 @@ export async function syncLibreConnection(
   timezone: string | null | undefined
 ): Promise<{ inserted: number; skipped: number; patientId: string }> {
   let creds: { email: string; password: string };
+  let usedLegacyKey = false;
   try {
-    creds = JSON.parse(decryptCredential(conn.credentials_enc)) as {
+    const decrypted = decryptCredentialDetailed(conn.credentials_enc);
+    usedLegacyKey = decrypted.usedLegacyKey;
+    creds = JSON.parse(decrypted.plain) as {
       email: string;
       password: string;
     };
@@ -46,10 +60,33 @@ export async function syncLibreConnection(
   const result = await ingestUnifiedReadings(supabase, conn.user_id, readings);
   if (result.error) throw new Error(result.error);
 
+  const reset = breakerAfterSuccess();
+  const connectionUpdate: {
+    last_sync_at: string;
+    last_error: null;
+    patient_id: string;
+    consecutive_failures: number;
+    circuit_open_until: null;
+    last_error_kind: null;
+    credentials_enc?: string;
+  } = {
+    last_sync_at: new Date().toISOString(),
+    last_error: null,
+    patient_id: patientId,
+    consecutive_failures: reset.consecutive_failures,
+    circuit_open_until: null,
+    last_error_kind: null,
+  };
+  // Migra cipher antigo (CRON_SECRET) → chave dedicada na próxima sync bem-sucedida.
+  if (usedLegacyKey) {
+    connectionUpdate.credentials_enc = encryptCredential(JSON.stringify(creds));
+  }
+
   await supabase
     .from("cgm_connections")
-    .update({ last_sync_at: new Date().toISOString(), last_error: null, patient_id: patientId })
-    .eq("user_id", conn.user_id);
+    .update(connectionUpdate)
+    .eq("user_id", conn.user_id)
+    .eq("provider", "librelinkup");
 
   // Hipoglicemia na leitura mais recente do sensor → push crítico imediato
   // (dedupe pelo timestamp da leitura: 1 alerta por leitura).

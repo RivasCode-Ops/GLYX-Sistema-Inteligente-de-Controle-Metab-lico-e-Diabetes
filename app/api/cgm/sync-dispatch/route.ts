@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import {
+  breakerAfterFailure,
+  isCircuitOpen,
+  type CgmErrorKind,
+} from "@/lib/cgm/circuit-breaker";
+import { syncDexcomConnection } from "@/lib/cgm/sync-dexcom";
 import { syncLibreConnection, type CgmConnectionRow } from "@/lib/cgm/sync";
-
-// Chamado pelo pg_cron do Supabase (sem sessão de usuário) para sincronizar
-// TODAS as conexões LibreLinkUp em segundo plano — diferente de
-// /api/cgm/libre-sync (sessão de um único usuário, disparado do navegador).
-// Precisa da service role key porque decripta credenciais e grava
-// glucose_readings de qualquer usuário, sem RLS de um usuário logado.
+import { reportCronOutcome, reportException, reportMessage } from "@/lib/observability";
 
 const THROTTLE_MS = 10 * 60 * 1000;
+
+type ConnRow = CgmConnectionRow & { provider?: string | null };
 
 export async function POST(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -25,16 +28,32 @@ export async function POST(req: Request) {
 
   const { data: connections } = await supabase
     .from("cgm_connections")
-    .select("user_id, credentials_enc, patient_id, last_sync_at");
+    .select(
+      "user_id, provider, credentials_enc, patient_id, last_sync_at, consecutive_failures, circuit_open_until, last_error_kind"
+    );
   if (!connections?.length) {
-    return NextResponse.json({ ok: true, synced: 0, failed: 0, total: 0 });
+    return NextResponse.json({ ok: true, synced: 0, failed: 0, skipped: 0, total: 0 });
   }
 
-  const due = connections.filter(
-    (c) => !c.last_sync_at || Date.now() - new Date(c.last_sync_at).getTime() >= THROTTLE_MS
-  );
+  const now = Date.now();
+  let circuitSkipped = 0;
+  const due = (connections as ConnRow[]).filter((c) => {
+    if (isCircuitOpen({ circuit_open_until: c.circuit_open_until ?? null }, now)) {
+      circuitSkipped += 1;
+      return false;
+    }
+    return !c.last_sync_at || now - new Date(c.last_sync_at).getTime() >= THROTTLE_MS;
+  });
+
   if (!due.length) {
-    return NextResponse.json({ ok: true, synced: 0, failed: 0, total: 0, skipped: connections.length });
+    return NextResponse.json({
+      ok: true,
+      synced: 0,
+      failed: 0,
+      total: 0,
+      skipped: connections.length,
+      circuitSkipped,
+    });
   }
 
   const { data: profiles } = await supabase
@@ -48,18 +67,71 @@ export async function POST(req: Request) {
 
   let synced = 0;
   let failed = 0;
-  for (const conn of due as CgmConnectionRow[]) {
+  for (const conn of due) {
+    const provider = conn.provider === "dexcom" ? "dexcom" : "librelinkup";
     try {
-      await syncLibreConnection(supabase, conn, tzByUser.get(conn.user_id));
+      if (provider === "dexcom") {
+        await syncDexcomConnection(supabase, conn);
+      } else {
+        await syncLibreConnection(supabase, conn, tzByUser.get(conn.user_id));
+      }
       synced += 1;
     } catch (e) {
       failed += 1;
       const msg = e instanceof Error ? e.message : "Falha na sincronização.";
-      await supabase.from("cgm_connections").update({ last_error: msg }).eq("user_id", conn.user_id);
+      const { state, kind, shouldAlertOps } = breakerAfterFailure(
+        { consecutive_failures: conn.consecutive_failures ?? 0 },
+        msg,
+        now
+      );
+
+      reportException(e, {
+        tags: { job: "cgm-sync", surface: "cron", provider, error_kind: kind },
+        extra: {
+          userIdPrefix: conn.user_id.slice(0, 8),
+          consecutive: state.consecutive_failures,
+        },
+        level: "error",
+      });
+
+      if (shouldAlertOps) {
+        reportMessage(`CGM circuit (${provider}): ${kind} · falhas=${state.consecutive_failures}`, {
+          level: "warning",
+          tags: { job: "cgm-circuit", surface: "cron", provider, error_kind: kind },
+          extra: {
+            userIdPrefix: conn.user_id.slice(0, 8),
+            openUntil: state.circuit_open_until,
+            kind: kind as CgmErrorKind,
+          },
+        });
+      }
+
+      await supabase
+        .from("cgm_connections")
+        .update({
+          last_error: msg,
+          consecutive_failures: state.consecutive_failures,
+          circuit_open_until: state.circuit_open_until,
+          last_error_kind: state.last_error_kind,
+        })
+        .eq("user_id", conn.user_id)
+        .eq("provider", provider);
     }
   }
 
-  return NextResponse.json({ ok: true, synced, failed, total: due.length });
+  await reportCronOutcome("cgm-sync", {
+    synced,
+    failed,
+    total: due.length,
+    skipped: circuitSkipped,
+  });
+  return NextResponse.json({
+    ok: true,
+    synced,
+    failed,
+    total: due.length,
+    circuitSkipped,
+  });
 }
 
 export const runtime = "nodejs";

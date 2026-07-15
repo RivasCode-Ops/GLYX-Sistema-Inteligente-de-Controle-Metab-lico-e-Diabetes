@@ -10,7 +10,7 @@ export default function PrivacidadePage() {
       <h1 className="text-3xl font-semibold tracking-tight text-zinc-50">
         Política de Privacidade
       </h1>
-      <p className="mt-2 text-sm text-zinc-500">GLYX — Controle metabólico · atualizada em 11/07/2026</p>
+      <p className="mt-2 text-sm text-zinc-500">GLYX — Controle metabólico · atualizada em 15/07/2026</p>
 
       <div className="mt-8 space-y-6 text-sm leading-7 text-zinc-300">
         <section>
@@ -46,9 +46,9 @@ export default function PrivacidadePage() {
         <section>
           <h2 className="mb-2 text-lg font-medium text-zinc-100">Seus direitos (LGPD)</h2>
           <p>
-            Você pode solicitar acesso, correção, exportação ou exclusão definitiva dos seus dados a
-            qualquer momento pelo e-mail do responsável indicado abaixo. A exclusão da conta remove
-            todos os registros vinculados de forma irreversível.
+            No app você pode exportar seus dados (JSON) e apagar os registros de saúde, fotos
+            privadas e conexão CGM. A conta de login (Auth) permanece até solicitação ao responsável
+            pelo e-mail abaixo. Correções pontuais também podem ser pedidas por esse canal.
           </p>
         </section>
 

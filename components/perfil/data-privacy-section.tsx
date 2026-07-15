@@ -71,9 +71,10 @@ export function DataPrivacySection() {
         </div>
 
         <p className="text-xs leading-5 text-zinc-500">
-          A exclusão remove glicemia, refeições, medicações, exercícios, alertas, exames e insights
-          de forma <strong>irreversível</strong>. Para excluir também a conta de login, contate o
-          responsável indicado na Política de Privacidade.
+          A exclusão remove glicemia, refeições, água, peso, medicações, exercício, alertas, exames,
+          insights, uso de IA, push, conexão CGM e fotos privadas de forma{" "}
+          <strong>irreversível</strong>. Para excluir também a conta de login, contate o responsável
+          indicado na Política de Privacidade.
         </p>
       </CardContent>
     </Card>

@@ -16,8 +16,8 @@ export function getCgmIntegrationStatus(): CgmIntegrationStatus {
     dexcom: {
       configured: dexcomConfigured,
       hint: dexcomConfigured
-        ? "Credenciais OAuth presentes — ligar cliente HTTP no próximo passo."
-        : "Defina DEXCOM_CLIENT_ID e DEXCOM_CLIENT_SECRET (OAuth2 Dexcom).",
+        ? "OAuth pronto — use Conectar Dexcom em Glicemia → Sensor."
+        : "Defina DEXCOM_CLIENT_ID, DEXCOM_CLIENT_SECRET e DEXCOM_REDIRECT_URI (ou NEXT_PUBLIC_SITE_URL).",
     },
     libre: {
       configured: libreConfigured,

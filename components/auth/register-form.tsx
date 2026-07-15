@@ -33,45 +33,54 @@ export function RegisterForm() {
     }
     setLoading(true);
     try {
-      const inviteRes = await fetch("/api/auth/verify-invite", {
+      const registerRes = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: inviteCode }),
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          inviteCode,
+          consent: true,
+        }),
       });
-      const inviteData = (await inviteRes.json()) as { ok: boolean; error?: string };
-      if (!inviteRes.ok || !inviteData.ok) {
-        setError(inviteData.error ?? "Código de convite inválido.");
+      const registerData = (await registerRes.json()) as { ok: boolean; error?: string };
+      if (!registerRes.ok || !registerData.ok) {
+        setError(registerData.error ?? "Não foi possível criar a conta.");
         setLoading(false);
         return;
       }
-    } catch {
-      setError("Não foi possível validar o convite. Tente novamente.");
+
+      const supabase = createClient();
+      if (!supabase) {
+        setError("Cliente Supabase indisponível.");
+        setLoading(false);
+        return;
+      }
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
-      return;
+      if (signInErr) {
+        setError(
+          "Conta criada, mas o login automático falhou. Entre com o mesmo e-mail e senha."
+        );
+        router.push("/login");
+        return;
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setLoading(false);
+      setError("Falha de rede ao criar a conta. Tente novamente.");
     }
-    const supabase = createClient();
-    if (!supabase) return;
-    const { error: err } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, privacy_consent_at: new Date().toISOString() },
-      },
-    });
-    setLoading(false);
-    if (err) {
-      setError(err.message);
-      return;
-    }
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Criar conta</CardTitle>
-        <CardDescription>Cadastro por convite — peça o código a quem administra o GLYX.</CardDescription>
+        <CardDescription>
+          Cadastro somente por convite — peça o código a quem administra o GLYX.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-4">

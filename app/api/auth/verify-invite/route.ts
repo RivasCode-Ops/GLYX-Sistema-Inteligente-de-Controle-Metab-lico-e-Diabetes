@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
+import { getConfiguredInviteCode, inviteCodesMatch } from "@/lib/auth/invite";
 
-// Gate simples de cadastro: exige um código de convite antes do signUp.
-// Não substitui fechar o "Allow signups" no dashboard do Supabase para
-// quem quiser bloqueio garantido a nível de API — isto cobre o fluxo
-// normal da UI.
+// Gate de pré-checagem do código (UX). O cadastro real valida de novo em /api/auth/register.
 export async function POST(req: Request) {
-  const expected = process.env.SIGNUP_INVITE_CODE;
+  const expected = getConfiguredInviteCode();
   if (!expected) {
-    // Sem código configurado: cadastro segue aberto (comportamento anterior).
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: false, error: "Cadastro por convite não configurado (SIGNUP_INVITE_CODE ausente)." },
+      { status: 503 }
+    );
   }
 
   const body = await req.json().catch(() => null);
-  const code = typeof body?.code === "string" ? body.code.trim() : "";
+  const code = typeof body?.code === "string" ? body.code : "";
 
-  if (code !== expected) {
+  if (!inviteCodesMatch(code, expected)) {
     return NextResponse.json({ ok: false, error: "Código de convite inválido." }, { status: 403 });
   }
   return NextResponse.json({ ok: true });

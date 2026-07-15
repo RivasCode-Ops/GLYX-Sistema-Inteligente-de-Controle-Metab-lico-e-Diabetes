@@ -6,12 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  circuitOpenUserMessage,
+  isCircuitOpen,
+  type CgmErrorKind,
+} from "@/lib/cgm/circuit-breaker";
 import { friendlyCgmError } from "@/lib/cgm/friendly-error";
 
 type ConnectionInfo = {
   email: string;
   lastSyncAt: string | null;
   lastError: string | null;
+  circuitOpenUntil: string | null;
+  lastErrorKind: string | null;
 } | null;
 
 export function LibreLinkConnect({ connection }: { connection: ConnectionInfo }) {
@@ -111,6 +118,17 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
             O GLYX acompanha seu sensor como o seu médico: as leituras entram sozinhas sempre que
             você abre o app (e pelo botão abaixo). Alerta de hipoglicemia dispara automaticamente.
           </p>
+          {connection.circuitOpenUntil &&
+          isCircuitOpen({ circuit_open_until: connection.circuitOpenUntil }) ? (
+            <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2">
+              <p className="text-xs text-amber-200">
+                {circuitOpenUserMessage(
+                  connection.circuitOpenUntil,
+                  (connection.lastErrorKind as CgmErrorKind | null) ?? null
+                )}
+              </p>
+            </div>
+          ) : null}
           {connection.lastError ? (
             <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
               <p className="text-xs text-red-300">{friendlyCgmError(connection.lastError)}</p>

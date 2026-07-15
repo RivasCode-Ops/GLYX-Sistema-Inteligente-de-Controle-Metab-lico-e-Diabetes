@@ -68,8 +68,12 @@ export async function runSystemChecks(
   const [connRes, readingRes, subsRes, dispatchRes, aiRes, snoozeRes] = await Promise.all([
     supabase
       .from("cgm_connections")
-      .select("last_sync_at, last_error")
+      .select(
+        "provider, last_sync_at, last_error, circuit_open_until, last_error_kind, consecutive_failures"
+      )
       .eq("user_id", userId)
+      .order("last_sync_at", { ascending: false, nullsFirst: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("glucose_readings")
@@ -111,6 +115,19 @@ export async function runSystemChecks(
       status: "off",
       detail: "Nenhum sensor conectado. Conecte para receber leituras automáticas.",
       action: { label: "Conectar sensor", href: "/glicemia/sensor" },
+    });
+  } else if (
+    conn.circuit_open_until &&
+    new Date(conn.circuit_open_until).getTime() > Date.now()
+  ) {
+    checks.push({
+      id: "sensor",
+      title: "Sensor de glicose (LibreLinkUp)",
+      status: "warn",
+      detail: `Sync automático em pausa (proteção) até ${new Date(conn.circuit_open_until).toLocaleString("pt-BR")}${
+        conn.last_error ? ` — último erro: "${conn.last_error}"` : ""
+      }.`,
+      action: { label: "Ver sensor", href: "/glicemia/sensor" },
     });
   } else if (conn.last_error) {
     checks.push({
@@ -272,6 +289,30 @@ export async function runSystemChecks(
           detail: lastAi
             ? `Configurada — último uso ${idade(ageMinutes(lastAi.created_at))}.`
             : "Configurada e pronta (nenhum uso registrado ainda).",
+        }
+  );
+
+  // --- Observabilidade (ops) ---
+  const sentryOn = Boolean(
+    process.env.SENTRY_DSN?.length || process.env.NEXT_PUBLIC_SENTRY_DSN?.length
+  );
+  const webhookOn = Boolean(process.env.OPS_ALERT_WEBHOOK_URL?.length);
+  checks.push(
+    sentryOn
+      ? {
+          id: "observability",
+          title: "Monitoramento de erros (Sentry)",
+          status: "ok",
+          detail: webhookOn
+            ? "Sentry ativo e webhook de alerta de cron configurado."
+            : "Sentry ativo — falhas de CGM/push/cron são registradas. Webhook ops opcional.",
+        }
+      : {
+          id: "observability",
+          title: "Monitoramento de erros (Sentry)",
+          status: "warn",
+          detail:
+            "Sentry não configurado (SENTRY_DSN). Erros de sync/push ficam só nos logs do servidor.",
         }
   );
 

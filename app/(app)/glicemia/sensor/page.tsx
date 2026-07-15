@@ -1,31 +1,56 @@
+import { Suspense } from "react";
 import { getCgmIntegrationStatus } from "@/lib/cgm/config";
+import { isDexcomOAuthConfigured } from "@/lib/cgm/dexcom";
 import { createClient } from "@/lib/supabase/server";
 import { SensorPanel } from "@/components/glicemia/sensor-panel";
 import { LibreCsvImport } from "@/components/glicemia/libre-csv-import";
 import { LibreLinkConnect } from "@/components/glicemia/libre-link-connect";
+import { DexcomConnect } from "@/components/glicemia/dexcom-connect";
 
 export default async function GlicemiaSensorPage() {
   const status = getCgmIntegrationStatus();
 
-  let connection: { email: string; lastSyncAt: string | null; lastError: string | null } | null =
-    null;
+  let libreConnection: {
+    email: string;
+    lastSyncAt: string | null;
+    lastError: string | null;
+    circuitOpenUntil: string | null;
+    lastErrorKind: string | null;
+  } | null = null;
+  let dexcomConnection: {
+    lastSyncAt: string | null;
+    lastError: string | null;
+    circuitOpenUntil: string | null;
+    lastErrorKind: string | null;
+  } | null = null;
+
   const supabase = await createClient();
   if (supabase) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase
+      const { data: rows } = await supabase
         .from("cgm_connections")
-        .select("email, last_sync_at, last_error")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data) {
-        connection = {
-          email: data.email,
-          lastSyncAt: data.last_sync_at,
-          lastError: data.last_error,
-        };
+        .select("provider, email, last_sync_at, last_error, circuit_open_until, last_error_kind")
+        .eq("user_id", user.id);
+      for (const data of rows ?? []) {
+        if (data.provider === "dexcom") {
+          dexcomConnection = {
+            lastSyncAt: data.last_sync_at,
+            lastError: data.last_error,
+            circuitOpenUntil: data.circuit_open_until,
+            lastErrorKind: data.last_error_kind,
+          };
+        } else if (data.provider === "librelinkup") {
+          libreConnection = {
+            email: data.email ?? "",
+            lastSyncAt: data.last_sync_at,
+            lastError: data.last_error,
+            circuitOpenUntil: data.circuit_open_until,
+            lastErrorKind: data.last_error_kind,
+          };
+        }
       }
     }
   }
@@ -36,7 +61,10 @@ export default async function GlicemiaSensorPage() {
         Conecte seu sensor de glicose: as leituras entram no mesmo histórico das medições manuais
         (mg/dL), sem duplicar nada.
       </p>
-      <LibreLinkConnect connection={connection} />
+      <LibreLinkConnect connection={libreConnection} />
+      <Suspense fallback={null}>
+        <DexcomConnect connection={dexcomConnection} oauthConfigured={isDexcomOAuthConfigured()} />
+      </Suspense>
       <LibreCsvImport />
       <SensorPanel initialStatus={status} />
     </div>

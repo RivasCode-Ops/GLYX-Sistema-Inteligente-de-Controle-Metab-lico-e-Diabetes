@@ -48,8 +48,11 @@ export async function POST(req: Request) {
       credentials_enc: encryptCredential(JSON.stringify(parsed.data)),
       patient_id: patientId,
       last_error: null,
+      consecutive_failures: 0,
+      circuit_open_until: null,
+      last_error_kind: null,
     },
-    { onConflict: "user_id" }
+    { onConflict: "user_id,provider" }
   );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -68,7 +71,11 @@ export async function DELETE() {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const { error } = await supabase.from("cgm_connections").delete().eq("user_id", user.id);
+  const { error } = await supabase
+    .from("cgm_connections")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("provider", "librelinkup");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

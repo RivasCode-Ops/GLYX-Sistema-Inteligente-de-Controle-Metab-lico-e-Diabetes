@@ -23,6 +23,8 @@ export async function GET() {
       .from("cgm_connections")
       .select("last_sync_at, last_error")
       .eq("user_id", user.id)
+      .order("last_sync_at", { ascending: false, nullsFirst: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("glucose_readings")

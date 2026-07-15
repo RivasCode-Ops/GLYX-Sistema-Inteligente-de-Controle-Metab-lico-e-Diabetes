@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { reportCronOutcome } from "@/lib/observability";
 import { sendToSubscription } from "@/lib/push/send";
 
 // Chamado pelo pg_cron do Supabase a cada 5 min com os alarmes vencidos.
@@ -45,6 +46,12 @@ export async function POST(req: Request) {
     else dead += 1;
   }
 
+  await reportCronOutcome("push-dispatch", {
+    sent,
+    dead,
+    total: parsed.data.length,
+    failed: sent === 0 && dead > 0 ? dead : 0,
+  });
   return NextResponse.json({ ok: true, sent, dead });
 }
 

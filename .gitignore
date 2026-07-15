@@ -38,3 +38,7 @@ next-env.d.ts
 
 # typescript incremental
 tsconfig.tsbuildinfo
+.vercel
+.env*
+
+.env.vercel.pull

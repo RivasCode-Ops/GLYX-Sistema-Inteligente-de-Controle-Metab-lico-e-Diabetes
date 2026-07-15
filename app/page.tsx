@@ -18,7 +18,7 @@ export default function Home() {
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
               <Sparkles className="h-3.5 w-3.5" />
-              Prova pública MVP · dados fictícios realistas
+              MVP com acesso por convite · dados reais só após login
             </div>
 
             <div className="space-y-5">
@@ -26,28 +26,28 @@ export default function Home() {
                 GLYX controla sinais metabólicos em uma experiência única.
               </h1>
               <p className="max-w-2xl text-lg leading-8 text-zinc-300">
-                Dashboard, glicemia, alimentação, exercício, medicação, exames e insights em um
-                protótipo navegável para validação visual e funcional. Esta versão usa dados demo e
-                não substitui avaliação médica.
+                Dashboard, glicemia, alimentação, exercício, medicação, exames e insights com
+                backend Supabase. Com variáveis configuradas, o app exige login; o cadastro é
+                somente por código de convite. Não substitui avaliação médica.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg">
-                <Link href="/dashboard">
-                  Abrir demo navegável <ArrowRight className="h-4 w-4" />
+                <Link href="/login">
+                  Entrar <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href="/glicemia/tendencias">Ver curva glicêmica</Link>
+                <Link href="/register">Criar conta com convite</Link>
               </Button>
             </div>
 
             <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
               {[
-                ["Sem login obrigatório", "abre localmente com mocks"],
-                ["Pronto para Vercel", "stack Next.js compatível"],
-                ["Fluxo interativo", "módulos e drill-downs"],
+                ["Login obrigatório", "sessão Supabase Auth"],
+                ["Convite no cadastro", "signup público fechável"],
+                ["LGPD na conta", "exportar e apagar dados"],
               ].map(([title, desc]) => (
                 <div
                   key={title}
@@ -70,21 +70,21 @@ export default function Home() {
                     <Activity className="h-5 w-5 text-emerald-300" />
                   </div>
                   <div>
-                    <CardTitle>GLYX Demo Board</CardTitle>
-                    <CardDescription>Paciente fictícia · Marina Costa</CardDescription>
+                    <CardTitle>GLYX</CardTitle>
+                    <CardDescription>Autocuidado metabólico · pt-BR</CardDescription>
                   </div>
                 </div>
                 <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-200">
-                  online-ready
+                  invite-only
                 </span>
               </div>
             </CardHeader>
             <CardContent className="relative space-y-5">
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
-                  ["112", "mg/dL", "última glicemia"],
-                  ["92 g", "carb", "hoje"],
-                  ["38 min", "ativo", "exercício"],
+                  ["CGM", "Libre", "sync automático"],
+                  ["IA", "visão", "refeição e exames"],
+                  ["Push", "VAPID", "medicação"],
                 ].map(([value, unit, label]) => (
                   <div key={label} className="rounded-2xl border border-zinc-800 bg-black/25 p-4">
                     <p className="font-mono text-3xl text-zinc-50">{value}</p>
@@ -96,37 +96,19 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 bg-black/20 p-4">
-                <div className="mb-3 flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Curva 24h</span>
-                  <span className="text-emerald-300">70-160 alvo demo</span>
-                </div>
-                <div className="flex h-32 items-end gap-2">
-                  {[42, 56, 48, 68, 88, 72, 60, 76, 52, 44, 58, 50].map((h, index) => (
-                    <div
-                      key={index}
-                      className="flex-1 rounded-t-lg bg-gradient-to-t from-emerald-500 to-sky-400"
-                      style={{ height: `${h}%`, opacity: 0.55 + index / 28 }}
-                    />
-                  ))}
-                </div>
-              </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
                 {modules.slice(1, 5).map((item) => {
                   const Icon = item.icon;
                   return (
-                    <Link
+                    <div
                       key={item.href}
-                      href={item.href}
-                      className="group flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3 transition hover:border-emerald-500/40 hover:bg-zinc-900"
+                      className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3"
                     >
                       <span className="flex items-center gap-3 text-sm text-zinc-200">
                         <Icon className="h-4 w-4 text-emerald-400" />
                         {item.title}
                       </span>
-                      <ArrowRight className="h-4 w-4 text-zinc-600 transition group-hover:text-emerald-400" />
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -134,8 +116,8 @@ export default function Home() {
               <div className="flex items-start gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
                 <p className="text-sm leading-6 text-sky-100/80">
-                  Demonstração para apresentação: os dados são fictícios, coerentes e não gravam
-                  informações reais quando Supabase não está configurado.{" "}
+                  Esta página só aparece se o Supabase não estiver configurado no ambiente. Em
+                  produção o middleware redireciona visitantes para o login.{" "}
                   <Link href="/privacidade" className="text-sky-300 underline-offset-2 hover:underline">
                     Política de Privacidade
                   </Link>

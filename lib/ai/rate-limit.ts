@@ -31,8 +31,12 @@ export async function checkAndRecordAiUsage(
     .eq("kind", kind)
     .gte("created_at", windowStart);
 
-  // Falha na contagem não pode derrubar a funcionalidade — segue permitindo.
-  if (!error && (count ?? 0) >= limit) {
+  // Fail-closed: se a contagem falhar, não liberamos uso de IA (evita bypass).
+  if (error) {
+    return { allowed: false, limit, retryAfterMinutes: 5 };
+  }
+
+  if ((count ?? 0) >= limit) {
     const { data: oldest } = await supabase
       .from("ai_usage")
       .select("created_at")
@@ -48,11 +52,14 @@ export async function checkAndRecordAiUsage(
     return { allowed: false, limit, retryAfterMinutes };
   }
 
-  const { data: inserted } = await supabase
+  const { data: inserted, error: insertError } = await supabase
     .from("ai_usage")
     .insert({ user_id: userId, kind })
     .select("id")
     .maybeSingle();
+  if (insertError) {
+    return { allowed: false, limit, retryAfterMinutes: 5 };
+  }
   return { allowed: true, usageId: inserted?.id ?? null };
 }
 
