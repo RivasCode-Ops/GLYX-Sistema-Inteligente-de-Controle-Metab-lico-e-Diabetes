@@ -12,6 +12,7 @@ import {
   ScrollText,
   BellRing,
   Plug,
+  Radar,
 } from "lucide-react";
 
 export type NavItem = {
@@ -35,6 +36,7 @@ export const mainNav: NavItem[] = [
   { title: "Exames", href: "/exames", icon: FileText, mobile: false },
   { title: "Histórico", href: "/historico", icon: ScrollText, mobile: false },
   { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false },
+  { title: "Auditoria", href: "/status", icon: Radar, mobile: false },
 ];
 
 export const mobileNav = mainNav.filter((i) => i.mobile);

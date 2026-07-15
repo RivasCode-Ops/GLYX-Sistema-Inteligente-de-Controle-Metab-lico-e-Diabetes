@@ -182,6 +182,12 @@ export default async function DashboardPage() {
           <MacroGaugesCard consumed={macroConsumed} targets={macroTargets} />
         ) : null}
       </div>
+      <Link
+        href="/status"
+        className="block rounded-2xl border border-zinc-800 bg-zinc-900/30 px-4 py-3 text-sm text-zinc-400 transition hover:border-emerald-500/40 hover:text-zinc-200"
+      >
+        🔎 Auditoria do sistema — veja com seus olhos o que está funcionando →
+      </Link>
     </div>
   );
 }

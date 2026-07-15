@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { AppHeader } from "@/components/shell/app-header";
+import { SessionGuard } from "@/components/shell/session-guard";
 import { SetupBanner } from "@/components/setup-banner";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -30,6 +31,7 @@ export default async function AppShellLayout({
 
   return (
     <div className="flex min-h-dvh">
+      <SessionGuard />
       <AppSidebar className="hidden md:flex" isAdmin={isAdmin} />
       <div className="flex min-h-dvh flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <SetupBanner />

@@ -103,9 +103,12 @@ export function SensorRadar() {
   }
 
   return (
-    <p className="flex items-center gap-2 px-1 text-[11px] text-zinc-500">
+    <Link
+      href="/status"
+      className="flex items-center gap-2 px-1 text-[11px] text-zinc-500 transition hover:text-zinc-300"
+    >
       <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-      Sensor ativo · última leitura {idadeLabel(readingAge)}
-    </p>
+      Sensor ativo · última leitura {idadeLabel(readingAge)} · ver auditoria →
+    </Link>
   );
 }
