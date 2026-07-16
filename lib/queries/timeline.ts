@@ -1,11 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 
 export type TimelineItem = {
-  type: "glicemia" | "refeição" | "medicação" | "exercício";
+  type: "glicemia" | "refeição" | "medicação" | "exercício" | "insulina";
   id: string;
   at: string;
   label: string;
   detail: string;
+};
+
+const INSULIN_REASON_LABEL: Record<string, string> = {
+  correcao: "correção",
+  refeicao: "refeição",
+  outra: "outro",
 };
 
 export async function getTimeline(): Promise<TimelineItem[]> {
@@ -17,7 +23,7 @@ export async function getTimeline(): Promise<TimelineItem[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const [gRes, mRes, medRes, exRes] = await Promise.all([
+  const [gRes, mRes, medRes, exRes, insRes] = await Promise.all([
     supabase
       .from("glucose_readings")
       .select("id, value_mg_dl, recorded_at")
@@ -41,6 +47,12 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       .select("id, label, started_at, duration_min")
       .eq("user_id", user.id)
       .order("started_at", { ascending: false })
+      .limit(25),
+    supabase
+      .from("insulin_logs")
+      .select("id, units, reason, glucose_mg_dl, applied_at")
+      .eq("user_id", user.id)
+      .order("applied_at", { ascending: false })
       .limit(25),
   ]);
 
@@ -84,6 +96,17 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       at: e.started_at,
       label: "Exercício",
       detail: e.duration_min != null ? `${e.label} · ${e.duration_min} min` : e.label,
+    });
+  }
+
+  for (const i of insRes.data ?? []) {
+    const motivo = INSULIN_REASON_LABEL[i.reason] ?? i.reason;
+    items.push({
+      type: "insulina",
+      id: i.id,
+      at: i.applied_at,
+      label: "Insulina extra",
+      detail: `${i.units} U (${motivo})${i.glucose_mg_dl ? ` · glicemia ${i.glucose_mg_dl}` : ""}`,
     });
   }
 

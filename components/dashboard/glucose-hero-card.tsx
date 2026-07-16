@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { QuickReadingDialog } from "@/components/dashboard/quick-reading-dialog";
+import { InsulinQuickDialog } from "@/components/glicemia/insulin-quick-dialog";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { cn } from "@/lib/utils";
 
@@ -85,8 +86,9 @@ export function GlucoseHeroCard({
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <QuickReadingDialog />
+          <InsulinQuickDialog latestGlucose={latestGlucose} />
         </div>
       </div>
     </Card>

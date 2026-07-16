@@ -10,7 +10,8 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { DashboardAutoRefresh } from "@/components/dashboard/auto-refresh";
 import { SensorRadar } from "@/components/glicemia/sensor-radar";
-import { WaterCard } from "@/components/dashboard/water-card";
+import { WaterCard, type BeverageSummary } from "@/components/dashboard/water-card";
+import { isHydrating, isBeverageKind } from "@/lib/health/beverages";
 import { MacroGaugesCard } from "@/components/alimentacao/macro-gauge";
 import { dailyTargets } from "@/lib/health/energy";
 import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
@@ -54,6 +55,7 @@ export default async function DashboardPage() {
   let focus: Focus | null = null;
   let waterMl = 0;
   let waterGoalMl = 2000;
+  let beverageExtras: BeverageSummary[] = [];
   let macroConsumed: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
     null;
   let macroTargets: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
@@ -78,7 +80,7 @@ export default async function DashboardPage() {
       const [waterRes, mealsRes, weightRes, lastTrainedByGroup, pausedGroups] = await Promise.all([
         supabase
           .from("water_logs")
-          .select("amount_ml")
+          .select("amount_ml, kind")
           .eq("user_id", user.id)
           .gte("logged_at", startOfDayISO),
         supabase
@@ -106,7 +108,21 @@ export default async function DashboardPage() {
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
 
-      waterMl = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml ?? 0), 0);
+      // Só bebidas hidratantes contam pra meta; o resto vira o resumo de extras.
+      const beverageRows = (waterRes.data ?? []) as { amount_ml: number | null; kind: string | null }[];
+      waterMl = beverageRows
+        .filter((w) => isHydrating(w.kind ?? "agua"))
+        .reduce((s, w) => s + (w.amount_ml ?? 0), 0);
+      const extrasMap = new Map<string, BeverageSummary>();
+      for (const w of beverageRows) {
+        const kind = w.kind ?? "agua";
+        if (isHydrating(kind) || !isBeverageKind(kind)) continue;
+        const cur = extrasMap.get(kind) ?? { kind, count: 0, totalMl: 0 };
+        cur.count += 1;
+        cur.totalMl += w.amount_ml ?? 0;
+        extrasMap.set(kind, cur);
+      }
+      beverageExtras = [...extrasMap.values()];
       const weightKg = weightRes.data?.weight_kg ? Number(weightRes.data.weight_kg) : null;
       if (weightKg) waterGoalMl = Math.round(weightKg * 35);
 
@@ -177,7 +193,7 @@ export default async function DashboardPage() {
         muscleFocusLabel={muscleFocusLabel}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <WaterCard todayMl={waterMl} goalMl={waterGoalMl} />
+        <WaterCard todayMl={waterMl} goalMl={waterGoalMl} extras={beverageExtras} />
         {macroConsumed && macroTargets ? (
           <MacroGaugesCard consumed={macroConsumed} targets={macroTargets} />
         ) : null}
