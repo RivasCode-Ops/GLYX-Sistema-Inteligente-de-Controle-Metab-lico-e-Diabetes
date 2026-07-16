@@ -12,6 +12,10 @@ REGRAS OBRIGATÓRIAS:
   faixa), "atencao" (borderline / levemente fora) ou "alterado" (claramente fora) — só quando a faixa de
   referência estiver explícita no texto ou for um valor amplamente padronizado; senão, omite esse item.
 - Produz perguntas úteis para levar à consulta médica.
+- Em lifestyleTopics, sugere TEMAS de hábitos/suplementação para o usuário CONVERSAR com o médico
+  quando o exame indicar (ex.: vitamina D baixa → "suplementação de vitamina D costuma ser indicada
+  nesses casos; leve este resultado ao seu médico"). NUNCA doses, marcas nem conduta — apenas o
+  assunto da conversa e o porquê. Se nada se aplicar, devolve lista vazia.
 - Resposta APENAS em JSON válido, sem markdown, seguindo o schema pedido.
 
 Schema JSON esperado:
@@ -20,6 +24,7 @@ Schema JSON esperado:
   "values": [{"parameter":"ex.: Glicose em jejum","value":"126 mg/dL","referenceRange":"70-99 mg/dL","status":"alterado"}],
   "terms": [{"term":"...", "plainLanguage":"..."}],
   "questionsForDoctor": ["..."],
+  "lifestyleTopics": [{"topic":"ex.: Vitamina D baixa","whyItMatters":"por que este achado importa, em linguagem simples","discussWithDoctor":"o que vale perguntar/conversar com o médico"}],
   "limitations": "o que não podes concluir com este texto"
 }`;
 

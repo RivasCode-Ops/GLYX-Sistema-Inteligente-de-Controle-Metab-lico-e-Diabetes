@@ -27,8 +27,11 @@ REGRAS OBRIGATÓRIAS:
   "values": [{"parameter":"ex.: Glicose em jejum","value":"126 mg/dL","referenceRange":"70-99 mg/dL","status":"alterado"}],
   "terms": [{"term":"...", "plainLanguage":"..."}],
   "questionsForDoctor": ["..."],
+  "lifestyleTopics": [{"topic":"ex.: Vitamina D baixa","whyItMatters":"por que importa, em linguagem simples","discussWithDoctor":"o que conversar com o médico"}],
   "limitations": "o que não podes concluir com esta imagem"
-}`;
+}
+Em lifestyleTopics: apenas TEMAS de hábitos/suplementação para conversar com o médico quando o exame
+indicar — NUNCA doses, marcas nem conduta. Lista vazia se nada se aplicar.`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();

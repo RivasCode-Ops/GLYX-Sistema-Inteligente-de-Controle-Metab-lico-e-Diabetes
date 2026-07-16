@@ -23,6 +23,19 @@ export const parsedExamSummarySchema = z.object({
     })
   ),
   questionsForDoctor: z.array(z.string()),
+  /**
+   * Hábitos/suplementações para CONVERSAR com o médico (educativo) — nunca
+   * doses nem prescrição; o modelo sugere o assunto da conversa, não a conduta.
+   */
+  lifestyleTopics: z
+    .array(
+      z.object({
+        topic: z.string(),
+        whyItMatters: z.string(),
+        discussWithDoctor: z.string(),
+      })
+    )
+    .optional(),
   limitations: z.string(),
 });
 

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { runExamInterpretation } from "@/app/actions/exam-interpret";
+import { importExamValue } from "@/app/actions/exam-import";
+import { extractImportableValues, type ImportableValue } from "@/lib/exams/import-values";
 import type { ParsedExamSummary } from "@/lib/exams/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +18,8 @@ type Props = {
 export function ExamInterpretSection({ examId, initialSummary, openAiConfigured }: Props) {
   const router = useRouter();
   const [msg, setMsg] = useState<string | null>(null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [imported, setImported] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
 
   function run() {
@@ -29,7 +33,32 @@ export function ExamInterpretSection({ examId, initialSummary, openAiConfigured 
     });
   }
 
+  function importValue(item: ImportableValue) {
+    setImportMsg(null);
+    startTransition(() => {
+      void (async () => {
+        const fd = new FormData();
+        fd.set("kind", item.kind);
+        if (item.kind === "weight") fd.set("weightKg", String(item.weightKg));
+        else fd.set("mgDl", String(item.mgDl));
+        const r = await importExamValue(fd);
+        if (r.error) {
+          setImportMsg(r.error);
+          return;
+        }
+        setImported((prev) => new Set(prev).add(item.label));
+        setImportMsg(
+          item.kind === "weight"
+            ? "✅ Peso salvo no seu registro de hoje."
+            : "✅ Glicemia de jejum salva no seu histórico."
+        );
+        router.refresh();
+      })();
+    });
+  }
+
   const summary = initialSummary;
+  const importables = summary?.values ? extractImportableValues(summary.values) : [];
 
   return (
     <div className="space-y-4">
@@ -105,6 +134,53 @@ export function ExamInterpretSection({ examId, initialSummary, openAiConfigured 
                 ))}
               </ul>
             </div>
+            {importables.length ? (
+              <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-emerald-300/90">
+                  Aproveitar valores no app
+                </p>
+                <div className="space-y-2">
+                  {importables.map((item) => (
+                    <div key={item.label} className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-zinc-300">{item.label}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={pending || imported.has(item.label)}
+                        onClick={() => importValue(item)}
+                      >
+                        {imported.has(item.label)
+                          ? "Salvo ✓"
+                          : item.kind === "weight"
+                            ? "Salvar como peso de hoje"
+                            : "Salvar na glicemia (jejum)"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {importMsg ? <p className="mt-2 text-xs text-emerald-200">{importMsg}</p> : null}
+              </div>
+            ) : null}
+            {summary.lifestyleTopics?.length ? (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Hábitos e suplementação — para conversar com o médico
+                </p>
+                <ul className="space-y-2">
+                  {summary.lifestyleTopics.map((t) => (
+                    <li key={t.topic} className="rounded-lg border border-sky-900/40 bg-sky-950/20 px-3 py-2">
+                      <span className="font-medium text-sky-300/90">{t.topic}</span>
+                      <p className="mt-1 text-zinc-400">{t.whyItMatters}</p>
+                      <p className="mt-1 text-xs text-zinc-500">💬 {t.discussWithDoctor}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-zinc-600">
+                  Sugestões de assunto, não de conduta — dose e indicação são decisão do seu médico.
+                </p>
+              </div>
+            ) : null}
             <div>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                 Perguntas para o médico
