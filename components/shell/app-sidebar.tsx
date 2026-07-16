@@ -68,6 +68,7 @@ export function AppSidebar({ className, isAdmin }: { className?: string; isAdmin
         <p className="text-[11px] leading-relaxed text-zinc-500">
           GLYX oferece orientações gerais. Não substitui avaliação médica.
         </p>
+        <p className="text-[11px] text-zinc-600">© {new Date().getFullYear()} Riva&apos;s Alexandre</p>
       </div>
     </aside>
   );

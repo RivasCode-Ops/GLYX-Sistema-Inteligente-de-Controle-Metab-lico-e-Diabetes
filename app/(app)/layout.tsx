@@ -37,6 +37,9 @@ export default async function AppShellLayout({
         <SetupBanner />
         <AppHeader />
         <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8">{children}</main>
+        <footer className="px-4 pb-4 pt-2 text-center text-xs text-zinc-600 md:px-8 md:text-left">
+          © {new Date().getFullYear()} Riva&apos;s Alexandre
+        </footer>
       </div>
       <MobileTabBar className="md:hidden" />
     </div>

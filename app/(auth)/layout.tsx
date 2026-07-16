@@ -9,6 +9,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </p>
       </div>
       <div className="w-full max-w-md">{children}</div>
+      <p className="mt-8 text-xs text-zinc-600">
+        © {new Date().getFullYear()} Riva&apos;s Alexandre
+      </p>
     </div>
   );
 }
