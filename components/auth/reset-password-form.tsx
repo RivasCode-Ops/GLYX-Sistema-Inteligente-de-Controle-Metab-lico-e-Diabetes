@@ -3,24 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyAuthError } from "@/lib/auth/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-function friendlyAuthError(message: string): string {
-  const m = message.toLowerCase();
-  if (m.includes("same") || m.includes("different from the old")) {
-    return "A nova senha precisa ser diferente da anterior.";
-  }
-  if (m.includes("session") || m.includes("not authenticated") || m.includes("jwt")) {
-    return "Link expirado ou inválido. Peça um novo em “Esqueci minha senha”.";
-  }
-  if (m.includes("weak") || m.includes("at least")) {
-    return "Senha fraca demais. Use no mínimo 6 caracteres.";
-  }
-  return message;
-}
 
 export function ResetPasswordForm() {
   const router = useRouter();

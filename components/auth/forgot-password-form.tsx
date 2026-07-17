@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyAuthError } from "@/lib/auth/errors";
 import { isSupabaseConfigured } from "@/lib/env";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ export function ForgotPasswordForm() {
     });
     setLoading(false);
     if (err) {
-      setError(err.message);
+      setError(friendlyAuthError(err.message));
       return;
     }
     setSent(true);
