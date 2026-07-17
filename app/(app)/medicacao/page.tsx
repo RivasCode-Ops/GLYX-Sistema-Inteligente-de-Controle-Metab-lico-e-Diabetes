@@ -21,6 +21,7 @@ import {
   type TodayLog,
   type TodaySnooze,
 } from "@/components/medicacao/daily-doses-card";
+import { AddMedicationByPhoto } from "@/components/medicacao/add-by-photo";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
@@ -169,11 +170,12 @@ export default async function MedicacaoOverviewPage() {
       ) : null}
 
       {!demoMode ? <AlarmSetup /> : null}
+      {!demoMode ? <AddMedicationByPhoto /> : null}
       {!demoMode ? <SupplementCheckForm /> : null}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Adicionar medicamento</CardTitle>
+          <CardTitle className="text-base">Adicionar medicamento (manual)</CardTitle>
           <CardDescription>Ajustes terapêuticos só com seu médico.</CardDescription>
         </CardHeader>
         <CardContent>
