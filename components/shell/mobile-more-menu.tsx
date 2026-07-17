@@ -1,0 +1,73 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Menu } from "lucide-react";
+import { moreNav } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+const HIGHLIGHT = new Set(["/exames", "/mapa-risco"]);
+
+export function MobileMoreMenu() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-200 md:hidden"
+          aria-label="Abrir mais opções"
+        >
+          <Menu className="h-4 w-4" aria-hidden />
+          Mais
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85dvh] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto rounded-2xl p-4 sm:rounded-2xl">
+        <DialogHeader className="text-left">
+          <DialogTitle>Mais no GLyX</DialogTitle>
+          <DialogDescription>
+            Exames (ECG / Raio-X), mapa de risco e o restante do app.
+          </DialogDescription>
+        </DialogHeader>
+        <nav className="mt-2 grid gap-1">
+          {moreNav.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+            const Icon = item.icon;
+            const highlight = HIGHLIGHT.has(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors",
+                  active
+                    ? "bg-zinc-800 text-white"
+                    : highlight
+                      ? "border border-emerald-600/40 bg-emerald-500/10 text-emerald-100"
+                      : "text-zinc-300 hover:bg-zinc-900"
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+                <span className="font-medium">{item.title}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </DialogContent>
+    </Dialog>
+  );
+}

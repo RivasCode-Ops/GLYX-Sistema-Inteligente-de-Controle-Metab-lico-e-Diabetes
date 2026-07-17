@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { mainNav } from "@/lib/navigation";
 import { ModuleSubnav } from "@/components/shell/module-subnav";
+import { MobileMoreMenu } from "@/components/shell/mobile-more-menu";
 import { SignOutButton } from "@/components/shell/sign-out-button";
 
 function titleForPath(pathname: string): { title: string; crumbs: string[] } {
@@ -47,7 +48,8 @@ export function AppHeader() {
             ))}
           </div>
           {/* No desktop o "Sair" fica na sidebar; no mobile ela não existe. */}
-          <div className="md:hidden">
+          <div className="flex items-center gap-2 md:hidden">
+            <MobileMoreMenu />
             <SignOutButton compact />
           </div>
         </div>

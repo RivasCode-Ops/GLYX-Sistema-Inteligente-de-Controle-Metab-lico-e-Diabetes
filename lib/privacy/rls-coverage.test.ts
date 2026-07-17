@@ -26,6 +26,8 @@ const CLINICAL_TABLES_WITH_USER_ID = [
   "ai_messages",
   "health_snapshots",
   "insight_findings",
+  "metabolic_audits",
+  "insulin_logs",
   "ai_usage",
   "push_subscriptions",
   "push_dispatch_log",

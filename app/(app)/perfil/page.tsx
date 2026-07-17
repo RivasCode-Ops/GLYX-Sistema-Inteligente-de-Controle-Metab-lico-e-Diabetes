@@ -2,6 +2,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { logWeight, updateProfile } from "@/app/actions/profile";
 import { AiUsageCard } from "@/components/perfil/ai-usage-card";
+import { ChangePasswordCard } from "@/components/perfil/change-password-card";
 import { DataPrivacySection } from "@/components/perfil/data-privacy-section";
 import { GoalFeasibilityCard } from "@/components/perfil/goal-feasibility-card";
 import { WeightChart } from "@/components/perfil/weight-chart";
@@ -284,6 +285,7 @@ export default async function PerfilPage() {
         </CardContent>
       </Card>
 
+      {!demoMode ? <ChangePasswordCard /> : null}
       {!demoMode ? <GoalFeasibilityCard /> : null}
       {!demoMode ? <AiUsageCard /> : null}
       {!demoMode ? <DataPrivacySection /> : null}

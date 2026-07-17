@@ -23,10 +23,14 @@ export function ForgotPasswordForm() {
       return;
     }
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setError("Supabase não configurado neste ambiente.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
     });
     setLoading(false);
     if (err) {

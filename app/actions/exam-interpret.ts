@@ -23,7 +23,7 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
 
   const { data: exam, error: fetchErr } = await supabase
     .from("exams")
-    .select("id, raw_text, user_id")
+    .select("id, raw_text, user_id, exam_type")
     .eq("id", examId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -43,10 +43,15 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
 
   await recordAiTokens(supabase, rate.usageId, result.usage, aiModel());
 
+  const summary = {
+    ...result.data,
+    modality: (exam.exam_type as "lab" | "ecg" | "rx" | null) ?? result.data.modality ?? "lab",
+  };
+
   const { error: upErr } = await supabase
     .from("exams")
     .update({
-      parsed_summary: result.data as unknown as Record<string, unknown>,
+      parsed_summary: summary as unknown as Record<string, unknown>,
     })
     .eq("id", examId)
     .eq("user_id", user.id);

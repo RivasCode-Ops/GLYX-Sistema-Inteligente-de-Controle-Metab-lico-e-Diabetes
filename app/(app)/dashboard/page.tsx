@@ -198,12 +198,20 @@ export default async function DashboardPage() {
           <MacroGaugesCard consumed={macroConsumed} targets={macroTargets} />
         ) : null}
       </div>
-      <Link
-        href="/status"
-        className="block rounded-2xl border border-zinc-800 bg-zinc-900/30 px-4 py-3 text-sm text-zinc-400 transition hover:border-emerald-500/40 hover:text-zinc-200"
-      >
-        🔎 Auditoria do sistema — veja com seus olhos o que está funcionando →
-      </Link>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/mapa-risco"
+          className="block rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-zinc-300 transition hover:border-emerald-500/40 hover:text-zinc-100"
+        >
+          Mapa de risco — auditoria metabólica do seu período →
+        </Link>
+        <Link
+          href="/status"
+          className="block rounded-2xl border border-zinc-800 bg-zinc-900/30 px-4 py-3 text-sm text-zinc-400 transition hover:border-emerald-500/40 hover:text-zinc-200"
+        >
+          Auditoria do sistema — o que está funcionando →
+        </Link>
+      </div>
     </div>
   );
 }

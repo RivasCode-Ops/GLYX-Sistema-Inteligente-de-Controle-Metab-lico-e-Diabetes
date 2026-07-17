@@ -92,6 +92,48 @@ export function ExamInterpretSection({ examId, initialSummary, openAiConfigured 
           </CardHeader>
           <CardContent className="space-y-4 text-sm leading-relaxed text-zinc-300">
             <p>{summary.summary}</p>
+            {summary.imageQuality || summary.regionOrLeadNote ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {summary.imageQuality ? (
+                  <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-xs text-zinc-400">
+                    <span className="text-zinc-500">Qualidade: </span>
+                    {summary.imageQuality}
+                  </p>
+                ) : null}
+                {summary.regionOrLeadNote ? (
+                  <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-xs text-zinc-400">
+                    <span className="text-zinc-500">Região / traçado: </span>
+                    {summary.regionOrLeadNote}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {summary.findings?.length ? (
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Achados descritivos
+                </p>
+                <ul className="space-y-1.5">
+                  {summary.findings.map((f) => {
+                    const style =
+                      f.severity === "alterado"
+                        ? "border-red-500/40 bg-red-500/10"
+                        : f.severity === "atencao"
+                          ? "border-amber-500/40 bg-amber-500/10"
+                          : "border-zinc-700 bg-zinc-900/40";
+                    return (
+                      <li key={f.finding} className={`rounded-lg border px-3 py-2 ${style}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-zinc-100">{f.finding}</span>
+                          <span className="text-[11px] uppercase text-zinc-500">{f.severity}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-400">{f.plainLanguage}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
             {summary.values?.length ? (
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">

@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { examTypeSchema } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
 
 const schema = z.object({
   title: z.string().min(1),
   raw_text: z.string().min(10),
+  exam_type: examTypeSchema.default("lab"),
 });
 
 export type ActionResult = { ok?: true; error?: string };
@@ -23,6 +25,7 @@ export async function saveExamDraft(formData: FormData): Promise<ActionResult> {
   const parsed = schema.safeParse({
     title: formData.get("title"),
     raw_text: formData.get("raw_text"),
+    exam_type: formData.get("exam_type") || "lab",
   });
   if (!parsed.success) return { error: "Título e texto do exame são obrigatórios." };
 
@@ -30,6 +33,7 @@ export async function saveExamDraft(formData: FormData): Promise<ActionResult> {
     user_id: user.id,
     title: parsed.data.title,
     raw_text: parsed.data.raw_text,
+    exam_type: parsed.data.exam_type,
     parsed_summary: null,
   });
 

@@ -3,35 +3,12 @@ import OpenAI from "openai";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
-import { examPhotoResultSchema } from "@/lib/exams/types";
+import { defaultTitleFor, visionPromptFor, visionTemperatureFor } from "@/lib/exams/prompts";
+import { examPhotoResultSchema, parseExamType } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_PAGES = 3;
-
-const PROMPT = `És um assistente clínico-educativo para leigos (Português do Brasil).
-As imagens são páginas do MESMO exame laboratorial ou laudo médico (foto ou PDF digitalizado).
-
-REGRAS OBRIGATÓRIAS:
-- NÃO faças diagnóstico nem conclusões médicas definitivas.
-- NÃO alteres doses nem recomendes medicamentos.
-- Se a imagem NÃO for um exame/laudo legível, devolve extractedText vazio e explica em limitations.
-- Se houver valores numéricos com faixa de referência na imagem, classifica cada um como "normal" (dentro
-  da faixa), "atencao" (borderline / levemente fora) ou "alterado" (claramente fora) — só quando a faixa de
-  referência estiver visível ou for um valor amplamente padronizado; senão, omite esse item.
-- Resposta APENAS em JSON válido, sem markdown, com este schema:
-{
-  "extractedText": "transcrição fiel do texto/valores legíveis do exame",
-  "suggestedTitle": "título curto ex.: Hemograma jan/2026",
-  "summary": "parágrafo curto sobre o que o exame parece reportar (factual, sem diagnosticar)",
-  "values": [{"parameter":"ex.: Glicose em jejum","value":"126 mg/dL","referenceRange":"70-99 mg/dL","status":"alterado"}],
-  "terms": [{"term":"...", "plainLanguage":"..."}],
-  "questionsForDoctor": ["..."],
-  "lifestyleTopics": [{"topic":"ex.: Vitamina D baixa","whyItMatters":"por que importa, em linguagem simples","discussWithDoctor":"o que conversar com o médico"}],
-  "limitations": "o que não podes concluir com esta imagem"
-}
-Em lifestyleTopics: apenas TEMAS de hábitos/suplementação para conversar com o médico quando o exame
-indicar — NUNCA doses, marcas nem conduta. Lista vazia se nada se aplicar.`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -48,6 +25,7 @@ export async function POST(req: Request) {
 
   const formData = await req.formData();
   const titleInput = String(formData.get("title") ?? "").trim();
+  const examType = parseExamType(formData.get("examType") ?? formData.get("exam_type"));
 
   // Aceita "image" (uma foto, compatibilidade) e "images" (páginas de PDF convertidas)
   const single = formData.get("image");
@@ -104,11 +82,11 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "user",
-          content: [{ type: "text", text: PROMPT }, ...imageParts],
+          content: [{ type: "text", text: visionPromptFor(examType) }, ...imageParts],
         },
       ],
       max_tokens: 1600,
-      temperature: 0.3,
+      temperature: visionTemperatureFor(examType),
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
@@ -127,7 +105,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const parsed = examPhotoResultSchema.safeParse(json);
+  const parsed = examPhotoResultSchema.safeParse({
+    ...(typeof json === "object" && json ? json : {}),
+    modality: examType,
+  });
   if (!parsed.success) {
     return NextResponse.json(
       { error: "O modelo não devolveu o formato esperado. Tente novamente." },
@@ -135,25 +116,28 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!parsed.data.extractedText.trim()) {
+  const hasText = parsed.data.extractedText.trim().length > 0;
+  const hasFindings = (parsed.data.findings?.length ?? 0) > 0;
+  const hasSummary = parsed.data.summary.trim().length > 0;
+  if (!hasSummary || (!hasText && !hasFindings)) {
     return NextResponse.json(
-      { error: `Não consegui ler um exame nesta imagem. ${parsed.data.limitations}` },
+      {
+        error: `Não consegui analisar esta imagem como ${examType === "lab" ? "exame laboratorial" : examType === "ecg" ? "ECG" : "Raio-X"}. ${parsed.data.limitations}`,
+      },
       { status: 422 }
     );
   }
 
   const { extractedText, suggestedTitle, ...summary } = parsed.data;
-  const title =
-    titleInput ||
-    suggestedTitle ||
-    `Exame por foto ${new Date().toLocaleDateString("pt-BR")}`;
+  const title = titleInput || suggestedTitle || defaultTitleFor(examType);
 
   const { data: exam, error: insertErr } = await supabase
     .from("exams")
     .insert({
       user_id: user.id,
       title,
-      raw_text: extractedText,
+      exam_type: examType,
+      raw_text: extractedText || summary.summary,
       parsed_summary: summary as unknown as Record<string, unknown>,
     })
     .select("id")
@@ -163,7 +147,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
 
-  return NextResponse.json({ examId: exam?.id ?? null, title, summary });
+  return NextResponse.json({ examId: exam?.id ?? null, title, examType, summary });
 }
 
 export const runtime = "nodejs";

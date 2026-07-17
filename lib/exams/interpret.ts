@@ -20,8 +20,10 @@ REGRAS OBRIGATÓRIAS:
 
 Schema JSON esperado:
 {
+  "modality": "lab",
   "summary": "parágrafo curto sobre o que o texto parece reportar (factual, sem diagnosticar)",
   "values": [{"parameter":"ex.: Glicose em jejum","value":"126 mg/dL","referenceRange":"70-99 mg/dL","status":"alterado"}],
+  "findings": [],
   "terms": [{"term":"...", "plainLanguage":"..."}],
   "questionsForDoctor": ["..."],
   "lifestyleTopics": [{"topic":"ex.: Vitamina D baixa","whyItMatters":"por que este achado importa, em linguagem simples","discussWithDoctor":"o que vale perguntar/conversar com o médico"}],

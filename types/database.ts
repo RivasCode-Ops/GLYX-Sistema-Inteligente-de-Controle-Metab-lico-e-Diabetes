@@ -89,6 +89,20 @@ export type InsightFinding = {
   computed_at: string;
 };
 
+export type MetabolicAudit = {
+  id: string;
+  user_id: string;
+  window_days: number;
+  period_start: string;
+  period_end: string;
+  score: number;
+  label: "Estável" | "Atenção" | "Alerta" | "Dados insuficientes";
+  metrics: Record<string, unknown>;
+  factors: unknown[];
+  plan: unknown[];
+  computed_at: string;
+};
+
 export type HealthSnapshot = {
   id: string;
   user_id: string;

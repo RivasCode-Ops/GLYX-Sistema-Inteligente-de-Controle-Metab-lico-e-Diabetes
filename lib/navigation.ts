@@ -13,6 +13,7 @@ import {
   BellRing,
   Plug,
   Radar,
+  Map,
 } from "lucide-react";
 
 export type NavItem = {
@@ -31,15 +32,19 @@ export const mainNav: NavItem[] = [
   { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true },
   { title: "Integrações", href: "/integracoes", icon: Plug, mobile: false },
   { title: "Insights", href: "/insights", icon: Lightbulb, mobile: false },
+  { title: "Mapa de risco", href: "/mapa-risco", icon: Map, mobile: false },
   { title: "IA metabólica", href: "/ia-metabolica", icon: Sparkles, mobile: false },
   { title: "Perfil", href: "/perfil", icon: User, mobile: false },
   { title: "Exames", href: "/exames", icon: FileText, mobile: false },
   { title: "Histórico", href: "/historico", icon: ScrollText, mobile: false },
   { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false },
-  { title: "Auditoria", href: "/status", icon: Radar, mobile: false },
+  { title: "Sistema", href: "/status", icon: Radar, mobile: false },
 ];
 
 export const mobileNav = mainNav.filter((i) => i.mobile);
+
+/** Itens que no celular ficam fora da barra inferior (menu Mais). */
+export const moreNav = mainNav.filter((i) => !i.mobile);
 
 export type SubNavItem = { title: string; href: string };
 

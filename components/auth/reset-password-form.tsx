@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,27 +8,88 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+function friendlyAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("same") || m.includes("different from the old")) {
+    return "A nova senha precisa ser diferente da anterior.";
+  }
+  if (m.includes("session") || m.includes("not authenticated") || m.includes("jwt")) {
+    return "Link expirado ou inválido. Peça um novo em “Esqueci minha senha”.";
+  }
+  if (m.includes("weak") || m.includes("at least")) {
+    return "Senha fraca demais. Use no mínimo 6 caracteres.";
+  }
+  return message;
+}
+
 export function ResetPasswordForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function ensureSession() {
+      const supabase = createClient();
+      if (!supabase) {
+        if (!cancelled) setError("Supabase não configurado neste ambiente.");
+        return;
+      }
+
+      // Links de recuperação: session via cookies (callback) ou hash no URL.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        // Aguarda um tick do client auth processar o hash (#access_token / type=recovery).
+        await new Promise((r) => setTimeout(r, 400));
+        const again = await supabase.auth.getSession();
+        if (!again.data.session) {
+          if (!cancelled) {
+            setError(
+              "Não há sessão de recuperação ativa. Abra o link do e-mail de novo ou peça outro em “Esqueci minha senha”."
+            );
+          }
+          return;
+        }
+      }
+
+      if (!cancelled) setReady(true);
+    }
+
+    void ensureSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password.length < 6) {
+      setError("A nova senha precisa ter no mínimo 6 caracteres.");
+      return;
+    }
     if (password !== confirm) {
       setError("As senhas não coincidem.");
       return;
     }
+
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setError("Supabase não configurado neste ambiente.");
+      return;
+    }
+
     setLoading(true);
     const { error: err } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (err) {
-      setError(err.message);
+      setError(friendlyAuthError(err.message));
       return;
     }
     router.push("/dashboard");
@@ -42,11 +103,14 @@ export function ResetPasswordForm() {
         <CardDescription>Escolha a nova senha da sua conta.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="grid gap-4">
+        <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
           {error ? (
             <p className="rounded-lg border border-red-900/60 bg-red-950/40 p-2 text-xs text-red-200">
               {error}
             </p>
+          ) : null}
+          {!ready && !error ? (
+            <p className="text-xs text-zinc-500">Validando o link de recuperação…</p>
           ) : null}
           <div className="grid gap-2">
             <Label htmlFor="password">Nova senha (mín. 6 caracteres)</Label>
@@ -56,6 +120,7 @@ export function ResetPasswordForm() {
               autoComplete="new-password"
               required
               minLength={6}
+              disabled={!ready || loading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -68,11 +133,12 @@ export function ResetPasswordForm() {
               autoComplete="new-password"
               required
               minLength={6}
+              disabled={!ready || loading}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
             />
           </div>
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={!ready || loading}>
             {loading ? "Salvando…" : "Salvar nova senha"}
           </Button>
         </form>

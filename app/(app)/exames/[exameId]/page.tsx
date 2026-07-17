@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExamInterpretSection } from "@/components/exams/exam-interpret-section";
 import { isOpenAIConfigured, isSupabaseConfigured } from "@/lib/env";
-import { parsedExamSummarySchema } from "@/lib/exams/types";
+import { EXAM_TYPE_LABEL, parseExamType, parsedExamSummarySchema } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = { params: Promise<{ exameId: string }> };
@@ -44,6 +44,9 @@ export default async function ExameDetailPage({ params }: Props) {
         ← Voltar aos exames
       </Link>
       <div>
+        <p className="mb-1 text-xs uppercase tracking-wide text-zinc-500">
+          {EXAM_TYPE_LABEL[parseExamType(exam.exam_type)]}
+        </p>
         <h2 className="text-lg font-semibold text-zinc-100">{exam.title ?? "Exame"}</h2>
         <p className="font-mono text-xs text-zinc-500">{exam.id}</p>
       </div>

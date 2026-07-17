@@ -6,6 +6,7 @@ const PUBLIC_PREFIXES = [
   "/register",
   "/auth",
   "/forgot-password",
+  "/reset-password",
   "/privacidade",
   "/instalar",
   "/risco",

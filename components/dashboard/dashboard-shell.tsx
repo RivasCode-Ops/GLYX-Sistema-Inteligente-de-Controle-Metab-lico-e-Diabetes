@@ -8,6 +8,8 @@ import {
   Sparkles,
   BellRing,
   Plug,
+  Map,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GlucoseHeroCard } from "@/components/dashboard/glucose-hero-card";
@@ -112,6 +114,8 @@ export function DashboardShell({
               metric={muscleFocusLabel ?? `${activeMinutes} min · hoje`}
             />
             <ModuleRow title="Medicação" href="/medicacao" icon={Pill} metric="Ver agenda" />
+            <ModuleRow title="Exames" href="/exames" icon={FileText} metric="Lab · ECG · Raio-X" />
+            <ModuleRow title="Mapa de risco" href="/mapa-risco" icon={Map} metric="Auditoria" />
             <ModuleRow
               title="Integrações"
               href="/integracoes"

@@ -25,6 +25,10 @@ export default async function InsightsPage() {
             <Link href="/alertas" className="text-emerald-400 hover:underline">
               Alertas
             </Link>
+            . Para score longitudinal e plano de ação, use o{" "}
+            <Link href="/mapa-risco" className="text-emerald-400 hover:underline">
+              Mapa de risco
+            </Link>
             .
           </p>
         </div>
