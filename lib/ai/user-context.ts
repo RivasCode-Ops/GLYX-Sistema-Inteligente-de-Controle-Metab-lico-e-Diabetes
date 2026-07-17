@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
+import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 
 // Contexto compacto dos dados recentes do usuário para o copiloto de IA:
@@ -29,8 +30,16 @@ export async function buildUserContext(
   const startOfDay = startOfLocalDayISO(profile?.timezone);
   const twoDaysAgo = new Date(Date.now() - 48 * 3600_000).toISOString();
 
-  const [glucoseRes, mealsRes, insulinRes, beveragesRes, exerciseRes, weightRes, spikesRes] =
-    await Promise.all([
+  const [
+    glucoseRes,
+    mealsRes,
+    insulinRes,
+    beveragesRes,
+    exerciseRes,
+    weightRes,
+    spikesRes,
+    historyRes,
+  ] = await Promise.all([
       supabase
         .from("glucose_readings")
         .select("value_mg_dl, recorded_at, source")
@@ -77,6 +86,13 @@ export async function buildUserContext(
         .gte("eaten_at", new Date(Date.now() - 72 * 3600_000).toISOString())
         .order("eaten_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("glucose_readings")
+        .select("value_mg_dl, recorded_at")
+        .eq("user_id", userId)
+        .gte("recorded_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
+        .order("recorded_at", { ascending: false })
+        .limit(2000),
     ]);
 
   const linhas: string[] = [];
@@ -143,6 +159,21 @@ export async function buildUserContext(
         })
         .join("; ")}.`
     );
+  }
+
+  const history = historyRes.data ?? [];
+  if (history.length >= 20) {
+    const targetMax = profile?.target_glucose_max ?? 180;
+    const piores = worstHours(computeHourlyPattern(history, tz, targetMax));
+    if (piores.length) {
+      linhas.push(
+        `Padrão por hora do dia (14 dias, fuso do usuário) — janelas com mais leituras ACIMA da meta: ${piores
+          .map((b) => `${b.hour}h (média ${b.avg} mg/dL, ${b.pctAbove}% acima da meta em ${b.count} leituras)`)
+          .join("; ")}.`
+      );
+    } else {
+      linhas.push("Padrão por hora do dia (14 dias): nenhuma janela concentra leituras acima da meta.");
+    }
   }
 
   const spikes = spikesRes.data ?? [];

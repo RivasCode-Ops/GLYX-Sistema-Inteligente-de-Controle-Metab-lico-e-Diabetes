@@ -26,6 +26,11 @@ export function IaChat() {
         "Analise meus picos de glicemia recentes: quais refeições parecem ter causado, o que nelas provavelmente pesou (tipo e quantidade de carboidrato, horário, combinação) e o que eu posso ajustar na ALIMENTAÇÃO para reduzir os próximos picos? Sobre insulina, apenas resuma o que registrei e o que vale levar ao médico — sem sugerir dose.",
     },
     {
+      label: "⏰ Meus horários de risco",
+      prompt:
+        "Com base no meu padrão de glicemia por hora do dia: em quais horários minha glicemia mais fica alta? Analise o quadro todo (refeições, insulina registrada, atividade), proponha estratégias práticas para conter os picos nessas janelas, e explique em linguagem simples os riscos de ficar acima da meta com frequência e também de cair demais (hipoglicemia). Sem sugerir dose de insulina — o que for de dose, me diga o que levar ao médico.",
+    },
+    {
       label: "🍽️ Revisar meu dia",
       prompt:
         "Revise meu dia até agora (glicemia, refeições, bebidas, insulina registrada e exercício) e me diga o que está indo bem e o que merece atenção no restante do dia.",
