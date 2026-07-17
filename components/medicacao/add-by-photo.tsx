@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addMedication } from "@/app/actions/medications";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,15 +133,7 @@ export function AddMedicationByPhoto() {
   }
 
   return (
-    <Card className="border-sky-500/25">
-      <CardHeader>
-        <CardTitle className="text-base">📷 Cadastrar por foto ou arquivo do rótulo</CardTitle>
-        <CardDescription>
-          Tire a foto na hora ou escolha uma imagem da galeria/arquivos: a IA lê nome, tipo e
-          dose, você confere, ajusta os horários e salva — a imagem fica guardada como rótulo.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="file"
@@ -258,7 +249,6 @@ export function AddMedicationByPhoto() {
             </div>
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

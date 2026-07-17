@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -89,14 +88,7 @@ export function AlarmSetup() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Alarmes no dispositivo</CardTitle>
-        <CardDescription>
-          Receba alarme de medicação e alertas de glicemia neste aparelho, mesmo com o app fechado.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3">
+    <div className="grid gap-3">
         {state === "unsupported" ? (
           <p className="text-sm text-zinc-500">
             Este navegador não suporta notificações push. No iPhone, adicione o GLYX à tela inicial
@@ -130,7 +122,6 @@ export function AlarmSetup() {
           Ative em cada aparelho que deve tocar (celular, computador). Os horários de dose são
           definidos em cada medicamento, no módulo Medicação.
         </p>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

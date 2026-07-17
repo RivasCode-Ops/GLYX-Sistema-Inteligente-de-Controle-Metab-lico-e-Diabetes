@@ -9,11 +9,11 @@ import {
   updateMedication,
   updateMedicationStock,
 } from "@/app/actions/medications";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SectionCards } from "@/components/module/section-cards";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { AlarmSetup } from "@/components/push/alarm-setup";
 import { SupplementCheckForm } from "@/components/medicacao/supplement-check-form";
 import {
@@ -164,16 +164,6 @@ export default async function MedicacaoOverviewPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
-      <SectionCards
-        items={[
-          {
-            title: "Agenda",
-            description: "Linha do tempo de doses.",
-            href: "/medicacao/agenda",
-          },
-        ]}
-      />
-
       {!demoMode ? (
         <DailyDosesCard
           meds={meds}
@@ -184,16 +174,19 @@ export default async function MedicacaoOverviewPage({
         />
       ) : null}
 
-      {!demoMode ? <AlarmSetup /> : null}
-      {!demoMode ? <AddMedicationByPhoto /> : null}
-      {!demoMode ? <SupplementCheckForm /> : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Adicionar medicamento (manual)</CardTitle>
-          <CardDescription>Ajustes terapêuticos só com seu médico.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <CollapsibleSection
+        title="➕ Adicionar remédio ou suplemento"
+        description="Por foto do rótulo (a IA preenche) ou digitando — ajustes terapêuticos só com seu médico"
+      >
+        {!demoMode ? (
+          <>
+            <AddMedicationByPhoto />
+            <p className="border-t border-zinc-800/60 pt-4 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              ⌨️ Ou preencha manualmente
+            </p>
+          </>
+        ) : null}
+        <div>
           {demoMode ? (
             <p className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
               Demo pública: medicamentos e doses são fictícios. Ajustes terapêuticos continuam sendo
@@ -286,15 +279,33 @@ export default async function MedicacaoOverviewPage({
               />
               <p className="text-[11px] text-zinc-600">
                 Anexar ou não é opcional — guarda o rótulo para consulta rápida depois. Para a
-                análise de segurança por IA, use o card acima.
+                análise de segurança por IA, use a seção &quot;Analisar suplemento&quot;.
               </p>
             </div>
             <div className="sm:col-span-2">
               <Button type="submit">Salvar</Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </CollapsibleSection>
+
+      {!demoMode ? (
+        <CollapsibleSection
+          title="🔍 Analisar suplemento antes de comprar"
+          description="Só avalia a segurança cruzando com seus dados — não cadastra nada"
+        >
+          <SupplementCheckForm />
+        </CollapsibleSection>
+      ) : null}
+
+      {!demoMode ? (
+        <CollapsibleSection
+          title="⏰ Alarmes neste aparelho"
+          description="Ative para o celular tocar nos horários das doses"
+        >
+          <AlarmSetup />
+        </CollapsibleSection>
+      ) : null}
 
       <form method="get" className="flex items-center gap-2">
         <Input
@@ -518,6 +529,13 @@ export default async function MedicacaoOverviewPage({
       </div>
         );
       })}
+
+      <a
+        href="/medicacao/agenda"
+        className="block rounded-2xl border border-zinc-800 bg-zinc-900/30 px-4 py-3 text-sm text-zinc-400 transition hover:border-emerald-500/40 hover:text-zinc-200"
+      >
+        📖 Ver histórico completo de doses (agenda) →
+      </a>
     </div>
   );
 }

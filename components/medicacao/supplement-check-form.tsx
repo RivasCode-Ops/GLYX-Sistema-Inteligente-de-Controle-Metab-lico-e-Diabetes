@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
@@ -61,15 +61,7 @@ export function SupplementCheckForm() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Analisar suplemento antes de comprar</CardTitle>
-          <CardDescription>
-            Fotografe o rótulo (ingredientes + tabela nutricional). A IA cruza com sua glicemia,
-            exames e medicações — não recomenda onde comprar, só avalia a segurança.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div>
           <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
             <input
               type="file"
@@ -100,8 +92,7 @@ export function SupplementCheckForm() {
               nutricionista/nefrologista/endocrinologista.
             </p>
           </form>
-        </CardContent>
-      </Card>
+      </div>
 
       {result ? (
         <Card className={VERDICT_STYLE[result.verdict].box}>
