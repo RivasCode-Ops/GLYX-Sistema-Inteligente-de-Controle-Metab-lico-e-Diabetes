@@ -22,6 +22,7 @@ import {
   type TodaySnooze,
 } from "@/components/medicacao/daily-doses-card";
 import { AddMedicationByPhoto } from "@/components/medicacao/add-by-photo";
+import { ReminderTimesField } from "@/components/medicacao/reminder-times-field";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
@@ -38,7 +39,21 @@ const DOSE_UNITS = [
   "gota(s)",
 ] as const;
 
-export default async function MedicacaoOverviewPage() {
+/** Busca sem acento/maiúscula: "insulína" acha "Insulina NPH". */
+function normaliza(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+export default async function MedicacaoOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const busca = (q ?? "").trim();
   let meds: Medication[] = [];
   let todayLogs: TodayLog[] = [];
   let todaySnoozes: TodaySnooze[] = [];
@@ -239,8 +254,8 @@ export default async function MedicacaoOverviewPage() {
               <Input id="schedule_hint" name="schedule_hint" placeholder="ex.: café da manhã" />
             </div>
             <div className="grid gap-1">
-              <Label htmlFor="reminder_times">Alarmes de dose (horários HH:MM, separados por vírgula)</Label>
-              <Input id="reminder_times" name="reminder_times" placeholder="ex.: 08:00, 20:00" />
+              <Label>Alarmes de dose (quantos horários precisar)</Label>
+              <ReminderTimesField />
               <p className="text-[11px] text-zinc-600">
                 Nesses horários, os dispositivos com alarme ativado tocam com o nome e a dose.
               </p>
@@ -281,8 +296,29 @@ export default async function MedicacaoOverviewPage() {
         </CardContent>
       </Card>
 
+      <form method="get" className="flex items-center gap-2">
+        <Input
+          name="q"
+          defaultValue={busca}
+          placeholder="🔎 Buscar remédio ou suplemento pelo nome…"
+          className="max-w-sm"
+        />
+        <Button type="submit" variant="outline" size="sm">
+          Buscar
+        </Button>
+        {busca ? (
+          <a href="/medicacao" className="text-xs text-zinc-500 hover:text-zinc-300">
+            limpar
+          </a>
+        ) : null}
+      </form>
+
       {(["med", "supplement"] as const).map((section) => {
-        const items = meds.filter((m) => (m.kind ?? "med") === section);
+        const items = meds.filter(
+          (m) =>
+            (m.kind ?? "med") === section &&
+            (!busca || normaliza(m.name).includes(normaliza(busca)))
+        );
         if (section === "supplement" && items.length === 0) return null;
         return (
       <div key={section}>
@@ -290,7 +326,9 @@ export default async function MedicacaoOverviewPage() {
           {section === "med" ? "Medicamentos ativos" : "💪 Suplementos"}
         </h2>
         {items.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum medicamento cadastrado.</p>
+          <p className="text-sm text-zinc-500">
+            {busca ? `Nada encontrado para "${busca}".` : "Nenhum medicamento cadastrado."}
+          </p>
         ) : (
           <ul className="space-y-3">
             {items.map((m) => {
@@ -448,13 +486,8 @@ export default async function MedicacaoOverviewPage() {
                               />
                             </div>
                             <div className="grid gap-1">
-                              <Label className="text-xs">Alarmes (HH:MM, vírgula)</Label>
-                              <Input
-                                name="reminder_times"
-                                defaultValue={m.reminder_times?.join(", ") ?? ""}
-                                placeholder="vazio = sem alarme"
-                                className="h-8 text-sm"
-                              />
+                              <Label className="text-xs">Alarmes de dose</Label>
+                              <ReminderTimesField defaultTimes={m.reminder_times ?? []} />
                             </div>
                             <div className="grid gap-1">
                               <Label className="text-xs">Tipo</Label>

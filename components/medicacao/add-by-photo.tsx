@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReminderTimesField } from "@/components/medicacao/reminder-times-field";
 
 // Cadastro por foto do rótulo: a IA lê nome/tipo/dose/estoque e pré-preenche;
 // o usuário revisa, ajusta horários e salva — a própria foto fica anexada
@@ -224,12 +225,8 @@ export function AddMedicationByPhoto() {
               />
             </div>
             <div className="grid gap-1">
-              <Label>Alarmes (HH:MM, vírgula)</Label>
-              <Input
-                value={draft.reminder_times}
-                onChange={(e) => set("reminder_times", e.target.value)}
-                placeholder="ex.: 08:00, 20:00"
-              />
+              <Label>Alarmes de dose</Label>
+              <ReminderTimesField onChange={(v) => set("reminder_times", v)} />
             </div>
             <div className="grid gap-1">
               <Label>Estoque (opcional)</Label>
