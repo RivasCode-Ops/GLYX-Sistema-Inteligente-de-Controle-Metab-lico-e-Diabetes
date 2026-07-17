@@ -74,7 +74,7 @@ export function SupplementCheckForm() {
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,application/pdf"
-              capture="environment"
+              /* sem capture: o celular oferece camera OU galeria/arquivo */
               onChange={(e) => void onFileChange(e)}
               className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
             />

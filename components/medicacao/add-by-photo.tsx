@@ -136,10 +136,10 @@ export function AddMedicationByPhoto() {
   return (
     <Card className="border-sky-500/25">
       <CardHeader>
-        <CardTitle className="text-base">📷 Cadastrar por foto do rótulo</CardTitle>
+        <CardTitle className="text-base">📷 Cadastrar por foto ou arquivo do rótulo</CardTitle>
         <CardDescription>
-          Fotografe a caixa/pote: a IA lê nome, tipo e dose, você confere, ajusta os horários e
-          salva — a foto já fica guardada como rótulo.
+          Tire a foto na hora ou escolha uma imagem da galeria/arquivos: a IA lê nome, tipo e
+          dose, você confere, ajusta os horários e salva — a imagem fica guardada como rótulo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -147,7 +147,7 @@ export function AddMedicationByPhoto() {
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            capture="environment"
+            /* sem capture: o celular oferece camera OU galeria/arquivo */
             onChange={(e) => {
               setDraft(null);
               setSaved(false);
