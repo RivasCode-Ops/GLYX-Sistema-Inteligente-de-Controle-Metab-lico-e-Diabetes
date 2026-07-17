@@ -25,6 +25,24 @@ const medSchema = z.object({
   kind: z.enum(["med", "supplement"]).default("med"),
 });
 
+/**
+ * Compõe a dosagem a partir de quantidade + unidade do formulário (ex.: 10 +
+ * "U" → "10 U"; 30 + "g" → "30 g") — cobre insulina em unidades, whey e
+ * creatina em gramas/scoop, além de comprimidos. Sem quantidade, vale o
+ * texto livre.
+ */
+function composeDosage(formData: FormData): string | undefined {
+  const amountRaw = String(formData.get("dose_amount") ?? "").trim().replace(",", ".");
+  const unit = String(formData.get("dose_unit") ?? "").trim();
+  const free = String(formData.get("dosage") ?? "").trim();
+  const amount = Number(amountRaw);
+  if (amountRaw && Number.isFinite(amount) && amount > 0 && unit) {
+    const num = Number.isInteger(amount) ? String(amount) : String(amount).replace(".", ",");
+    return `${num} ${unit}`;
+  }
+  return free || undefined;
+}
+
 // "08:00, 20h30, 7:5" → ["08:00", "20:30"] (inválidos são descartados)
 function parseReminderTimes(input: string): string[] {
   return input
@@ -49,7 +67,7 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
 
   const parsed = medSchema.safeParse({
     name: formData.get("name"),
-    dosage: formData.get("dosage") || undefined,
+    dosage: composeDosage(formData),
     schedule_hint: formData.get("schedule_hint") || undefined,
     reminder_times: reminderTimes.length ? reminderTimes : undefined,
     kind: formData.get("kind") === "supplement" ? "supplement" : "med",

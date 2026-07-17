@@ -1,15 +1,31 @@
 import { isSupabaseConfigured } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
 import { getGlucoseReadingsSince } from "@/lib/queries/glucose-series";
 import { GlucoseTrendChart } from "@/components/glicemia/glucose-trend-chart";
 import { demoGlucosePoints } from "@/lib/demo/data";
 
 export default async function GlicemiaTendenciasPage() {
   let readings: Awaited<ReturnType<typeof getGlucoseReadingsSince>> = [];
+  let targetMin = 70;
+  let targetMax = 180;
 
   if (!isSupabaseConfigured()) {
     readings = demoGlucosePoints;
   } else {
     readings = await getGlucoseReadingsSince(14);
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = (await supabase?.auth.getUser()) ?? { data: { user: null } };
+    if (supabase && user) {
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("target_glucose_min, target_glucose_max")
+        .eq("id", user.id)
+        .maybeSingle();
+      targetMin = p?.target_glucose_min ?? 70;
+      targetMax = p?.target_glucose_max ?? 180;
+    }
   }
 
   const last = readings.length ? readings[readings.length - 1] : null;
@@ -37,9 +53,9 @@ export default async function GlicemiaTendenciasPage() {
           <p className="text-xs text-zinc-500">{readings.length} leituras</p>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
-          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Meta visual</p>
-          <p className="font-mono text-2xl text-emerald-400/90">70–180</p>
-          <p className="text-xs text-zinc-500">ajuste no perfil</p>
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Sua meta</p>
+          <p className="font-mono text-2xl text-emerald-400/90">{targetMin}–{targetMax}</p>
+          <p className="text-xs text-zinc-500">ajuste no Perfil, com seu médico</p>
         </div>
       </div>
       <GlucoseTrendChart readings={readings} />

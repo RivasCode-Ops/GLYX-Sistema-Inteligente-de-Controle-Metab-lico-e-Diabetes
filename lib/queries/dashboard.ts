@@ -26,10 +26,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("timezone")
+    .select("timezone, target_glucose_min, target_glucose_max")
     .eq("id", user.id)
     .maybeSingle();
   const startOfDayISO = startOfLocalDayISO(profile?.timezone);
+  const targetMin = profile?.target_glucose_min ?? 70;
+  const targetMax = profile?.target_glucose_max ?? 180;
 
   const [glucoseRes, mealsRes, exercisesRes, alertsRes] = await Promise.all([
     supabase
@@ -74,10 +76,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       0
     ) ?? 0;
 
+  // Faixa alvo do perfil (definida com o médico); 70–180 é só o padrão inicial.
   let riskLabel = "—";
   if (latestGlucose != null) {
-    if (latestGlucose >= 180 || latestGlucose < 70) riskLabel = "Atenção";
-    else if (latestGlucose >= 140) riskLabel = "Moderado";
+    const moderateFrom = Math.round(targetMin + (targetMax - targetMin) * 0.65);
+    if (latestGlucose >= targetMax || latestGlucose < targetMin) riskLabel = "Atenção";
+    else if (latestGlucose >= moderateFrom) riskLabel = "Moderado";
     else riskLabel = "Baixo";
   }
 

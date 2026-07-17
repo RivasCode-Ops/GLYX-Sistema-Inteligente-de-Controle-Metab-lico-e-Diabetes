@@ -22,14 +22,14 @@ export async function buildUserContext(
 ): Promise<string> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("timezone, primary_focus, body_goal")
+    .select("timezone, primary_focus, body_goal, target_glucose_min, target_glucose_max")
     .eq("id", userId)
     .maybeSingle();
   const tz = profile?.timezone || "America/Sao_Paulo";
   const startOfDay = startOfLocalDayISO(profile?.timezone);
   const twoDaysAgo = new Date(Date.now() - 48 * 3600_000).toISOString();
 
-  const [glucoseRes, mealsRes, insulinRes, beveragesRes, exerciseRes, weightRes] =
+  const [glucoseRes, mealsRes, insulinRes, beveragesRes, exerciseRes, weightRes, spikesRes] =
     await Promise.all([
       supabase
         .from("glucose_readings")
@@ -69,6 +69,14 @@ export async function buildUserContext(
         .order("logged_on", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("meals")
+        .select("name, carbs_g, eaten_at")
+        .eq("user_id", userId)
+        .eq("glucose_spike", true)
+        .gte("eaten_at", new Date(Date.now() - 72 * 3600_000).toISOString())
+        .order("eaten_at", { ascending: false })
+        .limit(5),
     ]);
 
   const linhas: string[] = [];
@@ -80,6 +88,9 @@ export async function buildUserContext(
     if (foco) linhas.push(`Foco do usuário: ${foco}.`);
   }
   if (weightRes.data?.weight_kg) linhas.push(`Peso atual: ${weightRes.data.weight_kg} kg.`);
+  linhas.push(
+    `Faixa alvo de glicemia definida no app: ${profile?.target_glucose_min ?? 70}–${profile?.target_glucose_max ?? 180} mg/dL (ajustes de meta são decisão médica).`
+  );
 
   const gl = glucoseRes.data ?? [];
   if (gl.length) {
@@ -130,6 +141,15 @@ export async function buildUserContext(
           const label = isBeverageKind(kind) ? BEVERAGE_META[kind].label : kind;
           return `${v.count}× ${label} (${v.ml} ml)`;
         })
+        .join("; ")}.`
+    );
+  }
+
+  const spikes = spikesRes.data ?? [];
+  if (spikes.length) {
+    linhas.push(
+      `Refeições que causaram PICO glicêmico (72h, subida ≥50 mg/dL ou acima de 180 em até 2h): ${spikes
+        .map((s) => `${s.name ?? "refeição"} (${s.carbs_g ?? "?"} g carb) às ${HORA(s.eaten_at, tz)}`)
         .join("; ")}.`
     );
   }

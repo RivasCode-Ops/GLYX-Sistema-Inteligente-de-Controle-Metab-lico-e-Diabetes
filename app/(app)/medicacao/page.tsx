@@ -16,11 +16,32 @@ import { Label } from "@/components/ui/label";
 import { SectionCards } from "@/components/module/section-cards";
 import { AlarmSetup } from "@/components/push/alarm-setup";
 import { SupplementCheckForm } from "@/components/medicacao/supplement-check-form";
+import {
+  DailyDosesCard,
+  type TodayLog,
+  type TodaySnooze,
+} from "@/components/medicacao/daily-doses-card";
+import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
 
+const DOSE_UNITS = [
+  "mg",
+  "g",
+  "mcg",
+  "ml",
+  "U",
+  "comprimido(s)",
+  "cápsula(s)",
+  "scoop",
+  "gota(s)",
+] as const;
+
 export default async function MedicacaoOverviewPage() {
   let meds: Medication[] = [];
+  let todayLogs: TodayLog[] = [];
+  let todaySnoozes: TodaySnooze[] = [];
+  let timezone: string | null = null;
   const demoMode = !isSupabaseConfigured();
 
   async function addMedicationAction(formData: FormData): Promise<void> {
@@ -88,6 +109,28 @@ export default async function MedicacaoOverviewPage() {
           .order("created_at", { ascending: false });
         meds = (data ?? []) as Medication[];
 
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("timezone")
+          .eq("id", user.id)
+          .maybeSingle();
+        timezone = p?.timezone ?? null;
+        const startOfDayISO = startOfLocalDayISO(timezone);
+        const [logsRes, snoozesRes] = await Promise.all([
+          supabase
+            .from("medication_logs")
+            .select("medication_id, taken_at")
+            .eq("user_id", user.id)
+            .gte("taken_at", startOfDayISO),
+          supabase
+            .from("medication_snoozes")
+            .select("medication_id, snoozed_until")
+            .eq("user_id", user.id)
+            .gte("created_at", startOfDayISO),
+        ]);
+        todayLogs = (logsRes.data ?? []) as TodayLog[];
+        todaySnoozes = (snoozesRes.data ?? []) as TodaySnooze[];
+
         const paths = meds
           .map((m) => m.label_photo_path)
           .filter((p): p is string => Boolean(p));
@@ -114,6 +157,16 @@ export default async function MedicacaoOverviewPage() {
           },
         ]}
       />
+
+      {!demoMode ? (
+        <DailyDosesCard
+          meds={meds}
+          logs={todayLogs}
+          snoozes={todaySnoozes}
+          timezone={timezone}
+          markTakenAction={logMedicationTakenAction}
+        />
+      ) : null}
 
       {!demoMode ? <AlarmSetup /> : null}
       {!demoMode ? <SupplementCheckForm /> : null}
@@ -147,9 +200,37 @@ export default async function MedicacaoOverviewPage() {
                 <option value="supplement">Suplemento</option>
               </select>
             </div>
-            <div className="grid gap-1">
-              <Label htmlFor="dosage">Dosagem</Label>
-              <Input id="dosage" name="dosage" placeholder="ex.: 500 mg" />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1">
+                <Label htmlFor="dose_amount">Dose por vez</Label>
+                <Input
+                  id="dose_amount"
+                  name="dose_amount"
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="ex.: 10"
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="dose_unit">Unidade</Label>
+                <select
+                  id="dose_unit"
+                  name="dose_unit"
+                  defaultValue="comprimido(s)"
+                  className="h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100"
+                >
+                  {DOSE_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u === "U" ? "U (insulina)" : u === "g" ? "g (whey/creatina)" : u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2 grid gap-1">
+                <Input id="dosage" name="dosage" placeholder="ou descreva: ex.: 1 colher rasa" className="h-8 text-xs" />
+              </div>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="schedule_hint">Observação de horário</Label>
@@ -252,12 +333,32 @@ export default async function MedicacaoOverviewPage() {
                           ) : null}
                           </div>
                         </div>
-                        <form action={logMedicationTakenAction}>
-                          <input type="hidden" name="medication_id" value={m.id} />
-                          <Button type="submit" variant="outline" size="sm">
-                            Registrar dose
-                          </Button>
-                        </form>
+                        <div className="flex flex-col items-end gap-1">
+                          <form action={logMedicationTakenAction}>
+                            <input type="hidden" name="medication_id" value={m.id} />
+                            <Button type="submit" variant="outline" size="sm">
+                              Registrar dose
+                            </Button>
+                          </form>
+                          {(() => {
+                            const doses = todayLogs.filter((l) => l.medication_id === m.id);
+                            if (!doses.length) return null;
+                            const ultima = doses
+                              .map((l) => l.taken_at)
+                              .sort()
+                              .at(-1)!;
+                            return (
+                              <p className="text-[11px] text-emerald-400/90">
+                                ✓ hoje: {doses.length}× · última às{" "}
+                                {new Date(ultima).toLocaleTimeString("pt-BR", {
+                                  timeZone: timezone ?? "America/Sao_Paulo",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            );
+                          })()}
+                        </div>
                       </div>
                       {!demoMode ? (
                         <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-3">

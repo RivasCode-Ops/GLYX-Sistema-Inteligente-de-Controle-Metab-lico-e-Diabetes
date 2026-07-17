@@ -19,8 +19,26 @@ export function IaChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function send() {
-    const text = input.trim();
+  const SUGGESTIONS = [
+    {
+      label: "🔎 Analisar meus picos",
+      prompt:
+        "Analise meus picos de glicemia recentes: quais refeições parecem ter causado, o que nelas provavelmente pesou (tipo e quantidade de carboidrato, horário, combinação) e o que eu posso ajustar na ALIMENTAÇÃO para reduzir os próximos picos? Sobre insulina, apenas resuma o que registrei e o que vale levar ao médico — sem sugerir dose.",
+    },
+    {
+      label: "🍽️ Revisar meu dia",
+      prompt:
+        "Revise meu dia até agora (glicemia, refeições, bebidas, insulina registrada e exercício) e me diga o que está indo bem e o que merece atenção no restante do dia.",
+    },
+    {
+      label: "💬 O que perguntar ao médico?",
+      prompt:
+        "Com base nos meus dados recentes, monte uma lista curta de perguntas e pontos concretos para eu levar à próxima consulta médica.",
+    },
+  ];
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim();
     if (!text || loading) return;
     setError(null);
     setLoading(true);
@@ -98,6 +116,19 @@ export function IaChat() {
           ))}
           {loading ? <p className="text-xs text-zinc-500">Gerando…</p> : null}
           {error ? <p className="text-xs text-red-400">{error}</p> : null}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              disabled={loading}
+              onClick={() => void send(s.prompt)}
+              className="rounded-full border border-zinc-700 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-emerald-500/50 hover:text-emerald-200 disabled:opacity-50"
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
         <div className="flex gap-2">
           <Input
