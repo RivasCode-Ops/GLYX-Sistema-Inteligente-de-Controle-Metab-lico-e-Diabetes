@@ -30,6 +30,9 @@ export async function buildUserContext(
   const startOfDay = startOfLocalDayISO(profile?.timezone);
   const twoDaysAgo = new Date(Date.now() - 48 * 3600_000).toISOString();
 
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const fiveDaysAgoDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+
   const [
     glucoseRes,
     mealsRes,
@@ -39,6 +42,10 @@ export async function buildUserContext(
     weightRes,
     spikesRes,
     historyRes,
+    medsRes,
+    sleepRes,
+    auditRes,
+    alertsRes,
   ] = await Promise.all([
       supabase
         .from("glucose_readings")
@@ -93,7 +100,49 @@ export async function buildUserContext(
         .gte("recorded_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
         .order("recorded_at", { ascending: false })
         .limit(2000),
+      supabase
+        .from("medications")
+        .select("id, name, dosage, reminder_times, kind")
+        .eq("user_id", userId)
+        .eq("active", true)
+        .eq("kind", "med"),
+      supabase
+        .from("health_snapshots")
+        .select("snapshot_date, source, sleep_hours")
+        .eq("user_id", userId)
+        .gte("snapshot_date", fiveDaysAgoDate)
+        .not("sleep_hours", "is", null),
+      supabase
+        .from("metabolic_audits")
+        .select("score, label, factors, computed_at")
+        .eq("user_id", userId)
+        .order("computed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("metabolic_alerts")
+        .select("severity, title, created_at")
+        .eq("user_id", userId)
+        .gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(5),
     ]);
+
+  const meds = medsRes.data ?? [];
+  const medIds = meds.map((m) => m.id as string);
+  const medLogCounts = new Map<string, number>();
+  if (medIds.length) {
+    const { data: medLogs } = await supabase
+      .from("medication_logs")
+      .select("medication_id")
+      .eq("user_id", userId)
+      .in("medication_id", medIds)
+      .gte("taken_at", sevenDaysAgo);
+    for (const l of medLogs ?? []) {
+      const id = l.medication_id as string;
+      medLogCounts.set(id, (medLogCounts.get(id) ?? 0) + 1);
+    }
+  }
 
   const linhas: string[] = [];
 
@@ -107,6 +156,43 @@ export async function buildUserContext(
   linhas.push(
     `Faixa alvo de glicemia definida no app: ${profile?.target_glucose_min ?? 70}–${profile?.target_glucose_max ?? 180} mg/dL (ajustes de meta são decisão médica).`
   );
+
+  const audit = auditRes.data as { score: number; label: string; factors: unknown; computed_at: string } | null;
+  if (audit) {
+    const factors = (Array.isArray(audit.factors) ? audit.factors : []) as {
+      label?: string;
+      severity?: string;
+    }[];
+    const topFactors = factors
+      .slice(0, 3)
+      .map((f) => `${f.label ?? "fator"}${f.severity ? ` (${f.severity})` : ""}`)
+      .join(", ");
+    linhas.push(
+      `Mapa de risco (auditoria longitudinal mais recente, ${new Date(audit.computed_at).toLocaleDateString("pt-BR")}): score ${audit.score}/100, classificação "${audit.label}"${topFactors ? `. Principais fatores: ${topFactors}` : ""}.`
+    );
+  }
+
+  const alerts = alertsRes.data ?? [];
+  if (alerts.length) {
+    linhas.push(
+      `Alertas metabólicos recentes (48h, já notificados ao usuário no app): ${alerts
+        .map((a) => `${a.title} (${a.severity}) às ${HORA(a.created_at, tz)}`)
+        .join("; ")}.`
+    );
+  }
+
+  if (meds.length) {
+    linhas.push(
+      `Medicação/insulina com horário programado (últimos 7 dias, doses REGISTRADAS no app — pode não refletir 100% da adesão real se o usuário esquecer de registrar): ${meds
+        .map((m) => {
+          const times = (m.reminder_times as string[] | null) ?? [];
+          const expected = times.length * 7;
+          const logged = medLogCounts.get(m.id as string) ?? 0;
+          return `${m.name}${m.dosage ? ` (${m.dosage})` : ""} — ${times.length}×/dia, ${logged}/${expected} doses registradas`;
+        })
+        .join("; ")}.`
+    );
+  }
 
   const gl = glucoseRes.data ?? [];
   if (gl.length) {
@@ -190,6 +276,26 @@ export async function buildUserContext(
     linhas.push(
       `Exercício (48h): ${ex
         .map((e) => `${e.label}${e.duration_min ? ` ${e.duration_min} min` : ""} em ${HORA(e.started_at, tz)}`)
+        .join("; ")}.`
+    );
+  }
+
+  const SLEEP_SRC_PRIORITY = ["manual", "apple_health", "google_fit"];
+  const sleepByDate = new Map<string, { hours: number; rank: number }>();
+  for (const row of sleepRes.data ?? []) {
+    const day = row.snapshot_date as string;
+    const rank = SLEEP_SRC_PRIORITY.indexOf(row.source as string);
+    if (rank === -1) continue;
+    const existing = sleepByDate.get(day);
+    if (!existing || rank < existing.rank) {
+      sleepByDate.set(day, { hours: Number(row.sleep_hours), rank });
+    }
+  }
+  if (sleepByDate.size) {
+    const dias = [...sleepByDate.entries()].sort(([a], [b]) => a.localeCompare(b));
+    linhas.push(
+      `Sono (últimos dias com registro): ${dias
+        .map(([day, v]) => `${new Date(day + "T12:00:00").toLocaleDateString("pt-BR")} — ${v.hours}h`)
         .join("; ")}.`
     );
   }
