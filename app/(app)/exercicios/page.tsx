@@ -6,11 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import type { ExerciseSession } from "@/types/database";
+import type { BodyGoal } from "@/lib/health/energy";
 import { demoExercises } from "@/lib/demo/data";
 
 export default async function ExerciciosOverviewPage() {
   let sessions: ExerciseSession[] = [];
-  let bodyGoal: "lose" | "gain" | "maintain" | null = null;
+  let bodyGoal: BodyGoal | null = null;
   const demoMode = !isSupabaseConfigured();
 
   if (demoMode) {

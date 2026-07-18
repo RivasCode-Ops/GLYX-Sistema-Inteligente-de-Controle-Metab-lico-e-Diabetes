@@ -13,7 +13,7 @@ const schema = z.object({
   birth_year: z.coerce.number().int().min(1900).max(2030).optional(),
   height_cm: z.coerce.number().int().min(80).max(250).optional(),
   activity_level: z.enum(["sedentary", "light", "moderate", "very"]).optional(),
-  body_goal: z.enum(["lose", "gain", "maintain"]).optional(),
+  body_goal: z.enum(["lose", "gain", "maintain", "recomp"]).optional(),
   target_weight_kg: z.coerce.number().min(20).max(400).optional(),
   family_history: z.string().max(500).optional(),
 });

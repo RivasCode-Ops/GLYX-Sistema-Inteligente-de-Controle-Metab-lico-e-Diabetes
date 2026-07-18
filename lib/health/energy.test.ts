@@ -47,6 +47,11 @@ describe("dailyTargets", () => {
     expect(t.calories).toBe(tdee(homem) + 300);
     expect(t.protein_g).toBe(162);
   });
+  it("recomposição: déficit leve de 200 kcal e 2.0 g/kg (mais proteína que emagrecer puro)", () => {
+    const t = dailyTargets(homem, "recomp");
+    expect(t.calories).toBe(tdee(homem) - 200);
+    expect(t.protein_g).toBe(180);
+  });
 });
 
 describe("safeWeeklyRateKg", () => {
@@ -55,6 +60,9 @@ describe("safeWeeklyRateKg", () => {
   });
   it("manter = 0", () => {
     expect(safeWeeklyRateKg(90, "maintain")).toBe(0);
+  });
+  it("recomposição = 0 (sucesso é composição, não a balança)", () => {
+    expect(safeWeeklyRateKg(90, "recomp")).toBe(0);
   });
 });
 
@@ -99,5 +107,17 @@ describe("adaptiveAdjustment", () => {
     ];
     const adj = adaptiveAdjustment(parado, "lose", 90);
     expect(Math.abs(adj!.deltaKcal)).toBeLessThanOrEqual(150);
+  });
+  it("recomposição: peso subindo mais que o esperado sugere reduzir calorias, não 'ganho lento'", () => {
+    const subindo = [
+      { weightKg: 90, loggedOn: "2026-06-01" },
+      { weightKg: 90.5, loggedOn: "2026-06-08" },
+      { weightKg: 91, loggedOn: "2026-06-15" },
+      { weightKg: 91.5, loggedOn: "2026-06-29" },
+    ];
+    const adj = adaptiveAdjustment(subindo, "recomp", 91.5);
+    expect(adj!.plannedWeeklyKg).toBe(0);
+    expect(adj!.deltaKcal).toBeLessThan(0);
+    expect(adj!.reason).toContain("recomposição");
   });
 });

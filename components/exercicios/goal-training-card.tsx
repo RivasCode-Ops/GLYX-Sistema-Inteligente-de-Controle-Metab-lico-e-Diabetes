@@ -39,6 +39,16 @@ const PLANS: Record<BodyGoal, { focus: string; week: string[]; glucose: string }
     ],
     glucose: "Meça antes/depois nos primeiros treinos para aprender seu padrão de resposta.",
   },
+  recomp: {
+    focus: "Ganhar músculo e perder gordura ao mesmo tempo: força é prioridade, cardio é complemento.",
+    week: [
+      "3-4x musculação progressiva em dias não consecutivos (ADA Rec. 5.37)",
+      "Cargas desafiadoras: 8-12 repetições, 2-4 séries por grupo — priorize progressão de carga",
+      "2-3x aeróbico moderado, sem exagerar (déficit já vem da alimentação, não do cardio)",
+    ],
+    glucose:
+      "Combina os dois efeitos: força pode SUBIR a glicemia temporariamente, aeróbico tende a BAIXAR — meça nos dois tipos até aprender seu padrão.",
+  },
 };
 
 export function GoalTrainingCard({ goal }: { goal: BodyGoal | null | undefined }) {

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import type { BodyGoal } from "@/lib/health/energy";
 
 export default async function ExerciciosPlanoPage() {
   const demoMode = !isSupabaseConfigured();
-  let bodyGoal: "lose" | "gain" | "maintain" | null = null;
+  let bodyGoal: BodyGoal | null = null;
 
   if (!demoMode) {
     const supabase = await createClient();

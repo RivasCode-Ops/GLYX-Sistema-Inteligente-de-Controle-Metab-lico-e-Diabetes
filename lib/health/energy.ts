@@ -12,7 +12,7 @@
 
 export type Sex = "m" | "f";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "very";
-export type BodyGoal = "lose" | "gain" | "maintain";
+export type BodyGoal = "lose" | "gain" | "maintain" | "recomp";
 
 export const ACTIVITY_LABEL: Record<ActivityLevel, string> = {
   sedentary: "Sedentário",
@@ -25,6 +25,7 @@ export const GOAL_LABEL: Record<BodyGoal, string> = {
   lose: "Emagrecer",
   gain: "Ganhar massa muscular",
   maintain: "Manter / controle glicêmico",
+  recomp: "Recomposição corporal (ganhar músculo, perder gordura)",
 };
 
 const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
@@ -93,6 +94,15 @@ export function dailyTargets(profile: BodyProfile, goal: BodyGoal): DailyTargets
       const protein_g = Math.round(1.2 * profile.weightKg);
       return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: 0 };
     }
+    case "recomp": {
+      // Recomposição (ganhar músculo + perder gordura ao mesmo tempo): déficit
+      // leve (não -500 como emagrecer puro, senão não sobra energia pra
+      // treino/síntese proteica) + proteína bem alta pra preservar/construir
+      // músculo mesmo em déficit — abordagem padrão da literatura esportiva.
+      const calories = Math.max(1200, expenditure - 200);
+      const protein_g = Math.round(2.0 * profile.weightKg);
+      return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: -200 };
+    }
   }
 }
 
@@ -103,6 +113,8 @@ export function dailyTargets(profile: BodyProfile, goal: BodyGoal): DailyTargets
 export function safeWeeklyRateKg(weightKg: number, goal: BodyGoal): number {
   if (goal === "lose") return Math.round(weightKg * 0.0075 * 100) / 100;
   if (goal === "gain") return Math.round(weightKg * 0.0025 * 100) / 100;
+  // recomp e maintain: sucesso é composição, não a balança — peso total
+  // esperado fica estável (0 kg/semana no plano).
   return 0;
 }
 
@@ -168,9 +180,13 @@ export function adaptiveAdjustment(
         ? deltaKcal < 0
           ? "Perda mais lenta que o planejado — reduza levemente as calorias."
           : "Perda mais rápida que o seguro — coma um pouco mais para proteger massa magra."
-        : deltaKcal > 0
-          ? "Ganho mais lento que o planejado — aumente levemente as calorias."
-          : "Ganho mais rápido que o ideal — reduza para priorizar músculo, não gordura.";
+        : goal === "recomp"
+          ? deltaKcal < 0
+            ? "Peso subindo mais do que o esperado pra recomposição — reduza levemente as calorias."
+            : "Peso caindo mais do que o esperado pra recomposição — coma um pouco mais para proteger massa magra."
+          : deltaKcal > 0
+            ? "Ganho mais lento que o planejado — aumente levemente as calorias."
+            : "Ganho mais rápido que o ideal — reduza para priorizar músculo, não gordura.";
 
   return { observedWeeklyKg: observedWeekly, plannedWeeklyKg: plannedWeekly, deltaKcal, reason };
 }

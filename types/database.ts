@@ -129,7 +129,7 @@ export type Profile = {
   birth_year?: number | null;
   height_cm?: number | null;
   activity_level?: "sedentary" | "light" | "moderate" | "very" | null;
-  body_goal?: "lose" | "gain" | "maintain" | null;
+  body_goal?: "lose" | "gain" | "maintain" | "recomp" | null;
   target_weight_kg?: number | null;
   family_history?: string | null;
   primary_focus?: "diabetes" | "lose" | "gain" | null;
