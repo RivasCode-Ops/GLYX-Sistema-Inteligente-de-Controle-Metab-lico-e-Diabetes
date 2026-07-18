@@ -72,6 +72,11 @@ export function QuickReadingDialog() {
             />
           </div>
           <div className="grid gap-1">
+            <Label htmlFor="recorded_at_local">Horário real da medição</Label>
+            <Input id="recorded_at_local" name="recorded_at_local" type="datetime-local" />
+            <p className="text-[11px] text-zinc-600">Deixe em branco para usar o horário de agora.</p>
+          </div>
+          <div className="grid gap-1">
             <Label htmlFor="context">Contexto</Label>
             <select
               id="context"

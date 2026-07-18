@@ -4,6 +4,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
+import { wallClockToUTC } from "@/lib/time/local-day";
+
+/** "2026-07-18T13:04" (sem fuso, do <input type="datetime-local">) → ISO UTC. */
+function localDateTimeToUTC(local: string, timezone: string | null | undefined): string | null {
+  const m = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m;
+  return wallClockToUTC(Number(y), Number(mo), Number(d), Number(h), Number(mi), 0, timezone).toISOString();
+}
 
 const schema = z.object({
   name: z.string().min(1),
@@ -11,6 +20,11 @@ const schema = z.object({
   carbs_g: z.coerce.number().optional(),
   protein_g: z.coerce.number().optional(),
   fat_g: z.coerce.number().optional(),
+  // datetime-local do formulário, sem fuso (ex.: "2026-07-18T13:04") — sem
+  // isso, meals.eaten_at sempre virava "agora" (default da coluna), mesmo
+  // quando o usuário registra bem depois de ter comido, distorcendo a
+  // janela de detecção de pico glicêmico pós-refeição.
+  eaten_at_local: z.string().optional(),
 });
 
 export type ActionResult = { ok?: true; error?: string };
@@ -30,12 +44,25 @@ export async function addMeal(formData: FormData): Promise<ActionResult> {
     carbs_g: formData.get("carbs_g") || undefined,
     protein_g: formData.get("protein_g") || undefined,
     fat_g: formData.get("fat_g") || undefined,
+    eaten_at_local: formData.get("eaten_at_local") || undefined,
   });
   if (!parsed.success) return { error: "Preencha pelo menos o nome da refeição." };
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { eaten_at_local, ...rest } = parsed.data;
+  const eatenAt = eaten_at_local
+    ? localDateTimeToUTC(eaten_at_local, profile?.timezone)
+    : undefined;
+
   const { error } = await supabase.from("meals").insert({
     user_id: user.id,
-    ...parsed.data,
+    ...rest,
+    ...(eatenAt ? { eaten_at: eatenAt } : {}),
   });
 
   if (error) return { error: error.message };

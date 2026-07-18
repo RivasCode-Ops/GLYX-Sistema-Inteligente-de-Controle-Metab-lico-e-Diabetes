@@ -34,6 +34,7 @@ const CLINICAL_TABLES_WITH_USER_ID = [
   "weight_logs",
   "water_logs",
   "cgm_connections",
+  "google_fit_connections",
   "medication_snoozes",
   "muscle_pauses",
 ] as const;

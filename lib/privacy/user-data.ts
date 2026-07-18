@@ -25,6 +25,7 @@ export const USER_DATA_DELETE_ORDER = [
   "push_dispatch_log",
   "push_subscriptions",
   "cgm_connections",
+  "google_fit_connections",
 ] as const;
 
 /** Tabelas incluídas no export JSON (profiles usa coluna id). */
@@ -51,6 +52,7 @@ export const USER_DATA_EXPORT_TABLES = [
   "push_subscriptions",
   "push_dispatch_log",
   "cgm_connections",
+  "google_fit_connections",
 ] as const;
 
 export const PRIVATE_PHOTO_BUCKETS = ["meal-photos", "medication-labels"] as const;
@@ -58,4 +60,5 @@ export const PRIVATE_PHOTO_BUCKETS = ["meal-photos", "medication-labels"] as con
 /** Colunas sensíveis removidas do export (nunca saem no JSON do usuário). */
 export const EXPORT_REDACT_COLUMNS: Record<string, readonly string[]> = {
   cgm_connections: ["credentials_enc"],
+  google_fit_connections: ["tokens_enc"],
 };

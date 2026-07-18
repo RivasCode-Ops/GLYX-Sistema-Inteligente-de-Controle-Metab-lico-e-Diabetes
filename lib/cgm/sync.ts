@@ -11,8 +11,7 @@ import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
 import { normalizeLibreMeasurements } from "@/lib/cgm/normalize/libre";
 import { sendPushToUser } from "@/lib/push/send";
 import { isPredictedHypo, predictTrend } from "@/lib/cgm/trend";
-
-const HYPO_MG_DL = 70;
+import { evaluateGlucoseAlert } from "@/lib/insights/rules";
 
 export type CgmConnectionRow = {
   user_id: string;
@@ -88,28 +87,17 @@ export async function syncLibreConnection(
     .eq("user_id", conn.user_id)
     .eq("provider", "librelinkup");
 
-  // Hipoglicemia na leitura mais recente do sensor → push crítico imediato
-  // (dedupe pelo timestamp da leitura: 1 alerta por leitura).
+  // Hiper/hipoglicemia na leitura mais recente do sensor → alerta persistido
+  // em metabolic_alerts + push (antes só hipo era checada e nunca era
+  // gravada em metabolic_alerts, só o push — que pode ser perdido).
   const latest = [...readings].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
-  if (latest && latest.valueMgDl < HYPO_MG_DL) {
-    const { data: fresh } = await supabase
-      .from("push_dispatch_log")
-      .insert({
-        user_id: conn.user_id,
-        kind: "hypo",
-        ref: `libre@${latest.recordedAt}`,
-        sent_on: new Date().toISOString().slice(0, 10),
-      })
-      .select("id")
-      .maybeSingle();
-    if (fresh) {
-      await sendPushToUser(supabase, conn.user_id, {
-        title: "🚨 Glicemia baixa no sensor",
-        body: `${latest.valueMgDl} mg/dL agora. Corrija com carboidrato rápido e meça de novo em 15 min.`,
-        url: "/glicemia",
-        critical: true,
-      });
-    }
+  if (latest) {
+    await evaluateGlucoseAlert(
+      supabase,
+      conn.user_id,
+      { valueMgDl: latest.valueMgDl, recordedAt: latest.recordedAt },
+      "librelinkup"
+    );
   }
 
   // Alerta PREDITIVO: ainda acima de 70, mas em queda que cruza a hipo em

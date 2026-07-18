@@ -3,7 +3,6 @@ import { z } from "zod";
 import { normalizeAppleHealthDaily } from "@/lib/health/apple-health";
 import { normalizeGoogleFitDaily } from "@/lib/health/google-fit";
 import { ingestHealthSnapshots } from "@/lib/health/ingest";
-import { generateMockHealthSnapshots } from "@/lib/health/mock";
 import type { UnifiedHealthSnapshot } from "@/lib/health/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,10 +29,6 @@ const bodySchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("apple_health"),
     days: z.array(z.any()),
-  }),
-  z.object({
-    mode: z.literal("mock"),
-    daysCount: z.number().min(1).max(90).optional(),
   }),
 ]);
 
@@ -82,9 +77,6 @@ export async function POST(req: Request) {
       break;
     case "apple_health":
       snapshots = normalizeAppleHealthDaily(parsed.data.days);
-      break;
-    case "mock":
-      snapshots = generateMockHealthSnapshots(parsed.data.daysCount ?? 7);
       break;
     default:
       break;

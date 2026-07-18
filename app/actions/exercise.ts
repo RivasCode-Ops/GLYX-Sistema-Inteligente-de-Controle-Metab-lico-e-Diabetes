@@ -4,13 +4,27 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { MUSCLE_GROUP_IDS } from "@/lib/data/muscle-groups";
+import { wallClockToUTC } from "@/lib/time/local-day";
 
 const schema = z.object({
   label: z.string().min(1),
   duration_min: z.coerce.number().optional(),
   calories_burned: z.coerce.number().optional(),
   intensity: z.string().optional(),
+  notes: z.string().optional(),
+  // Mesmo motivo do eaten_at_local em app/actions/meals.ts: sem isso,
+  // started_at sempre virava "agora" (default da coluna), mesmo quando o
+  // usuário registra bem depois de ter treinado.
+  started_at_local: z.string().optional(),
 });
+
+/** "2026-07-18T13:04" (sem fuso) → ISO UTC. */
+function localDateTimeToUTC(local: string, timezone: string | null | undefined): string | null {
+  const m = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m;
+  return wallClockToUTC(Number(y), Number(mo), Number(d), Number(h), Number(mi), 0, timezone).toISOString();
+}
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -131,12 +145,26 @@ export async function addExerciseSession(formData: FormData): Promise<ActionResu
     duration_min: formData.get("duration_min") || undefined,
     calories_burned: formData.get("calories_burned") || undefined,
     intensity: formData.get("intensity") || undefined,
+    notes: formData.get("notes") || undefined,
+    started_at_local: formData.get("started_at_local") || undefined,
   });
   if (!parsed.success) return { error: "Descreva a atividade." };
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { started_at_local, ...rest } = parsed.data;
+  const startedAt = started_at_local
+    ? localDateTimeToUTC(started_at_local, profile?.timezone)
+    : undefined;
+
   const { error } = await supabase.from("exercise_sessions").insert({
     user_id: user.id,
-    ...parsed.data,
+    ...rest,
+    ...(startedAt ? { started_at: startedAt } : {}),
   });
 
   if (error) return { error: error.message };

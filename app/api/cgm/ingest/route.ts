@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
-import { generateMockCgmSeries } from "@/lib/cgm/mock";
 import { normalizeDexcomEgvs } from "@/lib/cgm/normalize/dexcom";
 import { normalizeLibreMeasurements } from "@/lib/cgm/normalize/libre";
 import type { UnifiedCgmReading } from "@/lib/cgm/types";
@@ -28,10 +27,6 @@ const bodySchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("libre"),
     measurements: z.array(z.any()),
-  }),
-  z.object({
-    mode: z.literal("mock"),
-    points: z.number().min(1).max(288).optional(),
   }),
 ]);
 
@@ -88,9 +83,6 @@ export async function POST(req: Request) {
       );
       break;
     }
-    case "mock":
-      readings = generateMockCgmSeries(parsed.data.points ?? 36, 5);
-      break;
     default:
       break;
   }

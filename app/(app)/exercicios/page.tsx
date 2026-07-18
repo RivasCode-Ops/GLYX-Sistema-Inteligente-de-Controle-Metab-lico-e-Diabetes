@@ -101,6 +101,15 @@ export default async function ExerciciosOverviewPage() {
               <Label htmlFor="intensity">Intensidade</Label>
               <Input id="intensity" name="intensity" placeholder="leve / moderada / forte" />
             </div>
+            <div className="grid gap-1 sm:col-span-2">
+              <Label htmlFor="started_at_local">Horário real do treino</Label>
+              <Input id="started_at_local" name="started_at_local" type="datetime-local" />
+              <p className="text-[11px] text-zinc-600">Deixe em branco para usar o horário de agora.</p>
+            </div>
+            <div className="grid gap-1 sm:col-span-2">
+              <Label htmlFor="notes">Notas / contexto glicêmico (opcional)</Label>
+              <Input id="notes" name="notes" placeholder="ex.: glicemia antes 140, depois 110" />
+            </div>
             <div className="sm:col-span-2">
               <Button type="submit">Salvar sessão</Button>
             </div>

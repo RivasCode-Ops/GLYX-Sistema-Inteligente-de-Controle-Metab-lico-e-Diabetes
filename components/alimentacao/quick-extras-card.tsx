@@ -10,14 +10,53 @@ import { addMeal } from "@/app/actions/meals";
 
 /** Registro livre de lanches/bebidas fora do fluxo de foto — mesma lógica
  * de sempre (meals.eaten_at = agora), então entra automaticamente na
- * detecção de pico glicêmico pós-refeição já existente no banco. */
+ * detecção de pico glicêmico pós-refeição já existente no banco.
+ *
+ * Sem estimativa, calorias/proteína/gordura ficam nulas e a refeição some
+ * dos totais do dia sem aviso nenhum — por isso o botão "Estimar com IA"
+ * (opcional, mas visível) em vez de só o campo de carboidrato solto. */
 export function QuickExtrasCard() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [carbs, setCarbs] = useState("");
+  const [calories, setCalories] = useState("");
+  const [protein, setProtein] = useState("");
+  const [fat, setFat] = useState("");
+  const [estimating, setEstimating] = useState(false);
+  const [estimated, setEstimated] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+
+  async function estimate() {
+    if (!name.trim()) return;
+    setEstimating(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/ai/meal-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: name.trim() }),
+      });
+      const data = (await res.json()) as {
+        meal?: { calories: number; carbs_g: number; protein_g: number; fat_g: number };
+        error?: string;
+      };
+      if (!res.ok || !data.meal) {
+        setStatus(data.error ?? "Falha ao estimar.");
+        return;
+      }
+      setCalories(String(data.meal.calories));
+      setCarbs(String(data.meal.carbs_g));
+      setProtein(String(data.meal.protein_g));
+      setFat(String(data.meal.fat_g));
+      setEstimated(true);
+    } catch {
+      setStatus("Erro de rede.");
+    } finally {
+      setEstimating(false);
+    }
+  }
 
   function submit() {
     if (!name.trim()) return;
@@ -25,11 +64,18 @@ export function QuickExtrasCard() {
       const fd = new FormData();
       fd.set("name", name.trim());
       if (carbs) fd.set("carbs_g", carbs);
+      if (calories) fd.set("calories", calories);
+      if (protein) fd.set("protein_g", protein);
+      if (fat) fd.set("fat_g", fat);
       const res = await addMeal(fd);
       setStatus(res.error ?? `${name.trim()} registrado.`);
       if (!res.error) {
         setName("");
         setCarbs("");
+        setCalories("");
+        setProtein("");
+        setFat("");
+        setEstimated(false);
         setOpen(false);
         router.refresh();
       }
@@ -50,21 +96,54 @@ export function QuickExtrasCard() {
               <Input
                 id="quick_extra_name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="ex.: 2 maçãs"
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setEstimated(false);
+                }}
+                placeholder="ex.: 2 maçãs, omelete de 2 ovos com frango desfiado"
                 autoFocus
               />
             </div>
-            <div className="grid gap-1">
-              <Label htmlFor="quick_extra_carbs">Carbo (g) — opcional</Label>
-              <Input
-                id="quick_extra_carbs"
-                type="number"
-                value={carbs}
-                onChange={(e) => setCarbs(e.target.value)}
-                className="w-24"
-              />
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={estimating || pending || !name.trim()}
+              onClick={() => void estimate()}
+            >
+              {estimating ? "Estimando…" : "✨ Estimar calorias/macros com IA"}
+            </Button>
+            {estimated ? (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid gap-1">
+                  <Label htmlFor="quick_extra_cal">kcal</Label>
+                  <Input id="quick_extra_cal" type="number" value={calories} onChange={(e) => setCalories(e.target.value)} />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="quick_extra_carbs">Carbo (g)</Label>
+                  <Input id="quick_extra_carbs" type="number" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="quick_extra_protein">Proteína (g)</Label>
+                  <Input id="quick_extra_protein" type="number" value={protein} onChange={(e) => setProtein(e.target.value)} />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="quick_extra_fat">Gordura (g)</Label>
+                  <Input id="quick_extra_fat" type="number" value={fat} onChange={(e) => setFat(e.target.value)} />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-1">
+                <Label htmlFor="quick_extra_carbs_only">Carbo (g) — opcional, sem estimativa por IA</Label>
+                <Input
+                  id="quick_extra_carbs_only"
+                  type="number"
+                  value={carbs}
+                  onChange={(e) => setCarbs(e.target.value)}
+                  className="w-24"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <Button type="button" size="sm" disabled={pending || !name.trim()} onClick={submit}>
                 {pending ? "Registrando…" : "Registrar"}
@@ -73,6 +152,12 @@ export function QuickExtrasCard() {
                 Cancelar
               </Button>
             </div>
+            {!estimated ? (
+              <p className="text-[11px] text-zinc-600">
+                Sem estimar, só o carboidrato (se preenchido) conta nos totais do dia — calorias e
+                proteína ficam de fora.
+              </p>
+            ) : null}
           </div>
         ) : (
           <Button type="button" variant="outline" onClick={() => setOpen(true)}>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
+import { namesLookSimilar } from "@/lib/medications/similar";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -97,6 +98,36 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
 
   revalidatePath("/medicacao");
   return { ok: true };
+}
+
+export type SimilarMedication = {
+  id: string;
+  name: string;
+  dosage: string | null;
+  stock_units: number | null;
+};
+
+/**
+ * Checa se já existe um item ativo com nome parecido — usado no cadastro por
+ * foto pra avisar antes de criar duplicata (ex.: fotografar a 2ª/3ª caneta
+ * de um remédio que já está cadastrado, em vez de atualizar o estoque dele).
+ */
+export async function findSimilarActiveMedications(name: string): Promise<SimilarMedication[]> {
+  const supabase = await createClient();
+  if (!supabase || !name.trim()) return [];
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("medications")
+    .select("id, name, dosage, stock_units")
+    .eq("user_id", user.id)
+    .eq("active", true);
+
+  return (data ?? []).filter((m) => namesLookSimilar(name, m.name));
 }
 
 export async function attachMedicationLabel(formData: FormData): Promise<ActionResult> {

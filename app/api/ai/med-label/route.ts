@@ -5,6 +5,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { DOSE_UNITS } from "@/lib/medications/dose-units";
 
 // Lê o RÓTULO de um remédio/suplemento e devolve os campos do cadastro
 // pré-preenchidos (nome, tipo, dose por vez, estoque) — o usuário revisa e
@@ -12,18 +13,6 @@ import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_PHOTOS = 2;
-
-const DOSE_UNITS = [
-  "mg",
-  "g",
-  "mcg",
-  "ml",
-  "U",
-  "comprimido(s)",
-  "cápsula(s)",
-  "scoop",
-  "gota(s)",
-] as const;
 
 const resultSchema = z.object({
   name: z.string(),

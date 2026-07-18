@@ -1,15 +1,11 @@
 import { Suspense } from "react";
-import { getCgmIntegrationStatus } from "@/lib/cgm/config";
 import { isDexcomOAuthConfigured } from "@/lib/cgm/dexcom";
 import { createClient } from "@/lib/supabase/server";
-import { SensorPanel } from "@/components/glicemia/sensor-panel";
 import { LibreCsvImport } from "@/components/glicemia/libre-csv-import";
 import { LibreLinkConnect } from "@/components/glicemia/libre-link-connect";
 import { DexcomConnect } from "@/components/glicemia/dexcom-connect";
 
 export default async function GlicemiaSensorPage() {
-  const status = getCgmIntegrationStatus();
-
   let libreConnection: {
     email: string;
     lastSyncAt: string | null;
@@ -66,7 +62,6 @@ export default async function GlicemiaSensorPage() {
         <DexcomConnect connection={dexcomConnection} oauthConfigured={isDexcomOAuthConfigured()} />
       </Suspense>
       <LibreCsvImport />
-      <SensorPanel initialStatus={status} />
     </div>
   );
 }

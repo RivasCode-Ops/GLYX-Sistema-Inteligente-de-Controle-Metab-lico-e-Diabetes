@@ -9,9 +9,8 @@ import {
 import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
 import { sendPushToUser } from "@/lib/push/send";
 import { isPredictedHypo, predictTrend } from "@/lib/cgm/trend";
+import { evaluateGlucoseAlert } from "@/lib/insights/rules";
 import type { CgmConnectionRow } from "@/lib/cgm/sync";
-
-const HYPO_MG_DL = 70;
 
 export async function syncDexcomConnection(
   supabase: SupabaseClient,
@@ -65,25 +64,13 @@ export async function syncDexcomConnection(
     .eq("provider", "dexcom");
 
   const latest = [...readings].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
-  if (latest && latest.valueMgDl < HYPO_MG_DL) {
-    const { data: fresh } = await supabase
-      .from("push_dispatch_log")
-      .insert({
-        user_id: conn.user_id,
-        kind: "hypo",
-        ref: `dexcom@${latest.recordedAt}`,
-        sent_on: new Date().toISOString().slice(0, 10),
-      })
-      .select("id")
-      .maybeSingle();
-    if (fresh) {
-      await sendPushToUser(supabase, conn.user_id, {
-        title: "🚨 Glicemia baixa no sensor",
-        body: `${latest.valueMgDl} mg/dL agora. Corrija com carboidrato rápido e meça de novo em 15 min.`,
-        url: "/glicemia",
-        critical: true,
-      });
-    }
+  if (latest) {
+    await evaluateGlucoseAlert(
+      supabase,
+      conn.user_id,
+      { valueMgDl: latest.valueMgDl, recordedAt: latest.recordedAt },
+      "dexcom"
+    );
   }
 
   const trend = predictTrend(

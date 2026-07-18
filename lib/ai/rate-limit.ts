@@ -1,12 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type AiKind = "chat" | "meal_photo" | "exam" | "supplement" | "workout_suggestion";
+export type AiKind = "chat" | "meal_photo" | "meal_text" | "exam" | "supplement" | "workout_suggestion";
 
 // Limites por usuário em janela deslizante de 1 hora.
 // Persistidos em ai_usage (RLS) para valer entre instâncias serverless.
 const HOURLY_LIMITS: Record<AiKind, number> = {
   chat: 30,
   meal_photo: 10,
+  meal_text: 10,
   exam: 10,
   supplement: 10,
   workout_suggestion: 10,

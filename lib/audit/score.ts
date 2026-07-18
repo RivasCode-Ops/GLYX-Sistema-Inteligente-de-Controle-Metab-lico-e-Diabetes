@@ -238,6 +238,15 @@ function buildPlan(factors: AuditFactor[], metrics: AuditMetrics): AuditPlanItem
       actionLabel: "Ver tendências",
     });
   }
+  if (ids.has("variability_high")) {
+    add({
+      priority: plan.length + 1,
+      title: "Reduzir variabilidade da glicemia",
+      why: "Oscilação alta entre leituras pesa tanto quanto ficar fora da faixa — regularidade em refeições e doses ajuda.",
+      href: "/glicemia/tendencias",
+      actionLabel: "Ver tendências",
+    });
+  }
   if (ids.has("meal_spikes")) {
     add({
       priority: plan.length + 1,

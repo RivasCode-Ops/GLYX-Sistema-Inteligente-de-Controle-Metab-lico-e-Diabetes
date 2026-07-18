@@ -1,31 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { ingestMockHealth } from "@/app/actions/health";
 import type { HealthIntegrationStatus } from "@/lib/health/types";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Props = {
   initialStatus: HealthIntegrationStatus;
 };
 
-export function IntegrationPanel({ initialStatus }: Props) {
-  const [status] = useState(initialStatus);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function runMock() {
-    setMsg(null);
-    startTransition(() => {
-      void (async () => {
-        const r = await ingestMockHealth(7);
-        if (r.error) setMsg(r.error);
-        else setMsg(`Mock: ${r.upserted ?? 0} dias gravados (upsert).`);
-      })();
-    });
-  }
-
+export function IntegrationPanel({ initialStatus: status }: Props) {
   return (
     <div className="space-y-6">
       <Card>
@@ -38,22 +20,6 @@ export function IntegrationPanel({ initialStatus }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Dados de demo</CardTitle>
-          <CardDescription>
-            Grava 7 dias na tabela <code className="font-mono text-xs">health_snapshots</code>{" "}
-            (fonte mock).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Button type="button" variant="subtle" disabled={pending} onClick={runMock}>
-            {pending ? "A gravar…" : "Importar 7 dias (mock)"}
-          </Button>
-          {msg ? <p className="text-xs text-zinc-400">{msg}</p> : null}
-        </CardContent>
-      </Card>
-
       <Card className="border-zinc-800">
         <CardHeader>
           <CardTitle className="text-base text-zinc-200">API</CardTitle>
@@ -61,8 +27,7 @@ export function IntegrationPanel({ initialStatus }: Props) {
             <code className="font-mono text-[11px]">POST /api/health/ingest</code> — modos{" "}
             <code className="font-mono text-[11px]">unified</code>,{" "}
             <code className="font-mono text-[11px]">google_fit</code>,{" "}
-            <code className="font-mono text-[11px]">apple_health</code>,{" "}
-            <code className="font-mono text-[11px]">mock</code>.
+            <code className="font-mono text-[11px]">apple_health</code>.
           </CardDescription>
         </CardHeader>
       </Card>

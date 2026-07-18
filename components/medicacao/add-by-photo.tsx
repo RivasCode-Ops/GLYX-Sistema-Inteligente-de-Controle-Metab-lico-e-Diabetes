@@ -2,28 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addMedication } from "@/app/actions/medications";
+import { addMedication, findSimilarActiveMedications, type SimilarMedication } from "@/app/actions/medications";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ReminderTimesField } from "@/components/medicacao/reminder-times-field";
+import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
 
 // Cadastro por foto do rótulo: a IA lê nome/tipo/dose/estoque e pré-preenche;
 // o usuário revisa, ajusta horários e salva — a própria foto fica anexada
 // como rótulo do medicamento.
-
-const DOSE_UNITS = [
-  "mg",
-  "g",
-  "mcg",
-  "ml",
-  "U",
-  "comprimido(s)",
-  "cápsula(s)",
-  "scoop",
-  "gota(s)",
-] as const;
 
 type Draft = {
   name: string;
@@ -49,6 +38,7 @@ export function AddMedicationByPhoto() {
   const [limitations, setLimitations] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [similar, setSimilar] = useState<SimilarMedication[]>([]);
 
   async function analyze() {
     if (!file) {
@@ -91,6 +81,7 @@ export function AddMedicationByPhoto() {
         reminder_times: "",
       });
       setLimitations(r.limitations || null);
+      setSimilar(await findSimilarActiveMedications(r.name));
     } catch {
       setStatus("Erro de rede.");
     } finally {
@@ -125,6 +116,7 @@ export function AddMedicationByPhoto() {
       setSaved(true);
       setDraft(null);
       setLimitations(null);
+      setSimilar([]);
       clear();
       router.refresh();
     } finally {
@@ -142,6 +134,7 @@ export function AddMedicationByPhoto() {
             onChange={(e) => {
               setDraft(null);
               setSaved(false);
+              setSimilar([]);
               void selectSingle(e.target.files?.[0]);
             }}
             className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-900 file:px-3 file:py-2 file:text-sm file:text-sky-100"
@@ -201,7 +194,7 @@ export function AddMedicationByPhoto() {
                 >
                   {DOSE_UNITS.map((u) => (
                     <option key={u} value={u}>
-                      {u === "U" ? "U (insulina)" : u}
+                      {doseUnitLabel(u)}
                     </option>
                   ))}
                 </select>
@@ -242,10 +235,43 @@ export function AddMedicationByPhoto() {
                 A IA não conseguiu ler: {limitations}
               </p>
             ) : null}
-            <div className="sm:col-span-2">
+            {similar.length ? (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200 sm:col-span-2">
+                <p className="font-medium">Você já tem algo parecido cadastrado:</p>
+                <ul className="mt-1 space-y-0.5">
+                  {similar.map((m) => (
+                    <li key={m.id}>
+                      {m.name}
+                      {m.dosage ? ` · ${m.dosage}` : ""}
+                      {m.stock_units != null ? ` · estoque: ${m.stock_units}` : ""}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-amber-300/80">
+                  Se for a mesma caneta/pote, cancele aqui e use &quot;Atualizar estoque&quot; no item
+                  já cadastrado em vez de criar um novo — senão os lembretes duplicam.
+                </p>
+              </div>
+            ) : null}
+            <div className="flex gap-2 sm:col-span-2">
               <Button type="button" onClick={() => void save()} disabled={saving || !draft.name.trim()}>
-                {saving ? "Salvando…" : "Confirmar e cadastrar"}
+                {saving ? "Salvando…" : similar.length ? "Cadastrar mesmo assim" : "Confirmar e cadastrar"}
               </Button>
+              {similar.length ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={saving}
+                  onClick={() => {
+                    setDraft(null);
+                    setSimilar([]);
+                    setLimitations(null);
+                    clear();
+                  }}
+                >
+                  Cancelar
+                </Button>
+              ) : null}
             </div>
           </div>
         ) : null}

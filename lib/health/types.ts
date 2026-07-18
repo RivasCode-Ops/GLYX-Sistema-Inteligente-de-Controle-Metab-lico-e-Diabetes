@@ -15,14 +15,8 @@ export type UnifiedHealthSnapshot = {
 };
 
 export type HealthIntegrationStatus = {
-  googleFit: {
-    configured: boolean;
-    hint: string;
-  };
   appleHealth: {
     availableOnWeb: false;
     hint: string;
   };
-  manual: { available: boolean };
-  mock: { available: boolean };
 };

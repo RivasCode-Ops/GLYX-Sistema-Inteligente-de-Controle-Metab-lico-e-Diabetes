@@ -1,21 +1,14 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { addMeal, deleteMeal } from "@/app/actions/meals";
+import { deleteMeal } from "@/app/actions/meals";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { NewMealForm } from "@/components/alimentacao/new-meal-form";
 import type { Meal } from "@/types/database";
 import { demoMeals } from "@/lib/demo/data";
 
 export default async function AlimentacaoRefeicoesPage() {
   let meals: Meal[] = [];
   const demoMode = !isSupabaseConfigured();
-
-  async function addMealAction(formData: FormData): Promise<void> {
-    "use server";
-    await addMeal(formData);
-  }
 
   async function deleteMealAction(formData: FormData): Promise<void> {
     "use server";
@@ -68,31 +61,7 @@ export default async function AlimentacaoRefeicoesPage() {
               gravar dados reais.
             </p>
           ) : null}
-          <form action={addMealAction} className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="name">Nome</Label>
-              <Input id="name" name="name" required placeholder="ex.: Almoço" />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="calories">Calorias</Label>
-              <Input id="calories" name="calories" type="number" min={0} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="carbs_g">Carboidratos (g)</Label>
-              <Input id="carbs_g" name="carbs_g" type="number" step="0.1" min={0} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="protein_g">Proteína (g)</Label>
-              <Input id="protein_g" name="protein_g" type="number" step="0.1" min={0} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="fat_g">Gordura (g)</Label>
-              <Input id="fat_g" name="fat_g" type="number" step="0.1" min={0} />
-            </div>
-            <div className="sm:col-span-2">
-              <Button type="submit">Salvar refeição</Button>
-            </div>
-          </form>
+          <NewMealForm />
         </CardContent>
       </Card>
 

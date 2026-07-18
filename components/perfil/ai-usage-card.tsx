@@ -4,7 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const KIND_LABEL: Record<string, string> = {
   chat: "Chat copiloto",
   meal_photo: "Foto de refeição",
+  meal_text: "Estimativa de refeição por texto",
+  meal_suggest: "Sugestão de refeição",
   exam: "Interpretação de exame",
+  supplement: "Análise de suplemento",
+  workout_suggestion: "Sugestão de treino",
 };
 
 type UsageRow = {

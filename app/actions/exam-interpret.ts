@@ -43,6 +43,16 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
 
   await recordAiTokens(supabase, rate.usageId, result.usage, aiModel());
 
+  // Mesma checagem já feita na versão por foto (exam-photo/route.ts) —
+  // sem isso, um JSON tecnicamente válido mas com resumo vazio era salvo
+  // como sucesso, e o card de "Resumo" ficava em branco sem explicação.
+  if (!result.data.summary.trim()) {
+    return {
+      error:
+        "Não consegui gerar um resumo a partir deste texto. Tente colar um trecho maior do laudo.",
+    };
+  }
+
   const summary = {
     ...result.data,
     modality: (exam.exam_type as "lab" | "ecg" | "rx" | null) ?? result.data.modality ?? "lab",

@@ -27,18 +27,7 @@ import { ReminderTimesField } from "@/components/medicacao/reminder-times-field"
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
-
-const DOSE_UNITS = [
-  "mg",
-  "g",
-  "mcg",
-  "ml",
-  "U",
-  "comprimido(s)",
-  "cápsula(s)",
-  "scoop",
-  "gota(s)",
-] as const;
+import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
 
 /** Busca sem acento/maiúscula: "insulína" acha "Insulina NPH". */
 function normaliza(s: string): string {
@@ -234,7 +223,7 @@ export default async function MedicacaoOverviewPage({
                 >
                   {DOSE_UNITS.map((u) => (
                     <option key={u} value={u}>
-                      {u === "U" ? "U (insulina)" : u === "g" ? "g (whey/creatina)" : u}
+                      {doseUnitLabel(u)}
                     </option>
                   ))}
                 </select>
