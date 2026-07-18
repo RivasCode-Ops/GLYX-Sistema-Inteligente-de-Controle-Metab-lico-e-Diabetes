@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 
 type Props = {
   accept: string;
-  onFile: (file: File | undefined) => void;
+  /** Chamado pelo botão de câmera (sempre 1 arquivo) e pela galeria quando `multiple` é falso. */
+  onFile?: (file: File | undefined) => void;
+  /** Chamado pela galeria quando `multiple` é verdadeiro (seleção de vários de uma vez). */
+  onFiles?: (files: FileList | null) => void;
   multiple?: boolean;
   cameraLabel?: string;
   galleryLabel?: string;
@@ -20,6 +23,7 @@ type Props = {
 export function PhotoCaptureButtons({
   accept,
   onFile,
+  onFiles,
   multiple = false,
   cameraLabel = "📷 Tirar foto",
   galleryLabel = "🖼️ Escolher da galeria",
@@ -34,7 +38,7 @@ export function PhotoCaptureButtons({
         type="file"
         accept={accept}
         capture="environment"
-        onChange={(e) => onFile(e.target.files?.[0])}
+        onChange={(e) => onFile?.(e.target.files?.[0])}
         className="hidden"
       />
       <input
@@ -42,7 +46,7 @@ export function PhotoCaptureButtons({
         type="file"
         accept={accept}
         multiple={multiple}
-        onChange={(e) => onFile(e.target.files?.[0])}
+        onChange={(e) => (multiple ? onFiles?.(e.target.files) : onFile?.(e.target.files?.[0]))}
         className="hidden"
       />
       <Button type="button" variant="outline" onClick={() => cameraRef.current?.click()}>

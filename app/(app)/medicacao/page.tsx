@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { PhotoCaptureField } from "@/components/ui/photo-capture-field";
 import { AlarmSetup } from "@/components/push/alarm-setup";
 import { SupplementCheckForm } from "@/components/medicacao/supplement-check-form";
 import {
@@ -260,13 +261,7 @@ export default async function MedicacaoOverviewPage({
             </div>
             <div className="grid gap-1 sm:col-span-2">
               <Label htmlFor="label_photo">Foto do rótulo (opcional)</Label>
-              <input
-                id="label_photo"
-                name="label_photo"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-sm file:text-zinc-200"
-              />
+              <PhotoCaptureField name="label_photo" accept="image/jpeg,image/png,image/webp" />
               <p className="text-[11px] text-zinc-600">
                 Anexar ou não é opcional — guarda o rótulo para consulta rápida depois. Para a
                 análise de segurança por IA, use a seção &quot;Analisar suplemento&quot;.
@@ -437,12 +432,10 @@ export default async function MedicacaoOverviewPage({
                         <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-3">
                           <form action={attachLabelAction} className="flex items-center gap-2">
                             <input type="hidden" name="medication_id" value={m.id} />
-                            <input
-                              type="file"
+                            <PhotoCaptureField
                               name="label_photo"
                               accept="image/jpeg,image/png,image/webp"
                               required
-                              className="text-xs text-zinc-500 file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-2 file:py-1.5 file:text-xs file:text-zinc-200"
                             />
                             <Button type="submit" variant="outline" size="sm">
                               {m.label_photo_path ? "Trocar foto" : "Anexar foto"}

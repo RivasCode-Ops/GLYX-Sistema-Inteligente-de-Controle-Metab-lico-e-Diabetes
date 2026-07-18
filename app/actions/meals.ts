@@ -211,9 +211,18 @@ export async function deleteMeal(formData: FormData): Promise<ActionResult> {
   const { error } = await supabase.from("meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) return { error: error.message };
 
-  // Remove a foto do bucket (melhor esforço — registro já foi excluído)
+  // saveMealPhotoItems dá o MESMO photo_path a vários itens da mesma foto —
+  // só apaga do bucket se nenhuma refeição "irmã" ainda referenciar essa
+  // imagem, senão as outras ficam com a foto quebrada.
   if (meal?.photo_path) {
-    await supabase.storage.from("meal-photos").remove([meal.photo_path]);
+    const { count } = await supabase
+      .from("meals")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("photo_path", meal.photo_path);
+    if (!count) {
+      await supabase.storage.from("meal-photos").remove([meal.photo_path]);
+    }
   }
 
   revalidatePath("/dashboard");

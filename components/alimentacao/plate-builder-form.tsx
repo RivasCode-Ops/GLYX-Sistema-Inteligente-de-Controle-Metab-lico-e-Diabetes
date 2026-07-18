@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
 type PlateResult = {
@@ -21,9 +22,18 @@ export function PlateBuilderForm() {
     usePhotoSelection();
   const [result, setResult] = useState<PlateResult | null>(null);
 
-  async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFilesChange(fileList: FileList | null) {
     setResult(null);
-    await selectMultiple(e.target.files, MAX_PHOTOS);
+    await selectMultiple(fileList, MAX_PHOTOS);
+  }
+
+  async function onCameraShot(file: File | undefined) {
+    if (!file) return;
+    setResult(null);
+    const dt = new DataTransfer();
+    for (const existing of files) dt.items.add(existing);
+    dt.items.add(file);
+    await selectMultiple(dt.files, MAX_PHOTOS);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -65,12 +75,12 @@ export function PlateBuilderForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-            <input
-              type="file"
+            <PhotoCaptureButtons
               accept="image/jpeg,image/png,image/webp"
               multiple
-              onChange={(e) => void onFilesChange(e)}
-              className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
+              onFile={(f) => void onCameraShot(f)}
+              onFiles={(fl) => void onFilesChange(fl)}
+              galleryLabel="🖼️ Escolher várias da galeria"
             />
             {previews.length ? (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
