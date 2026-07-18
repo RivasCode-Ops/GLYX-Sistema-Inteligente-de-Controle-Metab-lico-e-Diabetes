@@ -17,8 +17,13 @@ export function LoginForm() {
   const next = searchParams.get("next") ?? "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    searchParams.get("error") === "not_allowed"
+      ? "Essa conta não está autorizada a entrar no GLYX."
+      : null
+  );
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +43,26 @@ export function LoginForm() {
     }
     router.push(next);
     router.refresh();
+  }
+
+  async function onOAuth(provider: "google" | "apple") {
+    setError(null);
+    if (!isSupabaseConfigured()) {
+      setError("Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) return;
+    setOauthLoading(provider);
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+    });
+    if (err) {
+      setError(friendlyAuthError(err.message));
+      setOauthLoading(null);
+    }
+    // Em sucesso o navegador é redirecionado pro provedor — sem mais nada a fazer aqui.
   }
 
   return (
@@ -84,6 +109,32 @@ export function LoginForm() {
           <Button type="submit" disabled={loading}>
             {loading ? "Entrando…" : "Entrar"}
           </Button>
+
+          <div className="flex items-center gap-3 text-xs text-zinc-600">
+            <span className="h-px flex-1 bg-zinc-800" />
+            ou
+            <span className="h-px flex-1 bg-zinc-800" />
+          </div>
+
+          <div className="grid gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={oauthLoading !== null}
+              onClick={() => void onOAuth("google")}
+            >
+              {oauthLoading === "google" ? "Redirecionando…" : "Continuar com Google"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={oauthLoading !== null}
+              onClick={() => void onOAuth("apple")}
+            >
+              {oauthLoading === "apple" ? "Redirecionando…" : "Continuar com Apple"}
+            </Button>
+          </div>
+
           <p className="text-center text-xs text-zinc-500">
             Não tem conta?{" "}
             <Link href="/register" className="text-emerald-400 hover:underline">
