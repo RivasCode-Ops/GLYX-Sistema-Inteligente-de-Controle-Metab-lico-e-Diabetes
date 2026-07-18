@@ -3,6 +3,8 @@ import { getHealthIntegrationStatus } from "@/lib/health/config";
 import { isGoogleFitOAuthConfigured } from "@/lib/health/google-fit-oauth";
 import { IntegrationPanel } from "@/components/integrations/integration-panel";
 import { GoogleFitConnect } from "@/components/integrations/google-fit-connect";
+import { ManualSleepForm } from "@/components/integrations/manual-sleep-form";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function IntegracoesPage() {
@@ -38,6 +40,18 @@ export default async function IntegracoesPage() {
       <Suspense fallback={null}>
         <GoogleFitConnect connection={googleFitConnection} oauthConfigured={isGoogleFitOAuthConfigured()} />
       </Suspense>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Sono manual</CardTitle>
+          <CardDescription>
+            Sem Apple/Google Fit conectado, registre aqui — entra no Mapa de risco e nos relatórios
+            com prioridade sobre qualquer outra fonte do mesmo dia.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ManualSleepForm />
+        </CardContent>
+      </Card>
       <IntegrationPanel initialStatus={status} />
     </div>
   );
