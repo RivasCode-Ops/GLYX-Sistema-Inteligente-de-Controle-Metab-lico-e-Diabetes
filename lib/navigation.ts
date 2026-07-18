@@ -16,35 +16,54 @@ import {
   Map,
 } from "lucide-react";
 
+/** "registrar" = ação do dia a dia; "analises" = telas retrospectivas/IA; "conta" = configuração. */
+export type NavGroup = "registrar" | "analises" | "conta";
+
 export type NavItem = {
   title: string;
   href: string;
   icon: LucideIcon;
   /** Show in bottom tab bar (mobile) */
   mobile?: boolean;
+  group: NavGroup;
 };
 
 export const mainNav: NavItem[] = [
-  { title: "Hoje", href: "/dashboard", icon: LayoutDashboard, mobile: true },
-  { title: "Glicemia", href: "/glicemia", icon: Droplets, mobile: true },
-  { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true },
-  { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true },
-  { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true },
-  { title: "Integrações", href: "/integracoes", icon: Plug, mobile: false },
-  { title: "Insights", href: "/insights", icon: Lightbulb, mobile: false },
-  { title: "Mapa de risco", href: "/mapa-risco", icon: Map, mobile: false },
-  { title: "IA metabólica", href: "/ia-metabolica", icon: Sparkles, mobile: false },
-  { title: "Perfil", href: "/perfil", icon: User, mobile: false },
-  { title: "Exames", href: "/exames", icon: FileText, mobile: false },
-  { title: "Histórico", href: "/historico", icon: ScrollText, mobile: false },
-  { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false },
-  { title: "Sistema", href: "/status", icon: Radar, mobile: false },
+  { title: "Hoje", href: "/dashboard", icon: LayoutDashboard, mobile: true, group: "registrar" },
+  { title: "Glicemia", href: "/glicemia", icon: Droplets, mobile: true, group: "registrar" },
+  { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true, group: "registrar" },
+  { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true, group: "registrar" },
+  { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true, group: "registrar" },
+  { title: "Insights", href: "/insights", icon: Lightbulb, mobile: false, group: "analises" },
+  { title: "Mapa de risco", href: "/mapa-risco", icon: Map, mobile: false, group: "analises" },
+  { title: "IA metabólica", href: "/ia-metabolica", icon: Sparkles, mobile: false, group: "analises" },
+  { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "analises" },
+  { title: "Histórico", href: "/historico", icon: ScrollText, mobile: false, group: "analises" },
+  { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false, group: "analises" },
+  { title: "Integrações", href: "/integracoes", icon: Plug, mobile: false, group: "conta" },
+  { title: "Perfil", href: "/perfil", icon: User, mobile: false, group: "conta" },
+  { title: "Sistema", href: "/status", icon: Radar, mobile: false, group: "conta" },
 ];
 
 export const mobileNav = mainNav.filter((i) => i.mobile);
 
 /** Itens que no celular ficam fora da barra inferior (menu Mais). */
 export const moreNav = mainNav.filter((i) => !i.mobile);
+
+export const GROUP_LABEL: Record<NavGroup, string> = {
+  registrar: "Registrar",
+  analises: "Análises",
+  conta: "Conta",
+};
+
+const GROUP_ORDER: NavGroup[] = ["registrar", "analises", "conta"];
+
+/** Agrupa preservando a ordem registrar → análises → conta; grupos vazios somem. */
+export function groupNavItems(items: NavItem[]): { group: NavGroup; items: NavItem[] }[] {
+  return GROUP_ORDER.map((group) => ({ group, items: items.filter((i) => i.group === group) })).filter(
+    (g) => g.items.length > 0
+  );
+}
 
 export type SubNavItem = { title: string; href: string };
 

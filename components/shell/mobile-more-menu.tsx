@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Menu } from "lucide-react";
-import { moreNav } from "@/lib/navigation";
+import { moreNav, groupNavItems, GROUP_LABEL } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -48,6 +48,7 @@ export function MobileMoreMenu({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = openProp ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
+  const groups = groupNavItems(moreNav);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -59,32 +60,39 @@ export function MobileMoreMenu({
             Exames (ECG / Raio-X), mapa de risco e o restante do app.
           </DialogDescription>
         </DialogHeader>
-        <nav className="mt-2 grid gap-1">
-          {moreNav.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
-            const Icon = item.icon;
-            const highlight = HIGHLIGHT.has(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors",
-                  active
-                    ? "bg-zinc-800 text-white"
-                    : highlight
-                      ? "border border-emerald-600/40 bg-emerald-500/10 text-emerald-100"
-                      : "text-zinc-300 hover:bg-zinc-900"
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
-                <span className="font-medium">{item.title}</span>
-              </Link>
-            );
-          })}
+        <nav className="mt-2 grid gap-3">
+          {groups.map(({ group, items }) => (
+            <div key={group} className="grid gap-1">
+              <p className="px-3 text-[11px] font-medium uppercase tracking-wide text-zinc-600">
+                {GROUP_LABEL[group]}
+              </p>
+              {items.map((item) => {
+                const active =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+                const Icon = item.icon;
+                const highlight = HIGHLIGHT.has(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors",
+                      active
+                        ? "bg-zinc-800 text-white"
+                        : highlight
+                          ? "border border-emerald-600/40 bg-emerald-500/10 text-emerald-100"
+                          : "text-zinc-300 hover:bg-zinc-900"
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+                    <span className="font-medium">{item.title}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </DialogContent>
     </Dialog>

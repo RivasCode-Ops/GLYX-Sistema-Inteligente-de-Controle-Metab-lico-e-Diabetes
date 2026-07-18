@@ -97,7 +97,10 @@ export default async function ExamesPage() {
       <div>
         <h2 className="mb-3 text-lg font-semibold">Salvos</h2>
         {exams.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum exame registrado.</p>
+          <p className="text-sm text-zinc-500">
+            Nenhum exame ainda. Cole o texto do laudo ou envie uma foto acima — o resumo
+            interpretado pela IA aparece aqui.
+          </p>
         ) : (
           <ul className="space-y-2">
             {exams.map((e) => (

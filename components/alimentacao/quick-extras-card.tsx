@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addMeal } from "@/app/actions/meals";
+import { useToast } from "@/components/ui/toast-provider";
 
 /** Registro livre de lanches/bebidas fora do fluxo de foto — mesma lógica
  * de sempre (meals.eaten_at = agora), então entra automaticamente na
@@ -17,6 +18,7 @@ import { addMeal } from "@/app/actions/meals";
  * (opcional, mas visível) em vez de só o campo de carboidrato solto. */
 export function QuickExtrasCard() {
   const router = useRouter();
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -59,7 +61,10 @@ export function QuickExtrasCard() {
   }
 
   function submit() {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      setStatus("Digite o que foi antes de registrar.");
+      return;
+    }
     startTransition(async () => {
       const fd = new FormData();
       fd.set("name", name.trim());
@@ -68,8 +73,11 @@ export function QuickExtrasCard() {
       if (protein) fd.set("protein_g", protein);
       if (fat) fd.set("fat_g", fat);
       const res = await addMeal(fd);
-      setStatus(res.error ?? `${name.trim()} registrado.`);
-      if (!res.error) {
+      if (res.error) {
+        setStatus(res.error);
+      } else {
+        setStatus(null);
+        toast(`${name.trim()} registrado.`);
         setName("");
         setCarbs("");
         setCalories("");
@@ -145,7 +153,7 @@ export function QuickExtrasCard() {
               </div>
             )}
             <div className="flex gap-2">
-              <Button type="button" size="sm" disabled={pending || !name.trim()} onClick={submit}>
+              <Button type="button" size="sm" disabled={pending} onClick={submit}>
                 {pending ? "Registrando…" : "Registrar"}
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={pending}>
@@ -164,7 +172,7 @@ export function QuickExtrasCard() {
             + Adicionar extra
           </Button>
         )}
-        {status ? <p className="text-xs text-emerald-300">{status}</p> : null}
+        {status ? <p className="text-xs text-amber-300">{status}</p> : null}
       </CardContent>
     </Card>
   );

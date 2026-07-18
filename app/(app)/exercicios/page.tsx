@@ -1,12 +1,9 @@
 import { SectionCards } from "@/components/module/section-cards";
 import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
+import { NewSessionForm } from "@/components/exercicios/new-session-form";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { addExerciseSession } from "@/app/actions/exercise";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import type { ExerciseSession } from "@/types/database";
 import { demoExercises } from "@/lib/demo/data";
@@ -15,11 +12,6 @@ export default async function ExerciciosOverviewPage() {
   let sessions: ExerciseSession[] = [];
   let bodyGoal: "lose" | "gain" | "maintain" | null = null;
   const demoMode = !isSupabaseConfigured();
-
-  async function addExerciseSessionAction(formData: FormData): Promise<void> {
-    "use server";
-    await addExerciseSession(formData);
-  }
 
   if (demoMode) {
     sessions = demoExercises;
@@ -84,36 +76,7 @@ export default async function ExerciciosOverviewPage() {
               Demo pública: sessões fictícias mostram o fluxo de registro e correlação com glicemia.
             </p>
           ) : null}
-          <form action={addExerciseSessionAction} className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="label">Atividade</Label>
-              <Input id="label" name="label" required placeholder="ex.: Caminhada leve" />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="duration_min">Duração (min)</Label>
-              <Input id="duration_min" name="duration_min" type="number" min={1} />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="calories_burned">Calorias (est.)</Label>
-              <Input id="calories_burned" name="calories_burned" type="number" min={0} />
-            </div>
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="intensity">Intensidade</Label>
-              <Input id="intensity" name="intensity" placeholder="leve / moderada / forte" />
-            </div>
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="started_at_local">Horário real do treino</Label>
-              <Input id="started_at_local" name="started_at_local" type="datetime-local" />
-              <p className="text-[11px] text-zinc-600">Deixe em branco para usar o horário de agora.</p>
-            </div>
-            <div className="grid gap-1 sm:col-span-2">
-              <Label htmlFor="notes">Notas / contexto glicêmico (opcional)</Label>
-              <Input id="notes" name="notes" placeholder="ex.: glicemia antes 140, depois 110" />
-            </div>
-            <div className="sm:col-span-2">
-              <Button type="submit">Salvar sessão</Button>
-            </div>
-          </form>
+          <NewSessionForm />
         </CardContent>
       </Card>
 

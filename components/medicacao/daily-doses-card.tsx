@@ -132,8 +132,8 @@ export function DailyDosesCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">📋 Doses de hoje</CardTitle>
         <CardDescription>
-          {tomadas} de {rows.length} tomadas — marque aqui ou pelo botão da notificação; o estado
-          aparece na hora.
+          {tomadas} de {rows.length} tomadas — registre em &quot;Registrar dose&quot;, na seção
+          Medicamentos ativos abaixo, ou pelo botão da notificação; o estado aparece na hora.
         </CardDescription>
       </CardHeader>
       <CardContent>

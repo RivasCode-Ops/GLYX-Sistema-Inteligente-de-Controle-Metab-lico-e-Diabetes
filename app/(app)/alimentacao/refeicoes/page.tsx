@@ -105,7 +105,7 @@ export default async function AlimentacaoRefeicoesPage() {
                           type="submit"
                           aria-label={`Excluir refeição ${m.name}`}
                           title="Excluir"
-                          className="rounded-md px-1.5 py-0.5 text-xs text-zinc-600 transition hover:bg-red-950/50 hover:text-red-300"
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-sm text-zinc-600 transition hover:bg-red-950/50 hover:text-red-300"
                         >
                           ✕
                         </button>

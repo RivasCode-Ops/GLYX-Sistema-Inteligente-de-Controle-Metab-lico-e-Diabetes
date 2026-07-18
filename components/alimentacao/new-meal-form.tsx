@@ -6,6 +6,7 @@ import { addMeal } from "@/app/actions/meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast-provider";
 
 /** "2026-07-18T13:04" no fuso local do navegador — valor inicial do
  * datetime-local, pra já vir preenchido com "agora" mas editável. */
@@ -17,6 +18,7 @@ function nowLocalInputValue(): string {
 
 export function NewMealForm() {
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
   const [carbs, setCarbs] = useState("");
@@ -26,7 +28,6 @@ export function NewMealForm() {
   const [estimating, setEstimating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   async function estimate() {
     if (!name.trim()) return;
@@ -59,10 +60,12 @@ export function NewMealForm() {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      setStatus("Digite o nome da refeição antes de salvar.");
+      return;
+    }
     setSaving(true);
     setStatus(null);
-    setSaved(false);
     try {
       const fd = new FormData();
       fd.set("name", name.trim());
@@ -82,7 +85,7 @@ export function NewMealForm() {
       setProtein("");
       setFat("");
       setEatenAt(nowLocalInputValue());
-      setSaved(true);
+      toast("Refeição salva.");
       router.refresh();
     } finally {
       setSaving(false);
@@ -96,11 +99,7 @@ export function NewMealForm() {
         <Input
           id="name"
           value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setSaved(false);
-          }}
-          required
+          onChange={(e) => setName(e.target.value)}
           placeholder="ex.: Almoço, omelete de 2 ovos com frango desfiado"
         />
       </div>
@@ -140,14 +139,11 @@ export function NewMealForm() {
         </p>
       </div>
       <div className="sm:col-span-2">
-        <Button type="submit" disabled={saving || !name.trim()}>
+        <Button type="submit" disabled={saving}>
           {saving ? "Salvando…" : "Salvar refeição"}
         </Button>
       </div>
       {status ? <p className="text-xs text-amber-300 sm:col-span-2">{status}</p> : null}
-      {saved && !status ? (
-        <p className="text-xs text-emerald-400 sm:col-span-2">Refeição salva.</p>
-      ) : null}
       {!calories && !carbs && !protein && !fat ? (
         <p className="text-[11px] text-zinc-600 sm:col-span-2">
           Sem estimar nem preencher os campos, essa refeição não vai contar nos totais de hoje.
