@@ -11,6 +11,7 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 | Diário: glicemia, refeições, água, peso, exercício, medicação, exames | Vivo |
 | CGM LibreLinkUp + CSV LibreView + circuit breaker | Vivo |
 | Dexcom OAuth + sync (requer credenciais de parceiro/sandbox) | Vivo (config) |
+| Google Fit OAuth + sync (passos/sono/FC — requer projeto Google Cloud; risco de descontinuação da Fitness API) | Vivo (config) |
 | IA: chat, foto de refeição, exames, suplementos, sugestões | Vivo |
 | Web Push (medicação, água, dicas, hipo) | Vivo |
 | LGPD: consentimento, export, wipe amplo + Storage | Vivo |
@@ -26,8 +27,7 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 1. **Habilitar em produção** o que o código já espera — guia em [docs/PRODUCAO.md](docs/PRODUCAO.md); validar env com `npm run check:prod` (Auth signup off, secrets, migrations circuit breaker + multi-provider, cron URL/secret).
 2. **E2E clínico autenticado** no CI (`E2E_USER_EMAIL` / `E2E_USER_PASSWORD`).
 3. **Dexcom sandbox → produção** quando houver app aprovado no portal Dexcom; validar payload real de EGVs e ajustar normalizer se necessário.
-4. **Google Fit OAuth** (Health Connect no Android fica para nativo depois).
-5. **DPIA viva** — manter `docs/DPIA.md` alinhado a qualquer novo processamento de dado sensível.
+4. **DPIA viva** — manter `docs/DPIA.md` alinhado a qualquer novo processamento de dado sensível (inclui Google Fit).
 
 ### P2 — produto
 

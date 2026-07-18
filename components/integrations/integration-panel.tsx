@@ -28,32 +28,15 @@ export function IntegrationPanel({ initialStatus }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Google Fit / Health Connect</CardTitle>
-            <CardDescription>{status.googleFit.hint}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <span
-              className={
-                status.googleFit.configured ? "text-sm text-emerald-400" : "text-sm text-zinc-500"
-              }
-            >
-              {status.googleFit.configured ? "Variáveis OAuth presentes" : "Não configurado"}
-            </span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Apple Health</CardTitle>
-            <CardDescription>{status.appleHealth.hint}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <span className="text-sm text-amber-400/90">Apenas nativo / exportação → API</span>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Apple Health</CardTitle>
+          <CardDescription>{status.appleHealth.hint}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <span className="text-sm text-amber-400/90">Apenas nativo / exportação → API</span>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

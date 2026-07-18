@@ -21,8 +21,22 @@ Defina **todas** as variáveis obrigatórias (ver `.env.example`):
 | `NEXT_PUBLIC_SITE_URL` | recomendado | Domínio público (Dexcom redirect) |
 | `OPS_ALERT_WEBHOOK_URL` | opcional | Slack/Discord para falhas de cron |
 | `DEXCOM_*` | opcional | Só se for usar Dexcom |
+| `GOOGLE_FIT_CLIENT_ID` / `GOOGLE_FIT_CLIENT_SECRET` / `GOOGLE_FIT_REDIRECT_URI` | opcional | Só se for usar Google Fit — ver passo a passo abaixo |
 
 Nunca exponha `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` ou `CGM_CREDENTIALS_SECRET` no cliente.
+
+### 1.1 Google Fit (OAuth) — passo a passo
+
+Traz passos/sono/FC de relógios que sincronizam com o Google Fit (ex.: Amazfit via app Zepp).
+**Risco conhecido**: o Google vem descontinuando a Fitness REST API — se o passo 4 falhar
+mostrando "API indisponível", é sinal de que não aceita mais projetos novos.
+
+1. Acesse [console.cloud.google.com](https://console.cloud.google.com/) e crie um projeto (ou use um existente).
+2. Em **APIs e serviços → Biblioteca**, procure "Fitness API" e clique em **Ativar**.
+3. Em **APIs e serviços → Tela de consentimento OAuth**: tipo "Externo", preencha nome do app e e-mail; em modo de teste, adicione seu e-mail como usuário de teste (evita precisar de verificação do Google pra uso pessoal).
+4. Em **APIs e serviços → Credenciais → Criar credenciais → ID do cliente OAuth**: tipo "Aplicativo da Web"; em "URIs de redirecionamento autorizados" adicione `https://SEU-DOMINIO/api/health/google-fit/callback` (e `http://localhost:3000/api/health/google-fit/callback` para testar local).
+5. Copie o **Client ID** e **Client secret** gerados para `GOOGLE_FIT_CLIENT_ID` / `GOOGLE_FIT_CLIENT_SECRET`.
+6. Em `/integracoes` no GLYX, clique em "Conectar com Google" e autorize.
 
 ## 2. Migrations Supabase
 
