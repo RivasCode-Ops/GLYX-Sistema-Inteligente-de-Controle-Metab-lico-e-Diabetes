@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeMuscleRecovery, suggestMuscleFocus, suggestMuscleSplit } from "./muscle-recovery";
+import {
+  computeMuscleRecovery,
+  limitAvailableByTime,
+  suggestMuscleFocus,
+  suggestMuscleSplit,
+} from "./muscle-recovery";
 
 const NOW = new Date("2026-07-13T12:00:00.000Z");
 const ALL_IDS = [
@@ -138,5 +143,52 @@ describe("suggestMuscleSplit", () => {
     const lastTrained = Object.fromEntries(ALL_IDS.map((id) => [id, justTrained]));
     const statuses = computeMuscleRecovery(lastTrained, {}, NOW);
     expect(suggestMuscleSplit(statuses)).toBeNull();
+  });
+
+  it("ordena available do mais atrasado pro menos atrasado (nunca-treinado primeiro)", () => {
+    // pull: costas nunca treinado, bíceps pronto há muito, antebraços pronto há pouco
+    // (janela de bíceps e antebraços é 36h — precisa passar disso pra virar "ready")
+    const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
+    const recentReady = new Date(NOW.getTime() - 40 * 3_600_000).toISOString();
+    const lastTrained = Object.fromEntries(
+      ALL_IDS.filter((id) => id !== "costas").map((id) => [
+        id,
+        id === "biceps" ? longAgo : id === "antebracos" ? recentReady : new Date(NOW.getTime() - 1 * 3_600_000).toISOString(),
+      ])
+    );
+    const statuses = computeMuscleRecovery(lastTrained, {}, NOW);
+    const suggestion = suggestMuscleSplit(statuses);
+    expect(suggestion?.split.id).toBe("pull");
+    expect(suggestion?.available.map((s) => s.id)).toEqual(["costas", "biceps", "antebracos"]);
+  });
+});
+
+describe("limitAvailableByTime", () => {
+  const three = ["a", "b", "c"].map((id) => ({
+    id: id as never,
+    label: id,
+    lastTrainedAt: null,
+    status: "ready" as const,
+    hoursRemaining: null,
+    hoursReady: 0,
+    pauseReason: null,
+  }));
+
+  it("30 min: só o primeiro (mais prioritário) entra", () => {
+    const { included, deferred } = limitAvailableByTime(three, 30);
+    expect(included.map((s) => s.id)).toEqual(["a"]);
+    expect(deferred.map((s) => s.id)).toEqual(["b", "c"]);
+  });
+
+  it("60 min: os dois primeiros entram", () => {
+    const { included, deferred } = limitAvailableByTime(three, 60);
+    expect(included.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(deferred.map((s) => s.id)).toEqual(["c"]);
+  });
+
+  it("90 min: todos entram, nada fica pra depois", () => {
+    const { included, deferred } = limitAvailableByTime(three, 90);
+    expect(included).toHaveLength(3);
+    expect(deferred).toHaveLength(0);
   });
 });

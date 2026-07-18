@@ -93,6 +93,16 @@ function isAvailable(s: MuscleRecoveryStatus): boolean {
   return s.status === "ready" || s.status === "never";
 }
 
+/** Nunca-treinado primeiro, depois quem está pronto há mais tempo — mesmo
+ * critério de `suggestMuscleFocus`, usado aqui pra ordenar `available` para
+ * que "pegar os N primeiros" (filtro de tempo) sempre priorize quem está
+ * mais atrasado, não a ordem arbitrária de cadastro do grupo. */
+function byPriority(a: MuscleRecoveryStatus, b: MuscleRecoveryStatus): number {
+  if (a.status === "never" && b.status !== "never") return -1;
+  if (b.status === "never" && a.status !== "never") return 1;
+  return (b.hoursReady ?? 0) - (a.hoursReady ?? 0);
+}
+
 export type MuscleSplitId = "push" | "pull" | "pernas";
 
 export type MuscleSplitDef = { id: MuscleSplitId; label: string; groups: MuscleGroupId[] };
@@ -123,7 +133,7 @@ export function suggestMuscleSplit(statuses: MuscleRecoveryStatus[]): MuscleSpli
 
   const candidates = MUSCLE_SPLITS.map((split) => {
     const groupStatuses = split.groups.map((id) => byId.get(id)).filter((s): s is MuscleRecoveryStatus => !!s);
-    const available = groupStatuses.filter(isAvailable);
+    const available = groupStatuses.filter(isAvailable).sort(byPriority);
     const resting = groupStatuses.filter((s) => !isAvailable(s));
     const score = available.reduce(
       (sum, s) => sum + (s.status === "never" ? 1000 : (s.hoursReady ?? 0)) + 1,
@@ -137,4 +147,22 @@ export function suggestMuscleSplit(statuses: MuscleRecoveryStatus[]): MuscleSpli
   candidates.sort((a, b) => b.score - a.score);
   const { split, available, resting } = candidates[0];
   return { split, available, resting };
+}
+
+export type TimeBudgetMinutes = 30 | 60 | 90;
+
+export const TIME_BUDGETS: TimeBudgetMinutes[] = [30, 60, 90];
+
+/** Quantos grupos musculares cabem no tempo escolhido — 30min só dá pra um
+ * grupo bem feito, 90min cabe o split inteiro. `available` já vem priorizado
+ * (mais atrasado primeiro), então "pegar os N primeiros" nunca deixa de fora
+ * quem mais precisa. Sem isso, com tudo recuperado (ex.: depois de uma
+ * pausa longa) o treino sugerido vira o split inteiro mesmo sem tempo pra
+ * cumprir, e o usuário some do app em vez de fazer uma versão menor. */
+export function limitAvailableByTime(
+  available: MuscleRecoveryStatus[],
+  minutes: TimeBudgetMinutes
+): { included: MuscleRecoveryStatus[]; deferred: MuscleRecoveryStatus[] } {
+  const cap = minutes === 30 ? 1 : minutes === 60 ? 2 : available.length;
+  return { included: available.slice(0, cap), deferred: available.slice(cap) };
 }

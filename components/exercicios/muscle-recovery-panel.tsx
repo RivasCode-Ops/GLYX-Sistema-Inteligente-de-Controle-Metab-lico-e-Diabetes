@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { logMuscleTraining, pauseMuscleGroup, resumeMuscleGroup } from "@/app/actions/exercise";
 import { MUSCLE_GROUPS } from "@/lib/data/muscle-groups";
-import { suggestMuscleSplit, type MuscleRecoveryStatus } from "@/lib/exercicios/muscle-recovery";
+import {
+  limitAvailableByTime,
+  suggestMuscleSplit,
+  TIME_BUDGETS,
+  type MuscleRecoveryStatus,
+  type TimeBudgetMinutes,
+} from "@/lib/exercicios/muscle-recovery";
 
 const RECOVERY_HOURS = Object.fromEntries(MUSCLE_GROUPS.map((g) => [g.id, g.recoveryHours]));
 
@@ -143,6 +149,11 @@ export function MuscleRecoveryPanel({ statuses, suggestion }: Props) {
   const [aiError, setAiError] = useState<string | null>(null);
 
   const splitSuggestion = useMemo(() => suggestMuscleSplit(statuses), [statuses]);
+  const [timeBudget, setTimeBudget] = useState<TimeBudgetMinutes>(90);
+  const limited = useMemo(
+    () => (splitSuggestion ? limitAvailableByTime(splitSuggestion.available, timeBudget) : null),
+    [splitSuggestion, timeBudget]
+  );
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]));
@@ -161,7 +172,7 @@ export function MuscleRecoveryPanel({ statuses, suggestion }: Props) {
   }
 
   async function askAiSuggestion() {
-    if (!splitSuggestion) return;
+    if (!splitSuggestion || !limited?.included.length) return;
     setAiPending(true);
     setAiError(null);
     setAiResult(null);
@@ -171,7 +182,7 @@ export function MuscleRecoveryPanel({ statuses, suggestion }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           splitLabel: splitSuggestion.split.label,
-          muscleLabels: splitSuggestion.available.map((s) => s.label),
+          muscleLabels: limited.included.map((s) => s.label),
           trainingType,
         }),
       });
@@ -190,14 +201,40 @@ export function MuscleRecoveryPanel({ statuses, suggestion }: Props) {
 
   return (
     <div className="space-y-4">
-      {splitSuggestion ? (
+      {splitSuggestion && limited ? (
         <div className="rounded-xl border border-emerald-800/60 bg-emerald-950/40 p-3.5">
           <p className="text-[11px] uppercase tracking-wide text-emerald-400/80">
             {splitSuggestion.split.label} — pode malhar hoje
           </p>
           <p className="mt-1 text-base font-medium text-zinc-50">
-            {splitSuggestion.available.map((s) => s.label).join(" + ")}
+            {limited.included.map((s) => s.label).join(" + ") || "—"}
           </p>
+          {splitSuggestion.available.length > 1 ? (
+            <div className="mt-2.5 flex items-center gap-1.5">
+              <span className="text-[11px] text-zinc-500">Tempo hoje:</span>
+              {TIME_BUDGETS.map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  onClick={() => setTimeBudget(minutes)}
+                  className={
+                    timeBudget === minutes
+                      ? "rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-medium text-emerald-950"
+                      : "rounded-full border border-emerald-800/60 px-2.5 py-1 text-[11px] text-emerald-300/80"
+                  }
+                >
+                  {minutes} min
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {limited.deferred.length ? (
+            <p className="mt-1.5 text-xs text-zinc-500">
+              Selecionamos {limited.included.length} grupo{limited.included.length > 1 ? "s" : ""} que{" "}
+              {limited.included.length > 1 ? "não recebem" : "não recebe"} estímulo há mais tempo pra
+              caber no seu tempo hoje. Fica pra próxima: {limited.deferred.map((s) => s.label).join(", ")}.
+            </p>
+          ) : null}
           {splitSuggestion.resting.length ? (
             <p className="mt-1 text-xs text-zinc-500">
               Ainda descansando nesse dia: {splitSuggestion.resting.map((s) => s.label).join(", ")}
