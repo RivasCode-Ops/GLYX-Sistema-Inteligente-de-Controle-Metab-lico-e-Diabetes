@@ -169,7 +169,18 @@ export default async function MapaRiscoPage() {
             .
           </p>
         </div>
-        <GenerateAuditButton />
+        <div className="flex flex-wrap items-center gap-2">
+          {latest ? (
+            <Link
+              href="/relatorio-medico"
+              target="_blank"
+              className="rounded-lg border border-zinc-700 bg-zinc-900/60 px-3 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-800"
+            >
+              📄 Exportar relatório
+            </Link>
+          ) : null}
+          <GenerateAuditButton />
+        </div>
       </div>
 
       {latest ? (
