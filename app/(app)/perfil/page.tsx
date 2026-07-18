@@ -112,6 +112,54 @@ export default async function PerfilPage() {
       </Card>
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Calculadora de dose de insulina</CardTitle>
+          <CardDescription>
+            Defina com seu endocrinologista — sem esses valores, a calculadora em Medicação não
+            aparece. Nunca ajuste dose sem orientação médica.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={updateProfileAction} className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-1">
+              <Label htmlFor="carb_ratio">Razão carbo/insulina (g por 1U)</Label>
+              <Input
+                id="carb_ratio"
+                name="carb_ratio"
+                type="number"
+                step="0.1"
+                defaultValue={profile?.carb_ratio ?? ""}
+                placeholder="ex.: 15"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="correction_factor">Fator de correção (mg/dL por 1U)</Label>
+              <Input
+                id="correction_factor"
+                name="correction_factor"
+                type="number"
+                step="0.1"
+                defaultValue={profile?.correction_factor ?? ""}
+                placeholder="ex.: 30"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="target_glucose_bolus">Meta pra correção (mg/dL)</Label>
+              <Input
+                id="target_glucose_bolus"
+                name="target_glucose_bolus"
+                type="number"
+                defaultValue={profile?.target_glucose_bolus ?? ""}
+                placeholder="ex.: 100"
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <Button type="submit">Salvar parâmetros</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Objetivo corporal</CardTitle>
           <CardDescription>
             Base para metas de calorias/proteína e para a análise de viabilidade. Mudanças de dieta

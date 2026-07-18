@@ -81,6 +81,7 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Tendências", href: "/glicemia/tendencias" },
     { title: "Sensor", href: "/glicemia/sensor" },
     { title: "Histórico", href: "/glicemia/historico" },
+    { title: "Pressão", href: "/glicemia/pressao" },
   ],
   "/alimentacao": [
     { title: "Visão geral", href: "/alimentacao" },
@@ -98,6 +99,7 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
   "/medicacao": [
     { title: "Visão geral", href: "/medicacao" },
     { title: "Agenda", href: "/medicacao/agenda" },
+    { title: "Calculadora", href: "/medicacao/calculadora" },
   ],
 };
 

@@ -134,8 +134,25 @@ export type Profile = {
   family_history?: string | null;
   primary_focus?: "diabetes" | "lose" | "gain" | null;
   onboarding_done?: boolean;
+  /** Gramas de carboidrato compensados por 1 unidade de insulina rápida. */
+  carb_ratio?: number | null;
+  /** mg/dL que 1 unidade de insulina reduz. */
+  correction_factor?: number | null;
+  /** Meta de glicemia usada só na calculadora de bolus (distinta de target_glucose_min/max). */
+  target_glucose_bolus?: number | null;
   created_at: string;
   updated_at: string;
+};
+
+export type BloodPressureLog = {
+  id: string;
+  user_id: string;
+  systolic: number;
+  diastolic: number;
+  pulse: number | null;
+  recorded_at: string;
+  notes: string | null;
+  created_at: string;
 };
 
 export type WeightLog = {

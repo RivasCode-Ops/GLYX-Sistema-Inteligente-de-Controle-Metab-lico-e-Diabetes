@@ -16,6 +16,9 @@ const schema = z.object({
   body_goal: z.enum(["lose", "gain", "maintain", "recomp"]).optional(),
   target_weight_kg: z.coerce.number().min(20).max(400).optional(),
   family_history: z.string().max(500).optional(),
+  carb_ratio: z.coerce.number().min(1).max(200).optional(),
+  correction_factor: z.coerce.number().min(1).max(200).optional(),
+  target_glucose_bolus: z.coerce.number().int().min(50).max(300).optional(),
 });
 
 export type ActionResult = { ok?: true; error?: string };
@@ -41,6 +44,9 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     body_goal: formData.get("body_goal") || undefined,
     target_weight_kg: formData.get("target_weight_kg") || undefined,
     family_history: formData.get("family_history") || undefined,
+    carb_ratio: formData.get("carb_ratio") || undefined,
+    correction_factor: formData.get("correction_factor") || undefined,
+    target_glucose_bolus: formData.get("target_glucose_bolus") || undefined,
   });
   if (!parsed.success) return { error: "Dados inválidos." };
 
