@@ -14,6 +14,10 @@ export type MealItem = {
   carbs_g: number;
   protein_g: number;
   fat_g: number;
+  /** Só preenchido pela análise por foto (um item pode ter carga glicêmica
+   * bem diferente do resto do prato — ex.: o refrigerante sozinho). */
+  glycemic_load_estimate?: number;
+  implication?: string;
 };
 
 // Soma os itens detectados (um por alimento/bebida distinto na foto) nos
@@ -36,6 +40,10 @@ export function sumMealItems(raw: Record<string, unknown>): {
       carbs_g: Number(r.carbs_g) || 0,
       protein_g: Number(r.protein_g) || 0,
       fat_g: Number(r.fat_g) || 0,
+      ...(typeof r.glycemic_load_estimate === "number"
+        ? { glycemic_load_estimate: r.glycemic_load_estimate }
+        : {}),
+      ...(typeof r.implication === "string" && r.implication ? { implication: r.implication } : {}),
     };
   });
 

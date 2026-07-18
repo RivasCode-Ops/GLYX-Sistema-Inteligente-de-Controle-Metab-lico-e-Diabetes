@@ -1,66 +1,79 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { PenLine } from "lucide-react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { saveMealPhoto } from "@/app/actions/meals";
+import { saveMealPhotoItems } from "@/app/actions/meals";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
-import { GlycemicImpactRing } from "@/components/alimentacao/glycemic-impact-ring";
-import { MacroGrid, type MacroField } from "@/components/alimentacao/macro-grid";
 
-type Draft = {
+type ItemDraft = {
   name: string;
   calories: string;
   carbs_g: string;
   protein_g: string;
   fat_g: string;
   glycemic_load_estimate: string;
-  notes: string;
+  implication: string;
+  included: boolean;
 };
 
-type DetectedItem = {
-  name: string;
-  calories: number;
-  carbs_g: number;
-  protein_g: number;
-  fat_g: number;
+type RawItem = {
+  name?: string;
+  calories?: number;
+  carbs_g?: number;
+  protein_g?: number;
+  fat_g?: number;
+  glycemic_load_estimate?: number;
+  implication?: string;
 };
 
-const MACRO_FIELDS: MacroField[] = ["calories", "carbs_g", "protein_g", "fat_g"];
+function toItemDraft(it: RawItem): ItemDraft {
+  return {
+    name: it.name ?? "Item",
+    calories: it.calories != null ? String(it.calories) : "",
+    carbs_g: it.carbs_g != null ? String(it.carbs_g) : "",
+    protein_g: it.protein_g != null ? String(it.protein_g) : "",
+    fat_g: it.fat_g != null ? String(it.fat_g) : "",
+    glycemic_load_estimate: it.glycemic_load_estimate != null ? String(it.glycemic_load_estimate) : "",
+    implication: it.implication ?? "",
+    included: true,
+  };
+}
+
+function glycemicTier(score: number): { label: string; className: string } {
+  if (score >= 67) return { label: "Impacto alto", className: "bg-red-500/15 text-red-300" };
+  if (score >= 34) return { label: "Impacto médio", className: "bg-amber-500/15 text-amber-300" };
+  return { label: "Impacto baixo", className: "bg-emerald-500/15 text-emerald-300" };
+}
 
 export default function AlimentacaoFotoPage() {
   const { files, previews, status, setStatus, loading, setLoading, selectSingle, clear } =
     usePhotoSelection();
   const file = files[0] ?? null;
   const preview = previews[0] ?? null;
-  const [draft, setDraft] = useState<Draft | null>(null);
-  /** Snapshot da estimativa original da IA, para detectar ajustes do usuário. */
-  const [aiDraft, setAiDraft] = useState<Draft | null>(null);
-  const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
+  const [items, setItems] = useState<ItemDraft[]>([]);
+  const [aiItems, setAiItems] = useState<ItemDraft[]>([]);
   const [eatingOrderTip, setEatingOrderTip] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const firstMacroInputRef = useRef<HTMLInputElement>(null);
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setDraft(null);
-    setAiDraft(null);
-    setDetectedItems([]);
+  function reset() {
+    setItems([]);
+    setAiItems([]);
     setEatingOrderTip(null);
     setSaved(false);
+  }
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    reset();
     await selectSingle(e.target.files?.[0]);
   }
 
   async function onAnalyze(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus(null);
-    setDraft(null);
-    setAiDraft(null);
-    setDetectedItems([]);
-    setSaved(false);
+    reset();
     if (!file) {
       setStatus("Selecione uma imagem.");
       return;
@@ -71,9 +84,14 @@ export default function AlimentacaoFotoPage() {
       fd.set("image", file);
       const res = await fetch("/api/ai/meal-photo", { method: "POST", body: fd });
       const data = (await res.json()) as {
-        meal?: Partial<Record<keyof Draft, string | number>> & {
+        meal?: {
+          name?: string;
+          calories?: number;
+          carbs_g?: number;
+          protein_g?: number;
+          fat_g?: number;
           eating_order_tip?: string;
-          items?: DetectedItem[];
+          items?: RawItem[];
         };
         error?: string;
         demo?: boolean;
@@ -87,19 +105,18 @@ export default function AlimentacaoFotoPage() {
         return;
       }
       const m = data.meal ?? {};
-      const parsed: Draft = {
-        name: String(m.name ?? ""),
-        calories: m.calories != null ? String(m.calories) : "",
-        carbs_g: m.carbs_g != null ? String(m.carbs_g) : "",
-        protein_g: m.protein_g != null ? String(m.protein_g) : "",
-        fat_g: m.fat_g != null ? String(m.fat_g) : "",
-        glycemic_load_estimate:
-          m.glycemic_load_estimate != null ? String(m.glycemic_load_estimate) : "",
-        notes: m.notes != null ? String(m.notes) : "",
-      };
-      setDraft(parsed);
-      setAiDraft(parsed);
-      setDetectedItems(Array.isArray(m.items) ? m.items : []);
+      const rawItems = Array.isArray(m.items) && m.items.length > 0 ? m.items : [
+        {
+          name: m.name,
+          calories: m.calories,
+          carbs_g: m.carbs_g,
+          protein_g: m.protein_g,
+          fat_g: m.fat_g,
+        },
+      ];
+      const drafts = rawItems.map(toItemDraft);
+      setItems(drafts);
+      setAiItems(drafts);
       setEatingOrderTip(m.eating_order_tip ? String(m.eating_order_tip) : null);
     } catch {
       setStatus("Erro de rede.");
@@ -108,38 +125,51 @@ export default function AlimentacaoFotoPage() {
     }
   }
 
-  function setField(field: keyof Draft, value: string) {
-    setDraft((d) => (d ? { ...d, [field]: value } : d));
-  }
-
-  function focusFirstMacro() {
-    firstMacroInputRef.current?.focus();
-    firstMacroInputRef.current?.select();
+  function setItemField(index: number, field: keyof ItemDraft, value: string | boolean) {
+    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));
   }
 
   async function onSave() {
-    if (!draft) return;
+    const included = items
+      .map((it, index) => ({ it, index }))
+      .filter(({ it }) => it.included && it.name.trim());
+    if (included.length === 0) {
+      setStatus("Marque pelo menos um item pra salvar.");
+      return;
+    }
     setSaving(true);
     setStatus(null);
     try {
-      const aiCorrected = aiDraft
-        ? MACRO_FIELDS.some((f) => draft[f] !== aiDraft[f]) ||
-          draft.glycemic_load_estimate !== aiDraft.glycemic_load_estimate
-        : false;
-
+      const payload = included.map(({ it, index }) => {
+        const ai = aiItems[index];
+        const corrected = ai
+          ? it.calories !== ai.calories ||
+            it.carbs_g !== ai.carbs_g ||
+            it.protein_g !== ai.protein_g ||
+            it.fat_g !== ai.fat_g
+          : false;
+        return {
+          name: it.name.trim(),
+          calories: it.calories,
+          carbs_g: it.carbs_g,
+          protein_g: it.protein_g,
+          fat_g: it.fat_g,
+          glycemic_load_estimate: it.glycemic_load_estimate,
+          notes: it.implication,
+          ai_corrected: corrected,
+        };
+      });
       const fd = new FormData();
-      Object.entries(draft).forEach(([k, v]) => fd.set(k, v));
-      fd.set("ai_corrected", String(aiCorrected));
+      fd.set("items", JSON.stringify(payload));
       if (file) fd.set("image", file);
-      const res = await saveMealPhoto(fd);
+      const res = await saveMealPhotoItems(fd);
       if (res.error) {
         setStatus(res.error);
         return;
       }
       setSaved(true);
-      setDraft(null);
-      setAiDraft(null);
-      setDetectedItems([]);
+      setItems([]);
+      setAiItems([]);
       clear();
     } finally {
       setSaving(false);
@@ -147,23 +177,17 @@ export default function AlimentacaoFotoPage() {
   }
 
   function onDiscard() {
-    setDraft(null);
-    setAiDraft(null);
-    setDetectedItems([]);
-    setEatingOrderTip(null);
+    reset();
     clear();
     setStatus(null);
   }
 
-  const changedMacros = draft && aiDraft
-    ? Object.fromEntries(MACRO_FIELDS.map((f) => [f, draft[f] !== aiDraft[f]]))
-    : undefined;
-
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <p className="text-sm text-zinc-400">
-        Envie a foto do prato: o modelo estima calorias e macronutrientes. Você revisa e decide se
-        conta no seu consumo diário antes de salvar.
+        Envie a foto do prato: o modelo identifica cada item separado (prato, bebida, acompanhamento
+        etc.) e estima calorias e macros de cada um. Você revisa, escolhe quais contar, e cada item
+        salvo vira um registro próprio — não uma refeição só com tudo somado.
       </p>
       <Card>
         <CardHeader>
@@ -193,18 +217,19 @@ export default function AlimentacaoFotoPage() {
             </Button>
             {status ? <p className="text-xs text-amber-300">{status}</p> : null}
             {saved ? (
-              <p className="text-xs text-emerald-300">✅ Refeição salva no seu consumo de hoje.</p>
+              <p className="text-xs text-emerald-300">✅ Itens salvos no seu consumo de hoje.</p>
             ) : null}
           </form>
         </CardContent>
       </Card>
 
-      {draft ? (
+      {items.length > 0 ? (
         <Card className="border-emerald-500/25">
           <CardHeader>
             <CardTitle className="text-base">Revisar antes de salvar</CardTitle>
             <CardDescription>
-              Ajuste o que a IA estimou — ou descarte se não quiser contar esta refeição.
+              Cada item vira uma refeição separada. Desmarque o que não quiser contar, ajuste os
+              números se precisar.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -214,62 +239,73 @@ export default function AlimentacaoFotoPage() {
               </p>
             ) : null}
 
-            {detectedItems.length > 0 ? (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-                <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
-                  Itens identificados na foto
-                </p>
-                <ul className="space-y-1 text-xs text-zinc-300">
-                  {detectedItems.map((it, i) => (
-                    <li key={i} className="flex items-center justify-between gap-2">
-                      <span className="truncate">{it.name}</span>
-                      <span className="shrink-0 font-mono text-zinc-400">{Math.round(it.calories)} kcal</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-[10px] text-zinc-500">
-                  Faltou algum item ou a divisão ficou errada? Ajuste os totais abaixo — os itens acima são
-                  só pra conferência, o que é salvo são os totais.
-                </p>
-              </div>
-            ) : null}
+            <div className="space-y-3">
+              {items.map((it, i) => {
+                const glyc = it.glycemic_load_estimate ? Number(it.glycemic_load_estimate) : null;
+                const tier = glyc != null ? glycemicTier(glyc) : null;
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-xl border p-3 transition-colors ${
+                      it.included ? "border-zinc-800 bg-zinc-900/40" : "border-zinc-800/50 bg-zinc-900/10 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={it.included}
+                        onChange={(e) => setItemField(i, "included", e.target.checked)}
+                        className="mt-2.5 h-4 w-4 shrink-0 accent-emerald-500"
+                        aria-label={`Incluir ${it.name}`}
+                      />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            value={it.name}
+                            onChange={(e) => setItemField(i, "name", e.target.value)}
+                            className="h-8 flex-1 text-sm"
+                          />
+                          {tier ? (
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${tier.className}`}>
+                              {tier.label}
+                            </span>
+                          ) : null}
+                        </div>
 
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-              <GlycemicImpactRing
-                score={draft.glycemic_load_estimate ? Number(draft.glycemic_load_estimate) : null}
-              />
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {(
+                            [
+                              ["calories", "kcal"],
+                              ["carbs_g", "carb g"],
+                              ["protein_g", "prot g"],
+                              ["fat_g", "gord g"],
+                            ] as const
+                          ).map(([field, label]) => (
+                            <div key={field} className="text-center">
+                              <input
+                                type="number"
+                                value={it[field]}
+                                onChange={(e) => setItemField(i, field, e.target.value)}
+                                className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-1 py-1 text-center font-mono text-xs text-zinc-100"
+                              />
+                              <p className="mt-0.5 text-[9px] text-zinc-600">{label}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {it.implication ? (
+                          <p className="text-[11px] leading-snug text-zinc-400">💡 {it.implication}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <button
-              type="button"
-              onClick={focusFirstMacro}
-              className="flex w-full items-center gap-2.5 rounded-xl bg-amber-500 px-3.5 py-2.5 text-left text-amber-950 transition hover:bg-amber-400"
-            >
-              <PenLine className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="text-xs font-medium">
-                Os números não bateram? Ajuste abaixo — isso ajuda a IA a acertar mais da próxima vez.
-              </span>
-            </button>
-
-            <div className="grid gap-1">
-              <Label htmlFor="draft_name">Nome</Label>
-              <Input
-                id="draft_name"
-                value={draft.name}
-                onChange={(e) => setField("name", e.target.value)}
-              />
-            </div>
-
-            <MacroGrid
-              ref={firstMacroInputRef}
-              values={draft}
-              changed={changedMacros}
-              onChange={setField}
-            />
 
             <div className="flex gap-2">
               <Button type="button" onClick={() => void onSave()} disabled={saving}>
-                {saving ? "Salvando…" : "Salvar no consumo de hoje"}
+                {saving ? "Salvando…" : "Salvar itens marcados"}
               </Button>
               <Button type="button" variant="ghost" onClick={onDiscard} disabled={saving}>
                 Descartar

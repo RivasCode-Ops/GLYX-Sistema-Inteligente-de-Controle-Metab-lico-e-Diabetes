@@ -131,6 +131,64 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+const photoItemSchema = z.object({
+  name: z.string().min(1),
+  calories: z.coerce.number().optional(),
+  carbs_g: z.coerce.number().optional(),
+  protein_g: z.coerce.number().optional(),
+  fat_g: z.coerce.number().optional(),
+  glycemic_load_estimate: z.coerce.number().optional(),
+  notes: z.string().optional(),
+  ai_corrected: z.boolean().optional().default(false),
+});
+const photoItemsSchema = z.array(photoItemSchema).min(1);
+
+/** Salva cada item marcado da foto como uma refeição SEPARADA (prato, bebida
+ * etc. não viram mais um único registro somado) — todas compartilham a
+ * mesma foto enviada, já que vieram da mesma análise. */
+export async function saveMealPhotoItems(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  let itemsRaw: unknown;
+  try {
+    itemsRaw = JSON.parse(String(formData.get("items") ?? "[]"));
+  } catch {
+    return { error: "Itens inválidos." };
+  }
+  const parsed = photoItemsSchema.safeParse(itemsRaw);
+  if (!parsed.success) return { error: "Marque pelo menos um item com nome preenchido." };
+
+  const photoPath = await uploadPrivatePhoto(
+    supabase,
+    "meal-photos",
+    user.id,
+    formData.get("image"),
+    MAX_PHOTO_BYTES
+  );
+
+  const eatenAt = new Date().toISOString();
+  const rows = parsed.data.map((item) => ({
+    user_id: user.id,
+    ...item,
+    photo_path: photoPath,
+    eaten_at: eatenAt,
+  }));
+
+  const { error } = await supabase.from("meals").insert(rows);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/alimentacao");
+  revalidatePath("/alimentacao/refeicoes");
+  return { ok: true };
+}
+
 export async function deleteMeal(formData: FormData): Promise<ActionResult> {
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Registro inválido." };
