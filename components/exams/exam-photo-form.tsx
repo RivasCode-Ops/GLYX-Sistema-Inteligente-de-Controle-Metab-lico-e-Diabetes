@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
+import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
 import { EXAM_TYPE_LABEL, type ExamType } from "@/lib/exams/types";
 
 type Result = { examId: string | null; title: string; examType?: ExamType };
@@ -26,9 +27,9 @@ export function ExamPhotoForm() {
   const [examType, setExamType] = useState<ExamType>("lab");
   const [result, setResult] = useState<Result | null>(null);
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileChange(file: File | undefined) {
     setResult(null);
-    await selectSingle(e.target.files?.[0]);
+    await selectSingle(file);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -109,12 +110,9 @@ export function ExamPhotoForm() {
               placeholder={placeholder}
             />
           </div>
-          <input
-            type="file"
+          <PhotoCaptureButtons
             accept="image/jpeg,image/png,image/webp,application/pdf"
-            /* sem capture: o celular oferece camera OU galeria/arquivo */
-            onChange={(e) => void onFileChange(e)}
-            className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
+            onFile={(f) => void onFileChange(f)}
           />
           {previews.length ? (
             <div className={previews.length > 1 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : ""}>

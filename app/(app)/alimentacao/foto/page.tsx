@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
 import { saveMealPhotoItems } from "@/app/actions/meals";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
@@ -65,9 +66,9 @@ export default function AlimentacaoFotoPage() {
     setSaved(false);
   }
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileChange(file: File | undefined) {
     reset();
-    await selectSingle(e.target.files?.[0]);
+    await selectSingle(file);
   }
 
   async function onAnalyze(e: React.FormEvent<HTMLFormElement>) {
@@ -196,13 +197,9 @@ export default function AlimentacaoFotoPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => void onAnalyze(e)} className="space-y-4">
-            <input
-              type="file"
-              name="image"
+            <PhotoCaptureButtons
               accept="image/jpeg,image/png,image/webp"
-              /* sem capture: o celular oferece camera OU galeria/arquivo */
-              onChange={(e) => void onFileChange(e)}
-              className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
+              onFile={(f) => void onFileChange(f)}
             />
             {preview ? (
               // eslint-disable-next-line @next/next/no-img-element

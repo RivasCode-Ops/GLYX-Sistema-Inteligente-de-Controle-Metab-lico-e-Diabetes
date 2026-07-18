@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addMedication, findSimilarActiveMedications, type SimilarMedication } from "@/app/actions/medications";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
+import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -127,17 +128,14 @@ export function AddMedicationByPhoto() {
   return (
     <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="file"
+          <PhotoCaptureButtons
             accept="image/jpeg,image/png,image/webp"
-            /* sem capture: o celular oferece camera OU galeria/arquivo */
-            onChange={(e) => {
+            onFile={(f) => {
               setDraft(null);
               setSaved(false);
               setSimilar([]);
-              void selectSingle(e.target.files?.[0]);
+              void selectSingle(f);
             }}
-            className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-900 file:px-3 file:py-2 file:text-sm file:text-sky-100"
           />
           <Button type="button" onClick={() => void analyze()} disabled={loading || !file}>
             {loading ? "Lendo rótulo…" : "Ler rótulo"}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 
 type Result = {
@@ -26,9 +27,9 @@ export function SupplementCheckForm() {
     usePhotoSelection({ allowPdf: true });
   const [result, setResult] = useState<Result | null>(null);
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFileChange(file: File | undefined) {
     setResult(null);
-    await selectSingle(e.target.files?.[0]);
+    await selectSingle(file);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -63,12 +64,9 @@ export function SupplementCheckForm() {
     <div className="space-y-4">
       <div>
           <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
-            <input
-              type="file"
+            <PhotoCaptureButtons
               accept="image/jpeg,image/png,image/webp,application/pdf"
-              /* sem capture: o celular oferece camera OU galeria/arquivo */
-              onChange={(e) => void onFileChange(e)}
-              className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900 file:px-3 file:py-2 file:text-sm file:text-emerald-100"
+              onFile={(f) => void onFileChange(f)}
             />
             {previews.length ? (
               <div className={previews.length > 1 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : ""}>
