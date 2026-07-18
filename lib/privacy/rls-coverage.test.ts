@@ -37,6 +37,7 @@ const CLINICAL_TABLES_WITH_USER_ID = [
   "google_fit_connections",
   "medication_snoozes",
   "muscle_pauses",
+  "strength_logs",
 ] as const;
 
 describe("cobertura RLS nas migrations", () => {
