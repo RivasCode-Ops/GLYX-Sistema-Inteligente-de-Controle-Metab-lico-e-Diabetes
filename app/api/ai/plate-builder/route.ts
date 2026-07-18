@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       { status: 413 }
     );
   }
-  if (files.some((f) => f.type && !f.type.startsWith("image/"))) {
+  if (files.some((f) => !f.type.startsWith("image/"))) {
     return NextResponse.json({ error: "Todos os arquivos precisam ser imagens." }, { status: 415 });
   }
 

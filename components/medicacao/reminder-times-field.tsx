@@ -28,6 +28,10 @@ export function ReminderTimesField({
     publish(times.map((t, idx) => (idx === i ? value : t)));
   }
 
+  const duplicateIndexes = new Set(
+    times.flatMap((t, i) => (t && times.findIndex((o) => o === t) !== i ? [i] : []))
+  );
+
   function removeAt(i: number) {
     publish(times.filter((_, idx) => idx !== i));
   }
@@ -44,8 +48,13 @@ export function ReminderTimesField({
             type="time"
             value={t}
             onChange={(e) => setAt(i, e.target.value)}
-            className="h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100 [color-scheme:dark]"
+            className={`h-9 rounded-md border bg-zinc-950 px-3 text-sm text-zinc-100 [color-scheme:dark] ${
+              duplicateIndexes.has(i) ? "border-red-500/60" : "border-zinc-800"
+            }`}
           />
+          {duplicateIndexes.has(i) ? (
+            <span className="text-xs text-red-400">horário repetido</span>
+          ) : null}
           <button
             type="button"
             onClick={() => removeAt(i)}

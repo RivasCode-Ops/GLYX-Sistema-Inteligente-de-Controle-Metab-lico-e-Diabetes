@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   if (files.reduce((s, f) => s + f.size, 0) > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Fotos muito grandes (máx. 4 MB no total)." }, { status: 413 });
   }
-  if (files.some((f) => f.type && !f.type.startsWith("image/"))) {
+  if (files.some((f) => !f.type.startsWith("image/"))) {
     return NextResponse.json({ error: "Os arquivos precisam ser imagens." }, { status: 415 });
   }
 

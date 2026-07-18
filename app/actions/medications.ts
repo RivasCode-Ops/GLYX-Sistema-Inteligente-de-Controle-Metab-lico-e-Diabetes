@@ -43,12 +43,13 @@ function composeDosage(formData: FormData): string | undefined {
   return free || undefined;
 }
 
-// "08:00, 20h30, 7:5" → ["08:00", "20:30"] (inválidos são descartados)
+// "08:00, 20h30, 7:5, 08:00" → ["08:00", "20:30"] (inválidos e repetidos são descartados)
 function parseReminderTimes(input: string): string[] {
-  return input
+  const times = input
     .split(/[,;]/)
     .map((t) => t.trim().replace("h", ":").replace(/^(\d):/, "0$1:"))
     .filter((t) => TIME_RE.test(t));
+  return [...new Set(times)];
 }
 
 export type ActionResult = { ok?: true; error?: string };

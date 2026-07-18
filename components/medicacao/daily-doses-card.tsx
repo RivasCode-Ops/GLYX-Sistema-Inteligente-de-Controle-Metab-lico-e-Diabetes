@@ -52,6 +52,44 @@ export function computeDoseStatus(
   return { state: "pendente" };
 }
 
+/**
+ * Resumo "doses de hoje" de UM medicamento, usando o mesmo casamento
+ * horário-agendado↔registro do DailyDosesCard — para não haver dois números
+ * diferentes na mesma tela para a mesma dose (ex.: card do topo dizendo
+ * "0 de 1 tomadas" e a lista de remédios abaixo dizendo "✓ hoje: 1×" pro
+ * mesmo medicamento). Remédios sem horário agendado (uso conforme
+ * necessidade) não têm janela pra casar — cada registro do dia conta direto.
+ */
+export function computeMedicationDoseSummary(
+  med: Medication,
+  medLogs: TodayLog[],
+  medSnoozes: TodaySnooze[],
+  timezone: string | null | undefined,
+  now: number = Date.now()
+): { taken: number; lastAt: string | null } {
+  const times = med.reminder_times ?? [];
+  if (!times.length) {
+    const sorted = medLogs.map((l) => l.taken_at).sort();
+    return { taken: sorted.length, lastAt: sorted.at(-1) ?? null };
+  }
+
+  const tz = timezone || "America/Sao_Paulo";
+  const [y, mo, d] = localDateKey(new Date(now).toISOString(), tz).split("-").map(Number);
+  const usedLogs = new Set<string>();
+  let taken = 0;
+  let lastAt: string | null = null;
+  for (const time of [...times].sort()) {
+    const [hh, mm] = time.split(":").map(Number);
+    const scheduledUTC = wallClockToUTC(y, mo, d, hh, mm, 0, tz);
+    const status = computeDoseStatus(scheduledUTC, medLogs, medSnoozes, usedLogs, now);
+    if (status.state === "tomada") {
+      taken += 1;
+      if (!lastAt || status.at > lastAt) lastAt = status.at;
+    }
+  }
+  return { taken, lastAt };
+}
+
 export function DailyDosesCard({
   meds,
   logs,

@@ -191,7 +191,13 @@ export function scoreFromMetrics(
   const label: AuditLabel =
     score < 45 ? "Alerta" : score < 70 ? "Atenção" : "Estável";
 
-  factors.sort((a, b) => b.scoreImpact - a.scoreImpact);
+  // `weight` era gravado em cada fator mas nunca influenciava nada — nem o
+  // score (scoreImpact já é calculado à parte) nem a ordem de exibição (que
+  // usava só scoreImpact). Usa weight como critério principal de ordenação,
+  // com scoreImpact como desempate: assim um fator clinicamente mais grave
+  // (ex.: 1 hipoglicemia, weight 3) aparece antes de um fator informativo
+  // com o mesmo impacto pontual (ex.: hidratação, weight 0.5).
+  factors.sort((a, b) => b.weight - a.weight || b.scoreImpact - a.scoreImpact);
 
   return {
     score,

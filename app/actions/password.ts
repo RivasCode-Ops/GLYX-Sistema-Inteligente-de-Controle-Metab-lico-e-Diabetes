@@ -49,9 +49,24 @@ export async function changePasswordAction(formData: FormData): Promise<Password
     .eq("id", user.id)
     .maybeSingle();
 
+  if (!user.email) {
+    return { error: "Não foi possível confirmar o e-mail da conta." };
+  }
+
+  // Sempre confirma a senha atual — inclusive para a conta admin. Só o passo
+  // de ESCRITA muda por conta: admin usa service role (evita martelar o
+  // endpoint de update do Auth, que é o que gerava o bloqueio por rate
+  // limit); as demais contas usam o client normal.
+  const { error: verifyErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyErr) {
+    return { error: friendlyAuthError(verifyErr.message) };
+  }
+
   const admin = createAdminClient();
 
-  // Dono / admin: uma chamada via service role (sem martelar signInWithPassword).
   if (profile?.is_admin && admin) {
     const { error } = await admin.auth.admin.updateUserById(user.id, {
       password: newPassword,
@@ -59,18 +74,6 @@ export async function changePasswordAction(formData: FormData): Promise<Password
     if (error) return { error: friendlyAuthError(error.message) };
     revalidatePath("/perfil");
     return { ok: true };
-  }
-
-  if (!user.email) {
-    return { error: "Não foi possível confirmar o e-mail da conta." };
-  }
-
-  const { error: verifyErr } = await supabase.auth.signInWithPassword({
-    email: user.email,
-    password: currentPassword,
-  });
-  if (verifyErr) {
-    return { error: friendlyAuthError(verifyErr.message) };
   }
 
   const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });

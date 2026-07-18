@@ -76,13 +76,18 @@ export function breakerAfterSuccess(): BreakerSnapshot {
   };
 }
 
-export function breakerAfterFailure(
-  prev: Pick<BreakerSnapshot, "consecutive_failures">,
+/**
+ * Mesmo cálculo de breakerAfterFailure, mas recebendo a contagem de falhas
+ * JÁ incrementada (ex.: por um UPDATE atômico no banco) em vez de somar 1
+ * aqui — usar quando o +1 precisa ser atômico no servidor para não perder
+ * incrementos em chamadas concorrentes (duplo clique, app + aba abertos).
+ */
+export function breakerStateForCount(
+  consecutive: number,
   errorMessage: string,
   now = Date.now()
 ): { state: BreakerSnapshot; shouldAlertOps: boolean; kind: CgmErrorKind } {
   const kind = classifyCgmError(errorMessage);
-  const consecutive = (prev.consecutive_failures ?? 0) + 1;
   const openMs = backoffMs(consecutive, kind);
   const openUntil = new Date(now + openMs).toISOString();
   // Alerta ops em falhas “duras” ou marcos (1ª / 3ª / 5ª), não a cada retry curto.
@@ -103,6 +108,14 @@ export function breakerAfterFailure(
       last_error_kind: kind,
     },
   };
+}
+
+export function breakerAfterFailure(
+  prev: Pick<BreakerSnapshot, "consecutive_failures">,
+  errorMessage: string,
+  now = Date.now()
+): { state: BreakerSnapshot; shouldAlertOps: boolean; kind: CgmErrorKind } {
+  return breakerStateForCount((prev.consecutive_failures ?? 0) + 1, errorMessage, now);
 }
 
 export function circuitOpenUserMessage(openUntilIso: string, kind: CgmErrorKind | null): string {

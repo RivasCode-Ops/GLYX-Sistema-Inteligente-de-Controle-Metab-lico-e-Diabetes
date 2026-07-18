@@ -31,11 +31,15 @@ export function dexcomRedirectUri(): string {
 }
 
 function oauthSecret(): string {
-  return (
-    process.env.CGM_CREDENTIALS_SECRET?.trim() ||
-    process.env.CRON_SECRET?.trim() ||
-    "dev-only-dexcom-state"
-  );
+  const configured = process.env.CGM_CREDENTIALS_SECRET?.trim() || process.env.CRON_SECRET?.trim();
+  if (configured) return configured;
+  // Falha explícita em produção — sem isso, o state OAuth do Dexcom seria
+  // assinado com um segredo fixo e público (visível no código-fonte),
+  // permitindo forjar/adulterar o state.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("CGM_CREDENTIALS_SECRET (ou CRON_SECRET legado) ausente no servidor.");
+  }
+  return "dev-only-dexcom-state";
 }
 
 export function signDexcomOAuthState(userId: string, now = Date.now()): string {

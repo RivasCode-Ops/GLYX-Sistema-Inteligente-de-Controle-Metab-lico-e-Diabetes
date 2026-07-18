@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { breakerAfterFailure, isCircuitOpen } from "@/lib/cgm/circuit-breaker";
+import { breakerStateForCount, isCircuitOpen } from "@/lib/cgm/circuit-breaker";
 import { syncDexcomConnection } from "@/lib/cgm/sync-dexcom";
 import { reportException } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
@@ -42,8 +42,13 @@ export async function POST() {
     return NextResponse.json({ ok: true, inserted: result.inserted, skipped: result.skipped });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha na sincronização Dexcom.";
-    const { state, kind } = breakerAfterFailure(
-      { consecutive_failures: conn.consecutive_failures ?? 0 },
+    const { data: bumpedCount } = await supabase.rpc("cgm_bump_failure", {
+      p_user_id: user.id,
+      p_provider: "dexcom",
+      p_error: msg,
+    });
+    const { state, kind } = breakerStateForCount(
+      bumpedCount ?? (conn.consecutive_failures ?? 0) + 1,
       msg
     );
     reportException(e, {
@@ -54,8 +59,6 @@ export async function POST() {
     await supabase
       .from("cgm_connections")
       .update({
-        last_error: msg,
-        consecutive_failures: state.consecutive_failures,
         circuit_open_until: state.circuit_open_until,
         last_error_kind: state.last_error_kind,
       })

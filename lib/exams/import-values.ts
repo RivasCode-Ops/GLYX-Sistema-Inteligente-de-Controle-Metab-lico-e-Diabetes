@@ -26,9 +26,19 @@ export function extractImportableValues(values: ExamValueLike[]): ImportableValu
     const param = v.parameter.toLowerCase();
 
     if (/\bpeso\b/.test(param) && !/molecular/.test(param)) {
-      const kg = parseNumber(v.value);
+      const raw = parseNumber(v.value);
+      const valueLower = v.value.toLowerCase();
+      // "183 lb" tem número plausível pra kg (20-400) por acaso — sem checar
+      // a unidade, isso seria importado como 183 kg (peso corporal
+      // fisicamente absurdo). Converte quando a unidade é lb/lbs/pound.
+      const isPounds = /\blbs?\b|\bpound/.test(valueLower);
+      const kg = raw != null && isPounds ? raw * 0.453592 : raw;
       if (kg != null && kg > 20 && kg < 400) {
-        out.push({ kind: "weight", label: `${v.parameter}: ${v.value}`, weightKg: kg });
+        out.push({
+          kind: "weight",
+          label: `${v.parameter}: ${v.value}`,
+          weightKg: Math.round(kg * 10) / 10,
+        });
         continue;
       }
     }

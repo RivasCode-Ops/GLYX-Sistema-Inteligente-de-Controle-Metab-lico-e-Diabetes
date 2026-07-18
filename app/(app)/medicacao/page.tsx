@@ -18,6 +18,7 @@ import { AlarmSetup } from "@/components/push/alarm-setup";
 import { SupplementCheckForm } from "@/components/medicacao/supplement-check-form";
 import {
   DailyDosesCard,
+  computeMedicationDoseSummary,
   type TodayLog,
   type TodaySnooze,
 } from "@/components/medicacao/daily-doses-card";
@@ -392,16 +393,19 @@ export default async function MedicacaoOverviewPage({
                             </Button>
                           </form>
                           {(() => {
-                            const doses = todayLogs.filter((l) => l.medication_id === m.id);
-                            if (!doses.length) return null;
-                            const ultima = doses
-                              .map((l) => l.taken_at)
-                              .sort()
-                              .at(-1)!;
+                            const medLogs = todayLogs.filter((l) => l.medication_id === m.id);
+                            const medSnoozes = todaySnoozes.filter((s) => s.medication_id === m.id);
+                            const { taken, lastAt } = computeMedicationDoseSummary(
+                              m,
+                              medLogs,
+                              medSnoozes,
+                              timezone
+                            );
+                            if (!taken || !lastAt) return null;
                             return (
                               <p className="text-[11px] text-emerald-400/90">
-                                ✓ hoje: {doses.length}× · última às{" "}
-                                {new Date(ultima).toLocaleTimeString("pt-BR", {
+                                ✓ hoje: {taken}× · última às{" "}
+                                {new Date(lastAt).toLocaleTimeString("pt-BR", {
                                   timeZone: timezone ?? "America/Sao_Paulo",
                                   hour: "2-digit",
                                   minute: "2-digit",

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditRawInputs } from "@/lib/audit/metrics";
 import { countAlteredSignals } from "@/lib/exams/types";
 import type { HealthSnapshotSource } from "@/lib/health/types";
-import { localDateKey } from "@/lib/time/local-day";
+import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 
 const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit", "mock"];
 
@@ -36,11 +36,20 @@ export async function loadAuditDayGrid(
   const targetMin = p?.target_glucose_min ?? 70;
   const targetMax = p?.target_glucose_max ?? 180;
 
-  const since = new Date();
-  since.setDate(since.getDate() - windowDays);
-  const sinceIso = since.toISOString();
-  const dayStart = localDateKey(sinceIso, timezone);
+  // Janela alinhada ao dia LOCAL do usuário, não ao instante exato — senão
+  // leituras feitas de madrugada (fuso local) no primeiro dia da janela
+  // ficam de fora da query mesmo aparecendo dentro do período exibido
+  // (mesma classe de bug de fuso já corrigida em outras telas; ver
+  // lib/time/local-day.ts).
   const periodEnd = localDateKey(new Date().toISOString(), timezone);
+  const [endYear, endMonth, endDay] = periodEnd.split("-").map(Number);
+  const startCalendarDate = new Date(Date.UTC(endYear, endMonth - 1, endDay - windowDays));
+  const dayStart = [
+    startCalendarDate.getUTCFullYear(),
+    String(startCalendarDate.getUTCMonth() + 1).padStart(2, "0"),
+    String(startCalendarDate.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+  const { startISO: sinceIso } = localDayRangeUTC(dayStart, timezone);
 
   const [gRes, mRes, eRes, hRes, wRes, medRes, insRes, weightRes, examRes] = await Promise.all([
     supabase

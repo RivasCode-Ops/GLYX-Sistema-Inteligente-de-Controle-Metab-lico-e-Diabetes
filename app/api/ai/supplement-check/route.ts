@@ -4,6 +4,7 @@ import { z } from "zod";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
+import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
   if (total > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Fotos muito grandes no total (máx. 4 MB)." }, { status: 413 });
   }
-  if (files.some((f) => f.type && !f.type.startsWith("image/"))) {
+  if (files.some((f) => !f.type.startsWith("image/"))) {
     return NextResponse.json({ error: "Todos os arquivos precisam ser imagens." }, { status: 415 });
   }
 
@@ -128,11 +129,17 @@ export async function POST(req: Request) {
     profile ? `Meta glicêmica: ${profile.target_glucose_min}-${profile.target_glucose_max} mg/dL.` : "",
     usesInsulinOrSulfonylurea ? "USA insulina ou sulfonilureia (risco de hipoglicemia)." : "",
     meds?.length
-      ? `Medicações/suplementos ativos: ${meds.map((m) => `${m.name}${m.dosage ? ` ${m.dosage}` : ""} (${m.kind})`).join(", ")}.`
+      ? `Medicações/suplementos ativos: ${meds
+          .map((m) => {
+            const name = sanitizeForPrompt(m.name, 60);
+            const dosage = m.dosage ? ` ${sanitizeForPrompt(m.dosage, 30)}` : "";
+            return `${name}${dosage} (${m.kind})`;
+          })
+          .join(", ")}.`
       : "Nenhuma medicação ativa cadastrada.",
     exams?.length
       ? `Trechos de exames recentes do usuário (para identificar HbA1c, microalbuminúria, creatinina etc. se citados):\n${exams
-          .map((e) => `- ${e.title}: ${e.raw_text.slice(0, 600)}`)
+          .map((e) => `- ${sanitizeForPrompt(e.title, 80)}: ${sanitizeForPrompt(e.raw_text, 600)}`)
           .join("\n")}`
       : "Nenhum exame cadastrado no app ainda — avaliação sem dados renais/HbA1c específicos.",
   ]

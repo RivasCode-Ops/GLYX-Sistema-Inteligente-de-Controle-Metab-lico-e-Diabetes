@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import {
-  breakerAfterFailure,
+  breakerStateForCount,
   isCircuitOpen,
   type CgmErrorKind,
 } from "@/lib/cgm/circuit-breaker";
@@ -79,8 +79,13 @@ export async function POST(req: Request) {
     } catch (e) {
       failed += 1;
       const msg = e instanceof Error ? e.message : "Falha na sincronização.";
-      const { state, kind, shouldAlertOps } = breakerAfterFailure(
-        { consecutive_failures: conn.consecutive_failures ?? 0 },
+      const { data: bumpedCount } = await supabase.rpc("cgm_bump_failure", {
+        p_user_id: conn.user_id,
+        p_provider: provider,
+        p_error: msg,
+      });
+      const { state, kind, shouldAlertOps } = breakerStateForCount(
+        bumpedCount ?? (conn.consecutive_failures ?? 0) + 1,
         msg,
         now
       );
@@ -106,11 +111,12 @@ export async function POST(req: Request) {
         });
       }
 
+      // last_error e consecutive_failures já foram gravados atomicamente
+      // pelo cgm_bump_failure acima — aqui só falta o resto do estado do
+      // breaker, que depende da contagem final retornada por ele.
       await supabase
         .from("cgm_connections")
         .update({
-          last_error: msg,
-          consecutive_failures: state.consecutive_failures,
           circuit_open_until: state.circuit_open_until,
           last_error_kind: state.last_error_kind,
         })
