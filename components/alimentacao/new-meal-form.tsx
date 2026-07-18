@@ -26,6 +26,7 @@ export function NewMealForm() {
   const [estimating, setEstimating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   async function estimate() {
     if (!name.trim()) return;
@@ -61,6 +62,7 @@ export function NewMealForm() {
     if (!name.trim()) return;
     setSaving(true);
     setStatus(null);
+    setSaved(false);
     try {
       const fd = new FormData();
       fd.set("name", name.trim());
@@ -80,6 +82,7 @@ export function NewMealForm() {
       setProtein("");
       setFat("");
       setEatenAt(nowLocalInputValue());
+      setSaved(true);
       router.refresh();
     } finally {
       setSaving(false);
@@ -93,7 +96,10 @@ export function NewMealForm() {
         <Input
           id="name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setSaved(false);
+          }}
           required
           placeholder="ex.: Almoço, omelete de 2 ovos com frango desfiado"
         />
@@ -139,6 +145,9 @@ export function NewMealForm() {
         </Button>
       </div>
       {status ? <p className="text-xs text-amber-300 sm:col-span-2">{status}</p> : null}
+      {saved && !status ? (
+        <p className="text-xs text-emerald-400 sm:col-span-2">Refeição salva.</p>
+      ) : null}
       {!calories && !carbs && !protein && !fat ? (
         <p className="text-[11px] text-zinc-600 sm:col-span-2">
           Sem estimar nem preencher os campos, essa refeição não vai contar nos totais de hoje.

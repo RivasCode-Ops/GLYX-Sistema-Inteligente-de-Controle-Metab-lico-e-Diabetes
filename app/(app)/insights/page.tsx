@@ -13,12 +13,8 @@ export default async function InsightsPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-zinc-400">
-            Motor <strong className="text-zinc-300">v2</strong>: cruza glicemia diária com sono (
-            <code className="font-mono text-xs">health_snapshots</code>), carboidratos (
-            <code className="font-mono text-xs">meals</code>) e exercício (
-            <code className="font-mono text-xs">exercise_sessions</code>). Heurísticas descritivas —
-            não diagnóstico. Execute a migração{" "}
-            <code className="font-mono text-xs">20260109150000_insight_findings.sql</code>.
+            Cruza glicemia diária com sono, carboidratos e exercício, buscando correlações que
+            ajudam a entender seu padrão. Heurísticas descritivas — não é diagnóstico.
           </p>
           <p className="mt-2 text-xs text-zinc-500">
             Alertas clínicos por leitura extrema continuam em{" "}
@@ -34,16 +30,6 @@ export default async function InsightsPage() {
         </div>
         {isSupabaseConfigured() ? <RefreshInsightsButton /> : null}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Regras legadas (leitura única)</CardTitle>
-          <CardDescription>
-            Hiper / hipo imediata — ver{" "}
-            <code className="font-mono text-xs">lib/insights/rules.ts</code>.
-          </CardDescription>
-        </CardHeader>
-      </Card>
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-zinc-100">Correlações (v2)</h2>

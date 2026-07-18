@@ -166,8 +166,7 @@ export default async function MapaRiscoPage() {
             <Link href="/insights" className="text-emerald-400 hover:underline">
               Insights
             </Link>
-            . Execute a migration{" "}
-            <code className="font-mono text-[11px]">20260717120000_metabolic_audits.sql</code>.
+            .
           </p>
         </div>
         <GenerateAuditButton />
