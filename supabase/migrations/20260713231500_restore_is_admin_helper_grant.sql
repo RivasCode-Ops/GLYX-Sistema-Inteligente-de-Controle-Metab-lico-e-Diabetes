@@ -1,0 +1,14 @@
+-- Backfill: esta migration foi aplicada direto no banco em 2026-07-13
+-- (fora do fluxo normal) e nunca virou arquivo neste repositório —
+-- reconstituída aqui pra fechar o drift entre o schema real e o git.
+--
+-- Correcao: is_current_user_admin() e chamada DENTRO das policies de RLS
+-- da tabela profiles (que tem GRANT SELECT/UPDATE para anon e
+-- authenticated, protegida so pela RLS). Revogar EXECUTE de anon
+-- (feito na migration anterior, tighten_admin_rpc_grants) faz a
+-- clausula "auth.uid() = id OR is_current_user_admin()" estourar
+-- "permission denied for function" em vez de simplesmente retornar
+-- vazio. A funcao so retorna um boolean (sem dado sensivel) e para
+-- anon (auth.uid() nulo) sempre resulta em false, entao mante-la
+-- executavel por anon e seguro e evita quebrar a query.
+grant execute on function public.is_current_user_admin() to anon;
