@@ -28,20 +28,27 @@ export type NavItem = {
   group: NavGroup;
 };
 
+/**
+ * Ordem dentro de cada grupo NÃO é alfabética/arbitrária — segue uso real
+ * medido no banco (contagem de registros por tabela) combinado com
+ * importância clínica onde o uso puro erraria a mão (ex.: Alertas é pouco
+ * "visitado" porque chega por push, mas é seguridade crítica; Exames tem
+ * zero registros até agora mas seria péssimo escondê-lo de propósito).
+ */
 export const mainNav: NavItem[] = [
   { title: "Hoje", href: "/dashboard", icon: LayoutDashboard, mobile: true, group: "registrar" },
-  { title: "Glicemia", href: "/glicemia", icon: Droplets, mobile: true, group: "registrar" },
-  { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true, group: "registrar" },
-  { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true, group: "registrar" },
-  { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true, group: "registrar" },
+  { title: "Glicemia", href: "/glicemia", icon: Droplets, mobile: true, group: "registrar" }, // uso: leituras é o dado mais numeroso do app, de longe
+  { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true, group: "registrar" }, // uso: 2º mais registrado
+  { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true, group: "registrar" }, // uso: 3º + criticidade clínica (insulina)
+  { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true, group: "registrar" }, // uso: o menos registrado do grupo hoje
+  { title: "Mapa de risco", href: "/mapa-risco", icon: Map, mobile: false, group: "analises" }, // importância: score longitudinal + relatório pro médico
+  { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false, group: "analises" }, // importância: segurança (hipo/hiperglicemia), não só clique
+  { title: "IA metabólica", href: "/ia-metabolica", icon: Sparkles, mobile: false, group: "analises" }, // uso: item mais acessado das análises
   { title: "Insights", href: "/insights", icon: Lightbulb, mobile: false, group: "analises" },
-  { title: "Mapa de risco", href: "/mapa-risco", icon: Map, mobile: false, group: "analises" },
-  { title: "IA metabólica", href: "/ia-metabolica", icon: Sparkles, mobile: false, group: "analises" },
-  { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "analises" },
   { title: "Histórico", href: "/historico", icon: ScrollText, mobile: false, group: "analises" },
-  { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false, group: "analises" },
+  { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "analises" }, // uso: zero registros até agora
+  { title: "Perfil", href: "/perfil", icon: User, mobile: false, group: "conta" }, // importância: metas, medicação de referência, dados corporais
   { title: "Integrações", href: "/integracoes", icon: Plug, mobile: false, group: "conta" },
-  { title: "Perfil", href: "/perfil", icon: User, mobile: false, group: "conta" },
   { title: "Sistema", href: "/status", icon: Radar, mobile: false, group: "conta" },
 ];
 
