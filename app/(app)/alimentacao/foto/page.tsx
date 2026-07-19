@@ -5,8 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
+import { StatusPill, type PillTone } from "@/components/ui/status-pill";
 import { saveMealPhotoItems } from "@/app/actions/meals";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
+import { glycemicTier, GLYCEMIC_TIER_LABEL, type GlycemicTier } from "@/lib/health/glycemic-tier";
+
+const GLYCEMIC_PILL_TONE: Record<GlycemicTier, PillTone> = {
+  baixo: "emerald",
+  medio: "amber",
+  alto: "red",
+};
 
 type ItemDraft = {
   name: string;
@@ -40,12 +48,6 @@ function toItemDraft(it: RawItem): ItemDraft {
     implication: it.implication ?? "",
     included: true,
   };
-}
-
-function glycemicTier(score: number): { label: string; className: string } {
-  if (score >= 67) return { label: "Impacto alto", className: "bg-red-500/15 text-red-300" };
-  if (score >= 34) return { label: "Impacto médio", className: "bg-amber-500/15 text-amber-300" };
-  return { label: "Impacto baixo", className: "bg-emerald-500/15 text-emerald-300" };
 }
 
 export default function AlimentacaoFotoPage() {
@@ -263,9 +265,9 @@ export default function AlimentacaoFotoPage() {
                             className="h-8 flex-1 text-sm"
                           />
                           {tier ? (
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${tier.className}`}>
-                              {tier.label}
-                            </span>
+                            <StatusPill tone={GLYCEMIC_PILL_TONE[tier]} className="text-[10px]">
+                              {GLYCEMIC_TIER_LABEL[tier]}
+                            </StatusPill>
                           ) : null}
                         </div>
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Plug } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -80,7 +81,10 @@ export function GoogleFitConnect({
     return (
       <Card className="border-sky-500/25">
         <CardHeader>
-          <CardTitle className="text-base">Google Fit conectado</CardTitle>
+          <div className="flex items-center gap-2">
+            <Plug className="h-4 w-4 shrink-0 text-sky-400" aria-hidden />
+            <CardTitle className="text-base">Google Fit conectado</CardTitle>
+          </div>
           <CardDescription>
             Passos, sono e frequência cardíaca
             {connection.lastSyncAt
@@ -116,7 +120,10 @@ export function GoogleFitConnect({
   return (
     <Card className="border-sky-500/20">
       <CardHeader>
-        <CardTitle className="text-base">Conectar Google Fit (OAuth)</CardTitle>
+        <div className="flex items-center gap-2">
+          <Plug className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+          <CardTitle className="text-base">Conectar Google Fit (OAuth)</CardTitle>
+        </div>
         <CardDescription>
           Traz passos, sono e frequência cardíaca de relógios que sincronizam com o Google Fit (ex.:
           Amazfit via app Zepp) — tokens guardados cifrados.

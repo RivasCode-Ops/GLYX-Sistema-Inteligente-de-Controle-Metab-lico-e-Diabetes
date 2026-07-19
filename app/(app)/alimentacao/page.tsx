@@ -1,11 +1,19 @@
 import { SectionCards } from "@/components/module/section-cards";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuickExtrasCard } from "@/components/alimentacao/quick-extras-card";
+import { StatusPill, type PillTone } from "@/components/ui/status-pill";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
+import { glycemicTier, GLYCEMIC_TIER_LABEL, type GlycemicTier } from "@/lib/health/glycemic-tier";
 import { demoMeals } from "@/lib/demo/data";
 import type { Meal } from "@/types/database";
+
+const GLYCEMIC_PILL_TONE: Record<GlycemicTier, PillTone> = {
+  baixo: "emerald",
+  medio: "amber",
+  alto: "red",
+};
 
 export default async function AlimentacaoOverviewPage() {
   let meals: Meal[] = [];
@@ -101,14 +109,25 @@ export default async function AlimentacaoOverviewPage() {
           {meals.length === 0 ? (
             <p className="text-sm text-zinc-500">Nenhuma refeição registrada ainda hoje.</p>
           ) : (
-            meals.map((meal) => (
-              <div key={meal.id} className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
-                <p className="font-medium text-zinc-100">{meal.name}</p>
-                <p className="text-xs text-zinc-500">
-                  {meal.carbs_g ?? 0} g carb · {meal.protein_g ?? 0} g proteína · {meal.calories ?? 0} kcal
-                </p>
-              </div>
-            ))
+            meals.map((meal) => {
+              const tier = meal.glycemic_load_estimate != null ? glycemicTier(meal.glycemic_load_estimate) : null;
+              return (
+                <div
+                  key={meal.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3"
+                >
+                  <div>
+                    <p className="font-medium text-zinc-100">{meal.name}</p>
+                    <p className="text-xs text-zinc-500">
+                      {meal.carbs_g ?? 0} g carb · {meal.protein_g ?? 0} g proteína · {meal.calories ?? 0} kcal
+                    </p>
+                  </div>
+                  {tier ? (
+                    <StatusPill tone={GLYCEMIC_PILL_TONE[tier]}>{GLYCEMIC_TIER_LABEL[tier]}</StatusPill>
+                  ) : null}
+                </div>
+              );
+            })
           )}
         </CardContent>
       </Card>
