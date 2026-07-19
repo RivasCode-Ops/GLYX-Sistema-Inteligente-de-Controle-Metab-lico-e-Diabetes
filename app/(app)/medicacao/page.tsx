@@ -24,6 +24,7 @@ import {
   type TodaySnooze,
 } from "@/components/medicacao/daily-doses-card";
 import { AddMedicationByPhoto } from "@/components/medicacao/add-by-photo";
+import { MedicationScheduleSuggestion } from "@/components/medicacao/medication-schedule-suggestion";
 import { ReminderTimesField } from "@/components/medicacao/reminder-times-field";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
@@ -164,6 +165,8 @@ export default async function MedicacaoOverviewPage({
           markTakenAction={logMedicationTakenAction}
         />
       ) : null}
+
+      {!demoMode ? <MedicationScheduleSuggestion medications={meds} /> : null}
 
       <CollapsibleSection
         title="➕ Adicionar remédio ou suplemento"
