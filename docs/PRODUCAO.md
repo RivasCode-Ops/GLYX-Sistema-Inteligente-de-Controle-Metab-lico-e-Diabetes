@@ -15,7 +15,8 @@ Defina **todas** as variáveis obrigatórias (ver `.env.example`):
 | `SIGNUP_INVITE_CODE` | sim | Sem isto o register retorna 503 |
 | `CRON_SECRET` | sim | Igual ao header nas funções SQL `pg_cron` |
 | `CGM_CREDENTIALS_SECRET` | sim (forte) | **Diferente** do `CRON_SECRET` |
-| `OPENAI_API_KEY` | sim (se IA) | Ou via OpenRouter |
+| `KIMI_API_KEY` | sim (se IA) | Chave da API oficial Moonshot; somente servidor |
+| `OPENAI_BASE_URL` / `AI_MODEL` | sim (se IA) | `https://api.moonshot.ai/v1` / `kimi-k2.6` |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | sim (push) | `npx web-push generate-vapid-keys` |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | recomendado | Mesmo valor |
 | `NEXT_PUBLIC_SITE_URL` | recomendado | Domínio público (Dexcom redirect) |
@@ -98,4 +99,4 @@ npm run check:prod
 
 Variáveis marcadas como **Sensitive** na Vercel **não voltam por `vercel env pull`** — o CLI grava `""`.  
 Não use pull para “sincronizar” `.env.local` ou você apaga os valores locais.  
-Para local: copie do painel Supabase (URL/anon/service_role), OpenAI e `npx web-push generate-vapid-keys` (ou do backup do `.env.local`).
+Para local: copie do painel Supabase (URL/anon/service_role), Moonshot/Kimi e `npx web-push generate-vapid-keys` (ou do backup do `.env.local`).

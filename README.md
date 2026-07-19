@@ -15,9 +15,9 @@ Storage + cron).
 - **Next.js 15** (App Router, React 19, Server Actions, Route Handlers), TypeScript, Tailwind.
 - **Supabase**: Postgres + Auth + Row Level Security + Storage (buckets privados) + `pg_cron`/`pg_net`
   para os despachantes agendados.
-- **IA**: qualquer provedor compatível com a API da OpenAI (`OPENAI_API_KEY`; opcionalmente
-  `OPENAI_BASE_URL`/`AI_MODEL` para usar OpenRouter etc.) — chat, visão (foto de refeição/exame/
-  rótulo/bancada) e geração de sugestões.
+- **IA**: Kimi K2.6 pela API oficial Moonshot (`KIMI_API_KEY`,
+  `OPENAI_BASE_URL=https://api.moonshot.ai/v1`, `AI_MODEL=kimi-k2.6`) — chat, visão
+  (foto de refeição/exame/rótulo/bancada) e geração de sugestões.
 - **Web Push** (VAPID) para alarmes e lembretes, com Service Worker (`public/sw.js`).
 - **CGM**: FreeStyle Libre 2 via LibreLinkUp e/ou Dexcom OAuth (sync automático com circuit
   breaker / backoff + timeout); importação CSV LibreView; multi-provider em `cgm_connections`.

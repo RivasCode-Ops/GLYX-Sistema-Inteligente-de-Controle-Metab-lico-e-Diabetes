@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
@@ -156,10 +156,11 @@ export async function POST(req: Request) {
     })
   );
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
   let completion;
   try {
     completion = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       response_format: { type: "json_object" },
       messages: [
@@ -172,7 +173,6 @@ export async function POST(req: Request) {
         },
       ],
       max_tokens: 1400,
-      temperature: 0.3,
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });

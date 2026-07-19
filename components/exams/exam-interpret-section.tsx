@@ -73,7 +73,7 @@ export function ExamInterpretSection({ examId, initialSummary, openAiConfigured 
         <CardContent className="flex flex-col gap-3">
           {!openAiConfigured ? (
             <p className="text-sm text-amber-200/90">
-              Configure <code className="font-mono text-xs">OPENAI_API_KEY</code> no servidor para gerar o
+              Configure <code className="font-mono text-xs">KIMI_API_KEY</code> no servidor para gerar o
               resumo estruturado.
             </p>
           ) : (

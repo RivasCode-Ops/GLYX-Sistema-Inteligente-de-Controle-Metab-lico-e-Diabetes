@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
@@ -98,10 +98,11 @@ export async function POST(req: Request) {
     }))
   );
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
   let completion;
   try {
     completion = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, ...imageParts] }],
       max_tokens: 500,

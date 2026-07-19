@@ -79,7 +79,7 @@ export default async function AdminPage() {
         <CardHeader>
           <CardTitle className="text-base">Relógio de gastos (IA)</CardTitle>
           <CardDescription>
-            Estimativa baseada no preço do gpt-4o-mini — a fatura real está no painel do OpenRouter.
+            Estimativa baseada no preço do Kimi K2.6 — a fatura real está no painel Moonshot.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap justify-center gap-8 py-4">

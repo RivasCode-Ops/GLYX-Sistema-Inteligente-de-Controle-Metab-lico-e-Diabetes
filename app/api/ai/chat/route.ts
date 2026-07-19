@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { buildUserContext } from "@/lib/ai/user-context";
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   if (!isOpenAIConfigured()) {
     return NextResponse.json({
       reply:
-        "Configure OPENAI_API_KEY no servidor para ativar o modelo. Enquanto isso, use o painel para registrar dados e consulte seu médico para decisões terapêuticas.",
+        "Configure KIMI_API_KEY no servidor para ativar o modelo. Enquanto isso, use o painel para registrar dados e consulte seu médico para decisões terapêuticas.",
       demo: true,
     });
   }
@@ -73,10 +73,11 @@ export async function POST(req: Request) {
     /* segue sem contexto */
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
   let stream;
   try {
     stream = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       messages: [
         { role: "system", content: SYSTEM },

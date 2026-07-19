@@ -12,6 +12,7 @@ const keys = [
   "SIGNUP_INVITE_CODE",
   "CRON_SECRET",
   "CGM_CREDENTIALS_SECRET",
+  "KIMI_API_KEY",
   "OPENAI_API_KEY",
   "OPENAI_BASE_URL",
   "AI_MODEL",
@@ -90,11 +91,14 @@ const required = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "CRON_SECRET",
-  "OPENAI_API_KEY",
   "VAPID_PRIVATE_KEY",
 ];
 for (const k of required) {
   const ok = Boolean(existing.get(k)?.trim());
   console.log(`  ${ok ? "OK" : "MISSING"} ${k}`);
 }
-process.exit(required.every((k) => existing.get(k)?.trim()) ? 0 : 1);
+const aiConfigured = Boolean(
+  existing.get("KIMI_API_KEY")?.trim() || existing.get("OPENAI_API_KEY")?.trim()
+);
+console.log(`  ${aiConfigured ? "OK" : "MISSING"} KIMI_API_KEY`);
+process.exit(required.every((k) => existing.get(k)?.trim()) && aiConfigured ? 0 : 1);

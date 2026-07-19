@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   if (!isOpenAIConfigured()) {
     return NextResponse.json(
       {
-        error: "OPENAI_API_KEY não configurada no servidor.",
+        error: "KIMI_API_KEY não configurada no servidor.",
         demo: true,
       },
       { status: 503 }
@@ -55,11 +55,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: rateLimitMessage(rate) }, { status: 429 });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
 
   let completion;
   try {
     completion = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       messages: [
         {

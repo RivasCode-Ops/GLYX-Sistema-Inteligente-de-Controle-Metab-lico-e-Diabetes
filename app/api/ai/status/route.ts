@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { aiApiKey, aiBaseUrl, aiModel, isOpenAIConfigured, KIMI_BASE_URL } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
 // Diagnóstico da configuração de IA (sem expor segredos).
@@ -15,20 +15,17 @@ export async function GET() {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const baseUrl = process.env.OPENAI_BASE_URL ?? null;
-  const key = process.env.OPENAI_API_KEY ?? "";
-  const looksLikeOpenRouterKey = key.startsWith("sk-or-");
+  const baseUrl = aiBaseUrl();
+  const key = aiApiKey() ?? "";
+  const usesKimi = baseUrl === KIMI_BASE_URL;
 
   const warnings: string[] = [];
   if (!isOpenAIConfigured()) {
-    warnings.push("OPENAI_API_KEY ausente — funções de IA desativadas.");
+    warnings.push("KIMI_API_KEY ausente — funções de IA desativadas.");
   }
-  if (looksLikeOpenRouterKey && !baseUrl) {
-    warnings.push(
-      "A chave parece ser do OpenRouter (sk-or-…), mas OPENAI_BASE_URL não está definida — as chamadas irão para api.openai.com e falharão com 401. Defina OPENAI_BASE_URL=https://openrouter.ai/api/v1."
-    );
-  }
-  if (baseUrl?.includes("openrouter") && !aiModel().includes("/")) {
+  if (usesKimi && aiModel() !== "kimi-k2.6") {
+    warnings.push("A API oficial Moonshot está configurada, mas AI_MODEL não é kimi-k2.6.");
+  } else if (baseUrl.includes("openrouter") && !aiModel().includes("/")) {
     warnings.push(
       "OpenRouter exige o modelo com prefixo do fornecedor (ex.: openai/gpt-4o-mini). Defina AI_MODEL."
     );
@@ -36,7 +33,7 @@ export async function GET() {
 
   return NextResponse.json({
     keyConfigured: isOpenAIConfigured(),
-    keyProviderHint: looksLikeOpenRouterKey ? "openrouter" : key ? "openai-ou-outro" : null,
+    keyProviderHint: key ? (usesKimi ? "kimi-moonshot" : "openai-compatible") : null,
     baseUrl,
     model: aiModel(),
     warnings,

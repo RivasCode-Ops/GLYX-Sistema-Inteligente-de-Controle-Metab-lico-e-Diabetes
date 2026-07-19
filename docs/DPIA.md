@@ -36,7 +36,7 @@ O GLYX permite que a pessoa titular registre e visualize dados de saúde metabó
 |---------|-------|----------------|
 | Supabase (Postgres, Auth, Storage, cron) | Hospedagem + isolamento RLS | São Paulo (configurado) |
 | Vercel (ou similar) | App Next.js | Conforme projeto |
-| Provedor OpenAI-compatible | Processamento de conteúdo sob demanda | Pode ser fora do BR — informar na privacidade |
+| Moonshot AI (Kimi K2.6) | Processamento de conteúdo sob demanda | Pode ser fora do BR — informar na privacidade |
 | LibreLinkUp / Dexcom | Fonte de CGM sob autorização do titular | Terceiros; canais oficiais ou semi-oficiais |
 | Sentry (opcional) | Erros e alertas ops | Sem PHI bruto proposital; extras truncados |
 

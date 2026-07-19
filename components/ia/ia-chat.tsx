@@ -102,7 +102,7 @@ export function IaChat() {
       <CardHeader>
         <CardTitle className="text-base">Conversa</CardTitle>
         <CardDescription>
-          Requer sessão e, para respostas do modelo, <code className="font-mono text-xs">OPENAI_API_KEY</code>.
+          Requer sessão e, para respostas do modelo, <code className="font-mono text-xs">KIMI_API_KEY</code>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

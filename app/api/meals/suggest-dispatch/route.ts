@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import { reportCronOutcome, reportException } from "@/lib/observability";
@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 // Quantas sugestões processamos ao mesmo tempo. Sequencial (1 por vez)
 // arrisca estourar o timeout de 60s da function quando muitos usuários
 // vencem a janela do mesmo horário de refeição; concorrência alta demais
-// arrisca rate limit da OpenAI. 5 é um meio-termo seguro para o volume
+// arrisca rate limit do provedor de IA. 5 é um meio-termo seguro para o volume
 // atual de usuários.
 const CONCURRENCY = 5;
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, sent: 0, skipped: "IA não configurada." });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
   const supabase = await createClient();
 
   async function processItem(item: SuggestItem): Promise<boolean> {
@@ -78,10 +78,10 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
     let completion;
     try {
       completion = await openai.chat.completions.create({
+        ...aiProviderOptions(),
         model: aiModel(),
         messages: [{ role: "user", content: prompt }],
         max_tokens: 80,
-        temperature: 0.5,
       });
     } catch (e) {
       reportException(e, {

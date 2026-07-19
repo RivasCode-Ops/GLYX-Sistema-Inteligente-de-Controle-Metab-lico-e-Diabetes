@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { parseMealJson } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   }
 
   if (!isOpenAIConfigured()) {
-    return NextResponse.json({ error: "OPENAI_API_KEY não configurada no servidor.", demo: true }, { status: 503 });
+    return NextResponse.json({ error: "KIMI_API_KEY não configurada no servidor.", demo: true }, { status: 503 });
   }
 
   const rate = await checkAndRecordAiUsage(supabase, user.id, "workout_suggestion");
@@ -61,11 +61,11 @@ Responda APENAS um JSON válido com: exercises (array com até 2 exercícios por
 
   let completion;
   try {
-    completion = await new OpenAI({ apiKey: process.env.OPENAI_API_KEY }).chat.completions.create({
+    completion = await createAiClient().chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       messages: [{ role: "user", content: prompt }],
       max_tokens: 300,
-      temperature: 0.6,
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });

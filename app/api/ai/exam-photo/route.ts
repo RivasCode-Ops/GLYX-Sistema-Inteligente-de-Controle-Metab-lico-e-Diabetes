@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
-import { defaultTitleFor, visionPromptFor, visionTemperatureFor } from "@/lib/exams/prompts";
+import { defaultTitleFor, visionPromptFor } from "@/lib/exams/prompts";
 import { examPhotoResultSchema, parseExamType } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -73,10 +73,11 @@ export async function POST(req: Request) {
     })
   );
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
   let completion;
   try {
     completion = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       response_format: { type: "json_object" },
       messages: [
@@ -86,7 +87,6 @@ export async function POST(req: Request) {
         },
       ],
       max_tokens: 1600,
-      temperature: visionTemperatureFor(examType),
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });

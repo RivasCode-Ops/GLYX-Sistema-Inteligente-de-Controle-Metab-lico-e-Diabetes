@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { parsedExamSummarySchema, type ParsedExamSummary } from "@/lib/exams/types";
 
@@ -47,17 +47,18 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
     return {
       ok: false,
       error:
-        "Configure OPENAI_API_KEY no servidor para interpretação assistida. O texto continua disponível para revisão manual.",
+        "Configure KIMI_API_KEY no servidor para interpretação assistida. O texto continua disponível para revisão manual.",
       demo: true,
     };
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
 
   let raw: string;
   let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
   try {
     const completion = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       response_format: { type: "json_object" },
       messages: [
@@ -68,7 +69,6 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
         },
       ],
       max_tokens: 1200,
-      temperature: 0.3,
     });
     raw = completion.choices[0]?.message?.content ?? "";
     usage = completion.usage ?? undefined;

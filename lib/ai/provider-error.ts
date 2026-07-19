@@ -6,11 +6,11 @@ export function providerErrorMessage(e: unknown): string {
 
   switch (status) {
     case 401:
-      return "Provedor de IA recusou a chave (401). Verifique OPENAI_API_KEY e, se usar OpenRouter, defina também OPENAI_BASE_URL=https://openrouter.ai/api/v1.";
+      return "A API Kimi recusou a chave (401). Verifique KIMI_API_KEY e OPENAI_BASE_URL=https://api.moonshot.ai/v1.";
     case 402:
       return "Provedor de IA sem créditos (402). Adicione saldo na conta do provedor.";
     case 404:
-      return "Modelo não encontrado (404). Verifique AI_MODEL (ex.: openai/gpt-4o-mini no OpenRouter).";
+      return "Modelo não encontrado (404). Verifique se AI_MODEL=kimi-k2.6.";
     case 429:
       return "Provedor de IA com limite de requisições atingido (429). Tente novamente em instantes.";
     default: {

@@ -48,7 +48,6 @@ $required = @(
   "SIGNUP_INVITE_CODE",
   "CRON_SECRET",
   "CGM_CREDENTIALS_SECRET",
-  "OPENAI_API_KEY",
   "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
   "VAPID_SUBJECT"
@@ -77,6 +76,12 @@ foreach ($k in $required) {
     Write-Host "  MISSING  $k" -ForegroundColor Red
     $fail++
   }
+}
+if ((Has-Value $envMap "KIMI_API_KEY") -or (Has-Value $envMap "OPENAI_API_KEY")) {
+  Write-Host "  OK  KIMI_API_KEY" -ForegroundColor Green
+} else {
+  Write-Host "  MISSING  KIMI_API_KEY" -ForegroundColor Red
+  $fail++
 }
 
 Write-Host "`n-- Recomendadas --"

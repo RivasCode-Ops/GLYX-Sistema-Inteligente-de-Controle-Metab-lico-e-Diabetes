@@ -79,7 +79,7 @@ export async function AiUsageCard() {
                 {totalInput.toLocaleString("pt-BR")} tokens de entrada +{" "}
                 {totalOutput.toLocaleString("pt-BR")} de saída
               </span>
-              . O custo em US$ aparece no painel do provedor (OpenRouter → Activity).
+              . O custo em US$ aparece no painel da Moonshot.
             </p>
           </div>
         )}

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isOpenAIConfigured } from "@/lib/env";
 
 // Auditoria automática do sistema, do ponto de vista do usuário logado.
 // Cada verificação consulta o estado REAL (banco, sensor, cron, push, IA)
@@ -272,7 +273,7 @@ export async function runSystemChecks(
   );
 
   // --- IA ---
-  const iaConfigured = Boolean(process.env.OPENAI_API_KEY?.length);
+  const iaConfigured = isOpenAIConfigured();
   const lastAi = aiRes.data;
   checks.push(
     !iaConfigured

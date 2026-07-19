@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
+import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
@@ -123,15 +123,15 @@ REGRAS:
 - Resposta APENAS JSON válido:
 {"verdict":"realista|agressiva|arriscada","summary":"2-3 frases diretas","monthly_milestones":[{"month":1,"weight_kg":0}],"factors_for":["..."],"factors_against":["..."],"risks":["..."],"recommendation":"próximo passo concreto, incluindo aval médico quando aplicável"}`;
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = createAiClient();
   let completion;
   try {
     completion = await openai.chat.completions.create({
+      ...aiProviderOptions(),
       model: aiModel(),
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: PROMPT }],
       max_tokens: 900,
-      temperature: 0.3,
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
