@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { localDateKey, wallClockToUTC } from "@/lib/time/local-day";
+import { localDateKey, localDayRangeUTC, wallClockToUTC } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 
 // Painel do dia: uma linha por dose agendada, com estado visível — era a
@@ -17,7 +17,6 @@ type DoseStatus =
   | { state: "pendente" };
 
 const MATCH_BEFORE_MS = 60 * 60 * 1000;
-const MATCH_AFTER_MS = 4 * 60 * 60 * 1000;
 
 function hora(iso: string, tz: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", {
@@ -27,20 +26,50 @@ function hora(iso: string, tz: string): string {
   });
 }
 
+/**
+ * Horários agendados de um remédio no dia, cada um com o instante UTC e o
+ * fim da janela de casamento com registros — o próximo horário do mesmo
+ * remédio (ou o fim do dia local, na última dose). Sem isso, uma dose
+ * registrada bem depois do horário (ex.: estatina às 23h54 agendada pras
+ * 19h) nunca casava com nenhuma janela fixa e ficava "pendente" pra sempre.
+ */
+function doseWindows(
+  times: string[],
+  y: number,
+  mo: number,
+  d: number,
+  tz: string
+): { time: string; scheduledUTC: Date; windowEndUTC: Date }[] {
+  const sorted = [...times].sort();
+  const scheduled = sorted.map((time) => {
+    const [hh, mm] = time.split(":").map(Number);
+    return { time, scheduledUTC: wallClockToUTC(y, mo, d, hh, mm, 0, tz) };
+  });
+  const dateStr = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const endOfDayUTC = new Date(localDayRangeUTC(dateStr, tz).endISO);
+  return scheduled.map((s, i) => ({
+    ...s,
+    windowEndUTC: scheduled[i + 1]?.scheduledUTC ?? endOfDayUTC,
+  }));
+}
+
 export function computeDoseStatus(
   scheduledUTC: Date,
+  windowEndUTC: Date,
   medLogs: TodayLog[],
   medSnoozes: TodaySnooze[],
   usedLogs: Set<string>,
   now: number
 ): DoseStatus {
-  // Um registro cobre uma dose agendada se caiu entre 1h antes e 4h depois
-  // do horário — e cada registro só conta para uma dose.
+  // Um registro cobre uma dose agendada se caiu entre 1h antes do horário e
+  // o próximo horário agendado (ou o fim do dia) — e cada registro só conta
+  // para uma dose.
   const t = scheduledUTC.getTime();
+  const end = windowEndUTC.getTime();
   const match = medLogs.find((l) => {
     if (usedLogs.has(l.taken_at)) return false;
     const lt = new Date(l.taken_at).getTime();
-    return lt >= t - MATCH_BEFORE_MS && lt <= t + MATCH_AFTER_MS;
+    return lt >= t - MATCH_BEFORE_MS && lt <= end;
   });
   if (match) {
     usedLogs.add(match.taken_at);
@@ -78,10 +107,8 @@ export function computeMedicationDoseSummary(
   const usedLogs = new Set<string>();
   let taken = 0;
   let lastAt: string | null = null;
-  for (const time of [...times].sort()) {
-    const [hh, mm] = time.split(":").map(Number);
-    const scheduledUTC = wallClockToUTC(y, mo, d, hh, mm, 0, tz);
-    const status = computeDoseStatus(scheduledUTC, medLogs, medSnoozes, usedLogs, now);
+  for (const { scheduledUTC, windowEndUTC } of doseWindows(times, y, mo, d, tz)) {
+    const status = computeDoseStatus(scheduledUTC, windowEndUTC, medLogs, medSnoozes, usedLogs, now);
     if (status.state === "tomada") {
       taken += 1;
       if (!lastAt || status.at > lastAt) lastAt = status.at;
@@ -115,15 +142,13 @@ export function DailyDosesCard({
       const medLogs = logs.filter((l) => l.medication_id === m.id);
       const medSnoozes = snoozes.filter((s) => s.medication_id === m.id);
       const usedLogs = new Set<string>();
-      return [...(m.reminder_times ?? [])].sort().map((time) => {
-        const [hh, mm] = time.split(":").map(Number);
-        const scheduledUTC = wallClockToUTC(y, mo, d, hh, mm, 0, tz);
-        return {
+      return doseWindows(m.reminder_times ?? [], y, mo, d, tz).map(
+        ({ time, scheduledUTC, windowEndUTC }) => ({
           med: m,
           time,
-          status: computeDoseStatus(scheduledUTC, medLogs, medSnoozes, usedLogs, now),
-        };
-      });
+          status: computeDoseStatus(scheduledUTC, windowEndUTC, medLogs, medSnoozes, usedLogs, now),
+        })
+      );
     })
     // Uma linha por horário, na ordem do relógio — não por remédio criado por último.
     .sort((a, b) => a.time.localeCompare(b.time) || a.med.name.localeCompare(b.med.name));
