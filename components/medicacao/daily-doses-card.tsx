@@ -110,20 +110,23 @@ export function DailyDosesCard({
   const now = Date.now();
   const [y, mo, d] = localDateKey(new Date().toISOString(), tz).split("-").map(Number);
 
-  const rows = scheduled.flatMap((m) => {
-    const medLogs = logs.filter((l) => l.medication_id === m.id);
-    const medSnoozes = snoozes.filter((s) => s.medication_id === m.id);
-    const usedLogs = new Set<string>();
-    return [...(m.reminder_times ?? [])].sort().map((time) => {
-      const [hh, mm] = time.split(":").map(Number);
-      const scheduledUTC = wallClockToUTC(y, mo, d, hh, mm, 0, tz);
-      return {
-        med: m,
-        time,
-        status: computeDoseStatus(scheduledUTC, medLogs, medSnoozes, usedLogs, now),
-      };
-    });
-  });
+  const rows = scheduled
+    .flatMap((m) => {
+      const medLogs = logs.filter((l) => l.medication_id === m.id);
+      const medSnoozes = snoozes.filter((s) => s.medication_id === m.id);
+      const usedLogs = new Set<string>();
+      return [...(m.reminder_times ?? [])].sort().map((time) => {
+        const [hh, mm] = time.split(":").map(Number);
+        const scheduledUTC = wallClockToUTC(y, mo, d, hh, mm, 0, tz);
+        return {
+          med: m,
+          time,
+          status: computeDoseStatus(scheduledUTC, medLogs, medSnoozes, usedLogs, now),
+        };
+      });
+    })
+    // Uma linha por horário, na ordem do relógio — não por remédio criado por último.
+    .sort((a, b) => a.time.localeCompare(b.time) || a.med.name.localeCompare(b.med.name));
 
   const tomadas = rows.filter((r) => r.status.state === "tomada").length;
 

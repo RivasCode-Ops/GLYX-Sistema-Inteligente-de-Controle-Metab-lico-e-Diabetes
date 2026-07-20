@@ -313,11 +313,18 @@ export default async function MedicacaoOverviewPage({
       </form>
 
       {(["med", "supplement"] as const).map((section) => {
-        const items = meds.filter(
-          (m) =>
-            (m.kind ?? "med") === section &&
-            (!busca || normaliza(m.name).includes(normaliza(busca)))
-        );
+        const items = meds
+          .filter(
+            (m) =>
+              (m.kind ?? "med") === section &&
+              (!busca || normaliza(m.name).includes(normaliza(busca)))
+          )
+          // Ordem de horário do primeiro alarme do dia; sem horário fica por último.
+          .sort((a, b) => {
+            const ta = [...(a.reminder_times ?? [])].sort()[0] ?? "99:99";
+            const tb = [...(b.reminder_times ?? [])].sort()[0] ?? "99:99";
+            return ta.localeCompare(tb) || a.name.localeCompare(b.name);
+          });
         if (section === "supplement" && items.length === 0) return null;
         return (
       <div key={section}>
@@ -373,12 +380,14 @@ export default async function MedicacaoOverviewPage({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          <form action={logMedicationTakenAction}>
-                            <input type="hidden" name="medication_id" value={m.id} />
-                            <Button type="submit" variant="outline" size="sm">
-                              Registrar dose
-                            </Button>
-                          </form>
+                          {!m.reminder_times?.length ? (
+                            <form action={logMedicationTakenAction}>
+                              <input type="hidden" name="medication_id" value={m.id} />
+                              <Button type="submit" variant="outline" size="sm">
+                                Registrar dose
+                              </Button>
+                            </form>
+                          ) : null}
                           {(() => {
                             const medLogs = todayLogs.filter((l) => l.medication_id === m.id);
                             const medSnoozes = todaySnoozes.filter((s) => s.medication_id === m.id);

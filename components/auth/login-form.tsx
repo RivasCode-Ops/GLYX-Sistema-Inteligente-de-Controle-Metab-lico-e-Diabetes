@@ -69,7 +69,7 @@ export function LoginForm() {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Entrar</CardTitle>
-        <CardDescription>Use o e-mail e senha da sua conta Supabase Auth.</CardDescription>
+        <CardDescription>Use o e-mail e senha da sua conta.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-4">
