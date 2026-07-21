@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import { getLastTrainedByMuscleGroup, getActiveMusclePauses } from "@/lib/queries/muscle-recovery";
-import { computeMuscleRecovery, suggestMuscleFocus } from "@/lib/exercicios/muscle-recovery";
+import { computeMuscleRecovery } from "@/lib/exercicios/muscle-recovery";
+import { planSummaryLabel, suggestFromPlan } from "@/lib/exercicios/training-plan";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { DashboardAutoRefresh } from "@/components/dashboard/auto-refresh";
@@ -99,11 +100,12 @@ export default async function DashboardPage() {
         getActiveMusclePauses(),
       ]);
 
-      const muscleFocus = suggestMuscleFocus(computeMuscleRecovery(lastTrainedByGroup, pausedGroups));
-      if (muscleFocus) {
-        muscleFocusLabel =
-          muscleFocus.status === "never" ? `Comece: ${muscleFocus.label}` : `${muscleFocus.label} pronto(a)`;
-      }
+      // Mesma fonte de verdade que /exercicios/plano — antes o dashboard
+      // sugeria um músculo solto e a tela de plano outro treino, sem nenhuma
+      // relação entre os dois.
+      muscleFocusLabel = planSummaryLabel(
+        suggestFromPlan(computeMuscleRecovery(lastTrainedByGroup, pausedGroups))
+      );
 
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;

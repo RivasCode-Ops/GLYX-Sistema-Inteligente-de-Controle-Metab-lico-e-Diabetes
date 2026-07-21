@@ -109,7 +109,10 @@ export function DashboardShell({
             />
             <ModuleRow
               title="Exercícios"
-              href="/exercicios/recuperacao"
+              // A métrica agora é o treino do dia, então o destino é o plano —
+              // clicar em "Hoje: Inferior A" e cair na tela de recuperação
+              // deixava a recomendação sem continuidade.
+              href="/exercicios/plano"
               icon={Dumbbell}
               metric={muscleFocusLabel ?? `${activeMinutes} min · hoje`}
             />
