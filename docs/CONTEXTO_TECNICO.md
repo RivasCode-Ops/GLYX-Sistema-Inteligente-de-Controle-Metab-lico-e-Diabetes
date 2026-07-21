@@ -488,32 +488,30 @@ que as exporia via `/rest/v1/rpc/...` para qualquer visitante.
 
 Achados de leitura de código, ordenados por gravidade. Nenhum foi corrigido neste levantamento.
 
-### 10.1 🔴 Calculadora de bolus sem trava de hipoglicemia, sem IOB e sem dose máxima
+### 10.1 🟠 Calculadora de bolus: trava de hipo resolvida, teto de dose ainda ausente
 
-**Verificado diretamente em `lib/medications/bolus-calculator.ts:20-41`.**
+**Estado original (21/07):** com a glicemia abaixo da meta, a correção virava 0 mas a dose de
+carboidrato saía **cheia** — 55 mg/dL com 60 g devolvia dose integral, sem aviso.
 
-Quando a glicemia está **abaixo** da meta, a correção vira 0 — mas a dose de carboidrato sai
-**cheia**, sem redução e sem aviso. Uma glicemia de 55 mg/dL com 60 g de carboidrato devolve dose
-integral. Não há:
+**Corrigido** em `1af295d`: `computeBolusDose` agora **recusa** o cálculo em hipoglicemia
+(`lib/medications/bolus-calculator.ts`), usando `target_glucose_min` do perfil como limiar (70 de
+padrão). O bloqueio recusa em vez de reduzir a dose de propósito: qualquer fator de redução seria
+conduta clínica inventada no código. A tela mostra card vermelho orientando tratar a hipo e remedir
+em 15 min. Toda dose passou a exibir que o cálculo **não desconta insulina ativa**.
 
-- **IOB / insulina ativa** — nenhuma referência a insulina a bordo em todo o `lib/`
-- **Dose máxima** — `totalDose` não tem clamp (o limite de 100 U em `app/actions/insulin.ts` aplica-se
-  só ao *registro manual*, não à saída da calculadora)
-- **Bloqueio ou aviso em hipoglicemia**
+**Escopo decidido:** a feature **fica** no produto. `ROADMAP.md` e o comentário de
+`app/actions/insulin.ts` foram alinhados — antes ambos afirmavam que o app nunca calcula dose.
 
-Agravantes:
+**Continua ausente:**
 
-1. `app/actions/insulin.ts:7-9` afirma: *"O app registra o que o usuário aplicou por orientação
-   médica — **nunca calcula nem recomenda dose**."* A calculadora contradiz esse comentário.
-2. O prompt do chat de IA carrega a mesma proibição (*"Nunca prescreva nem calcule doses"*), enquanto
-   a UI oferece o cálculo.
-3. O [ROADMAP](../ROADMAP.md) lista "calculadora de bolus de insulina como feature dedicada" em
-   **fora de escopo** — a feature entrou em 18/07 (`1fc4672`) sem que a decisão de escopo fosse
-   revista no documento.
-
-Existe disclaimer na UI (*"cálculo educativo, não é prescrição médica"*), mas disclaimer não é trava.
-**Recomendação: decidir explicitamente se a feature fica — e, se ficar, adicionar trava de hipo e
-teto de dose antes de qualquer usuário além dos dois atuais.**
+- **Teto de dose máxima** — `totalDose` não tem clamp. O limite de 100 U em `app/actions/insulin.ts`
+  aplica-se só ao *registro manual*. Não foi arbitrado um número porque dose máxima é individual e
+  precisa vir do endocrinologista.
+- **IOB / insulina ativa** — o app não registra insulina a bordo; o cálculo não tem como descontá-la.
+  Hoje isso é comunicado ao usuário, não resolvido.
+- O prompt do chat de IA mantém a proibição *"nunca prescreva nem calcule doses"* — correto para o
+  chat, que continua sem calcular; a calculadora é uma superfície separada, com parâmetros que o
+  usuário configurou com o médico.
 
 ### 10.2 🔴 Segredo de cron versionado no git
 
@@ -587,7 +585,8 @@ Confirmado por busca no código, não por suposição:
 - **HbA1c estimada / GMI** — não implementado
 - **AGP clínico** — explicitamente fora de escopo no ROADMAP
 - **TIR estratificado** (nível 1/2: <70 e <54; 180–250 e >250) — o valor 54 mg/dL não aparece
-- **IOB / insulina ativa** — não existe
+- **IOB / insulina ativa** — não existe (limitação comunicada na tela da calculadora)
+- **Teto de dose máxima de bolus** — depende de valor individual do endocrinologista
 - **Ajuste de bolus** por índice glicêmico, gordura/proteína ou exercício
 - **Portal do médico / prontuário**, **WhatsApp API**, **Apple Health no browser**, **classificação
   como SaMD/ANVISA** — todos fora de escopo declarado

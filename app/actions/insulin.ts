@@ -5,8 +5,14 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 // Registro de insulina EXTRA (correção quando a glicemia está alta, dose de
-// refeição fora da agenda etc.). O app registra o que o usuário aplicou por
-// orientação médica — nunca calcula nem recomenda dose.
+// refeição fora da agenda etc.): guarda o que o usuário JÁ aplicou, por
+// orientação médica.
+//
+// Este arquivo não calcula nem sugere dose. O cálculo educativo existe e vive
+// separado, em lib/medications/bolus-calculator.ts — a partir de parâmetros que
+// o próprio usuário configurou com o médico, bloqueado em hipoglicemia e sem
+// gravar nada. Manter as duas coisas apartadas é intencional: o que é registro
+// do passado não deve virar recomendação para o futuro.
 
 export type ActionResult = { ok?: true; error?: string };
 

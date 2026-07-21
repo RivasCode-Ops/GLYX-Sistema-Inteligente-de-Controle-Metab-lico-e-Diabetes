@@ -19,6 +19,14 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 | Observabilidade: Sentry + alertas de cron | Vivo (config) |
 | Qualidade: Vitest (RLS/LGPD/crypto) + E2E de portões | Vivo |
 | Admin: gasto de IA | Vivo |
+| Calculadora de bolus (educativa) | Vivo — ver ressalva abaixo |
+
+> **Calculadora de bolus.** Entrou em 18/07/2026, revertendo a decisão anterior de mantê-la fora de
+> escopo. É educativa: usa os parâmetros que o usuário configurou com o médico (`carb_ratio`,
+> `correction_factor`, `target_glucose_bolus`), bloqueia o cálculo em hipoglicemia e **não grava
+> dose em lugar nenhum**. Limitações conhecidas, sinalizadas na própria tela: **não considera
+> insulina ativa (IOB)** e **não tem teto de dose máxima** — esse teto depende de um valor
+> individual, que precisa vir do endocrinologista antes de virar código.
 
 ## Próximos (ordem sugerida)
 
@@ -39,7 +47,6 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 ### Fora de escopo (até nova decisão)
 
 - Portal do médico / prontuário
-- Calculadora de bolus de insulina como feature dedicada
 - WhatsApp API (hoje só link de instalação)
 - Apple Health no browser (requer app nativo)
 - Classificação como software médico (SaMD / ANVISA)
