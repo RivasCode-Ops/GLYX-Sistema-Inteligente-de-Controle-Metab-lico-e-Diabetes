@@ -111,7 +111,7 @@ export type MuscleSplitDef = { id: MuscleSplitId; label: string; groups: MuscleG
 export const MUSCLE_SPLITS: MuscleSplitDef[] = [
   { id: "push", label: "Push (empurrar)", groups: ["peito", "ombros", "triceps"] },
   { id: "pull", label: "Pull (puxar)", groups: ["costas", "biceps", "antebracos"] },
-  { id: "pernas", label: "Pernas", groups: ["pernas", "panturrilhas", "abdomen"] },
+  { id: "pernas", label: "Pernas", groups: ["quadriceps", "posterior", "panturrilhas", "abdomen"] },
 ];
 
 export type MuscleSplitSuggestion = {

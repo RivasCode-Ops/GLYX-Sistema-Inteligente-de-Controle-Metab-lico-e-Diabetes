@@ -18,8 +18,6 @@ export type TrainingDayId =
 export type TrainingDay = {
   id: TrainingDayId;
   label: string;
-  /** Foco do dia em linguagem de treino — distingue Inferior A (quadríceps) de
-   * Inferior B (posterior), que caem no mesmo grupo "pernas" do modelo. */
   focus: string;
   groups: MuscleGroupId[];
 };
@@ -57,7 +55,7 @@ export const WEEKDAY_PLAN: Record<number, TrainingDay> = {
     id: "inferior-a",
     label: "Inferior A",
     focus: "Quadríceps e panturrilha",
-    groups: ["pernas", "panturrilhas", "abdomen"],
+    groups: ["quadriceps", "panturrilhas", "abdomen"],
   },
   2: {
     id: "superior-a",
@@ -69,7 +67,7 @@ export const WEEKDAY_PLAN: Record<number, TrainingDay> = {
     id: "inferior-b",
     label: "Inferior B",
     focus: "Posterior de coxa e panturrilha",
-    groups: ["pernas", "panturrilhas", "abdomen"],
+    groups: ["posterior", "panturrilhas", "abdomen"],
   },
   4: {
     id: "superior-b",

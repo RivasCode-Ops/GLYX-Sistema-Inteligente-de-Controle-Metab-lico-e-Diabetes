@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
   computeMuscleRecovery,
   limitAvailableByTime,
@@ -10,7 +10,8 @@ const NOW = new Date("2026-07-13T12:00:00.000Z");
 const ALL_IDS = [
   "peito",
   "costas",
-  "pernas",
+  "quadriceps",
+  "posterior",
   "ombros",
   "biceps",
   "triceps",
@@ -20,22 +21,22 @@ const ALL_IDS = [
 ];
 
 describe("computeMuscleRecovery", () => {
-  it("marca como nunca treinado quando não há registro", () => {
+  it("marca como nunca treinado quando nÃ£o hÃ¡ registro", () => {
     const result = computeMuscleRecovery({}, {}, NOW);
     expect(result.every((r) => r.status === "never")).toBe(true);
   });
 
   it("marca como recuperando quando dentro da janela do grupo", () => {
-    // pernas: janela de 72h, treinado há 10h
+    // quadriceps: janela de 72h, treinado hÃ¡ 10h
     const trainedAt = new Date(NOW.getTime() - 10 * 3_600_000).toISOString();
-    const result = computeMuscleRecovery({ pernas: trainedAt }, {}, NOW);
-    const pernas = result.find((r) => r.id === "pernas")!;
-    expect(pernas.status).toBe("recovering");
-    expect(pernas.hoursRemaining).toBe(62);
+    const result = computeMuscleRecovery({ quadriceps: trainedAt }, {}, NOW);
+    const quadriceps = result.find((r) => r.id === "quadriceps")!;
+    expect(quadriceps.status).toBe("recovering");
+    expect(quadriceps.hoursRemaining).toBe(62);
   });
 
-  it("marca como pronto quando a janela já passou", () => {
-    // abdomen: janela de 24h, treinado há 30h
+  it("marca como pronto quando a janela jÃ¡ passou", () => {
+    // abdomen: janela de 24h, treinado hÃ¡ 30h
     const trainedAt = new Date(NOW.getTime() - 30 * 3_600_000).toISOString();
     const result = computeMuscleRecovery({ abdomen: trainedAt }, {}, NOW);
     const abdomen = result.find((r) => r.id === "abdomen")!;
@@ -43,26 +44,26 @@ describe("computeMuscleRecovery", () => {
     expect(abdomen.hoursReady).toBe(6);
   });
 
-  it("respeita janelas diferentes por grupo (pernas 72h vs abdômen 24h)", () => {
+  it("respeita janelas diferentes por grupo (pernas 72h vs abdÃ´men 24h)", () => {
     const trainedAt = new Date(NOW.getTime() - 30 * 3_600_000).toISOString();
-    const result = computeMuscleRecovery({ pernas: trainedAt, abdomen: trainedAt }, {}, NOW);
-    expect(result.find((r) => r.id === "pernas")!.status).toBe("recovering");
+    const result = computeMuscleRecovery({ quadriceps: trainedAt, abdomen: trainedAt }, {}, NOW);
+    expect(result.find((r) => r.id === "quadriceps")!.status).toBe("recovering");
     expect(result.find((r) => r.id === "abdomen")!.status).toBe("ready");
   });
 
-  it("pausa manual vence o cronômetro, mesmo pronto ou nunca treinado", () => {
+  it("pausa manual vence o cronÃ´metro, mesmo pronto ou nunca treinado", () => {
     const longReady = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const result = computeMuscleRecovery(
       { peito: longReady },
-      { peito: "dor no ombro", pernas: null },
+      { peito: "dor no ombro", quadriceps: null },
       NOW
     );
     const peito = result.find((r) => r.id === "peito")!;
-    const pernas = result.find((r) => r.id === "pernas")!;
+    const quadriceps = result.find((r) => r.id === "quadriceps")!;
     expect(peito.status).toBe("paused");
     expect(peito.pauseReason).toBe("dor no ombro");
-    expect(pernas.status).toBe("paused");
-    expect(pernas.pauseReason).toBeNull();
+    expect(quadriceps.status).toBe("paused");
+    expect(quadriceps.pauseReason).toBeNull();
   });
 });
 
@@ -77,18 +78,18 @@ describe("suggestMuscleFocus", () => {
     expect(suggestion?.status).toBe("never");
   });
 
-  it("sugere o grupo pronto há mais tempo quando todos já foram treinados", () => {
+  it("sugere o grupo pronto hÃ¡ mais tempo quando todos jÃ¡ foram treinados", () => {
     const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const recent = new Date(NOW.getTime() - 100 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(
-      ALL_IDS.map((id) => [id, id === "pernas" ? longAgo : recent])
+      ALL_IDS.map((id) => [id, id === "quadriceps" ? longAgo : recent])
     );
     const statuses = computeMuscleRecovery(lastTrained, {}, NOW);
     const suggestion = suggestMuscleFocus(statuses);
-    expect(suggestion?.id).toBe("pernas");
+    expect(suggestion?.id).toBe("quadriceps");
   });
 
-  it("retorna null quando tudo ainda está recuperando", () => {
+  it("retorna null quando tudo ainda estÃ¡ recuperando", () => {
     const justTrained = new Date(NOW.getTime() - 1 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(ALL_IDS.map((id) => [id, justTrained]));
     const statuses = computeMuscleRecovery(lastTrained, {}, NOW);
@@ -96,21 +97,21 @@ describe("suggestMuscleFocus", () => {
   });
 
   it("nunca sugere um grupo pausado", () => {
-    // pernas seria a única pronta (e a mais atrasada) se não estivesse pausada;
-    // as demais estão recuperando (não "nunca treinado"), então não há candidato.
+    // pernas seria a Ãºnica pronta (e a mais atrasada) se nÃ£o estivesse pausada;
+    // as demais estÃ£o recuperando (nÃ£o "nunca treinado"), entÃ£o nÃ£o hÃ¡ candidato.
     const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const justTrained = new Date(NOW.getTime() - 1 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(
-      ALL_IDS.map((id) => [id, id === "pernas" ? longAgo : justTrained])
+      ALL_IDS.map((id) => [id, id === "quadriceps" ? longAgo : justTrained])
     );
-    const statuses = computeMuscleRecovery(lastTrained, { pernas: "dor" }, NOW);
+    const statuses = computeMuscleRecovery(lastTrained, { quadriceps: "dor" }, NOW);
     expect(suggestMuscleFocus(statuses)).toBeNull();
   });
 });
 
 describe("suggestMuscleSplit", () => {
-  it("sugere o dia (push/pull/pernas) com músculos mais atrasados", () => {
-    // pull inteiro (costas, bíceps, antebraços) pronto há muito mais tempo que o resto
+  it("sugere o dia (push/pull/pernas) com mÃºsculos mais atrasados", () => {
+    // pull inteiro (costas, bÃ­ceps, antebraÃ§os) pronto hÃ¡ muito mais tempo que o resto
     const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const recent = new Date(NOW.getTime() - 100 * 3_600_000).toISOString();
     const pullIds = ["costas", "biceps", "antebracos"];
@@ -124,10 +125,10 @@ describe("suggestMuscleSplit", () => {
     expect(suggestion?.resting).toHaveLength(0);
   });
 
-  it("mostra no mínimo 1 músculo disponível quando só um do dia está pronto", () => {
+  it("mostra no mÃ­nimo 1 mÃºsculo disponÃ­vel quando sÃ³ um do dia estÃ¡ pronto", () => {
     const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const justTrained = new Date(NOW.getTime() - 1 * 3_600_000).toISOString();
-    // só peito (push) está pronto; todo o resto, incluindo ombros/tríceps do mesmo dia, recuperando
+    // sÃ³ peito (push) estÃ¡ pronto; todo o resto, incluindo ombros/trÃ­ceps do mesmo dia, recuperando
     const lastTrained = Object.fromEntries(
       ALL_IDS.map((id) => [id, id === "peito" ? longAgo : justTrained])
     );
@@ -138,7 +139,7 @@ describe("suggestMuscleSplit", () => {
     expect(suggestion?.resting.map((s) => s.id).sort()).toEqual(["ombros", "triceps"]);
   });
 
-  it("retorna null quando nenhum dia tem músculo disponível", () => {
+  it("retorna null quando nenhum dia tem mÃºsculo disponÃ­vel", () => {
     const justTrained = new Date(NOW.getTime() - 1 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(ALL_IDS.map((id) => [id, justTrained]));
     const statuses = computeMuscleRecovery(lastTrained, {}, NOW);
@@ -146,8 +147,8 @@ describe("suggestMuscleSplit", () => {
   });
 
   it("ordena available do mais atrasado pro menos atrasado (nunca-treinado primeiro)", () => {
-    // pull: costas nunca treinado, bíceps pronto há muito, antebraços pronto há pouco
-    // (janela de bíceps e antebraços é 36h — precisa passar disso pra virar "ready")
+    // pull: costas nunca treinado, bÃ­ceps pronto hÃ¡ muito, antebraÃ§os pronto hÃ¡ pouco
+    // (janela de bÃ­ceps e antebraÃ§os Ã© 36h â€” precisa passar disso pra virar "ready")
     const longAgo = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
     const recentReady = new Date(NOW.getTime() - 40 * 3_600_000).toISOString();
     const lastTrained = Object.fromEntries(
@@ -174,7 +175,7 @@ describe("limitAvailableByTime", () => {
     pauseReason: null,
   }));
 
-  it("30 min: só o primeiro (mais prioritário) entra", () => {
+  it("30 min: sÃ³ o primeiro (mais prioritÃ¡rio) entra", () => {
     const { included, deferred } = limitAvailableByTime(three, 30);
     expect(included.map((s) => s.id)).toEqual(["a"]);
     expect(deferred.map((s) => s.id)).toEqual(["b", "c"]);
@@ -192,3 +193,4 @@ describe("limitAvailableByTime", () => {
     expect(deferred).toHaveLength(0);
   });
 });
+

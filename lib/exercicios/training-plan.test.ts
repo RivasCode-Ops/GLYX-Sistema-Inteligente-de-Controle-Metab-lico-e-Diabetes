@@ -36,7 +36,11 @@ describe("getWeekPlan", () => {
 
   it("treina os grupos grandes 2x por semana", () => {
     const groups = getWeekPlan().flatMap((w) => w.day.groups);
-    expect(groups.filter((g) => g === "pernas")).toHaveLength(2);
+    // Coxa 2x na semana, mas em metades diferentes: quadríceps na segunda e
+    // posterior na quarta, pra cada um ter a janela de 72h respeitada.
+    expect(groups.filter((g) => g === "quadriceps" || g === "posterior")).toHaveLength(2);
+    expect(groups.filter((g) => g === "quadriceps")).toHaveLength(1);
+    expect(groups.filter((g) => g === "posterior")).toHaveLength(1);
     expect(groups.filter((g) => g === "panturrilhas")).toHaveLength(2);
   });
 
@@ -54,7 +58,8 @@ function trainedExcept(except: MuscleGroupId[], hours: number, now: Date) {
   const all: MuscleGroupId[] = [
     "peito",
     "costas",
-    "pernas",
+    "quadriceps",
+    "posterior",
     "ombros",
     "biceps",
     "triceps",
@@ -118,11 +123,11 @@ describe("suggestFromPlan", () => {
   });
 
   it("nunca sugere grupo pausado manualmente", () => {
-    const statuses = computeMuscleRecovery({}, { pernas: "dor no joelho" }, SEGUNDA);
+    const statuses = computeMuscleRecovery({}, { quadriceps: "dor no joelho" }, SEGUNDA);
     const s = suggestFromPlan(statuses, SEGUNDA);
 
-    expect(s.included.map((i) => i.id)).not.toContain("pernas");
-    expect(s.resting.map((r) => r.id)).toContain("pernas");
+    expect(s.included.map((i) => i.id)).not.toContain("quadriceps");
+    expect(s.resting.map((r) => r.id)).toContain("quadriceps");
   });
 });
 
@@ -148,3 +153,4 @@ describe("planSummaryLabel", () => {
     expect(planSummaryLabel(suggestFromPlan(statuses, SEGUNDA))).toBe("Tudo em recuperação");
   });
 });
+

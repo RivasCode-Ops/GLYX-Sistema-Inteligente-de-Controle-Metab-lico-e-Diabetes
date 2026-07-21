@@ -46,6 +46,8 @@ Este split está implementado em [`lib/exercicios/training-plan.ts`](../lib/exer
 e aparece em `/exercicios/plano`. A tabela acima é a **intenção** — o que o app sugere de fato sai do
 motor de recuperação muscular que o GLYX já usa:
 
+- Quadríceps e posterior de coxa são grupos separados (72h cada), então Inferior A na segunda e
+  Inferior B na quarta não conflitam — são músculos diferentes, não o mesmo "pernas" duas vezes.
 - Grupo ainda dentro da janela de recuperação (ou pausado manualmente) não entra no treino do dia.
 - Se **todos** os grupos do dia agendado estiverem saturados, o app antecipa outro dia do plano —
   aquele com maior atraso acumulado, mesmo critério de `suggestMuscleSplit`.
