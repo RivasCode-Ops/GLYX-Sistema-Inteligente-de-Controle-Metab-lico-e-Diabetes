@@ -8,6 +8,22 @@ export function parseMealJson(raw: string): Record<string, unknown> {
   }
 }
 
+/**
+ * Resposta que não dá pra usar: vazia ou cortada no teto de `max_tokens`.
+ *
+ * Sem essa checagem o fluxo falha em silêncio — `parseMealJson` cai no
+ * fallback, `sumMealItems` soma zero item e a rota devolve calorias/macros
+ * zerados como se a estimativa tivesse dado certo. Foi o que aconteceu em
+ * 20/07/2026, quando um build sem `thinking: disabled` gastou todos os tokens
+ * em raciocínio e devolveu conteúdo vazio: a tela mostrou 0 em tudo, sem erro.
+ */
+export function isUnusableCompletion(
+  content: string | null | undefined,
+  finishReason?: string | null
+): boolean {
+  return !content?.trim() || finishReason === "length";
+}
+
 export type MealItem = {
   name: string;
   calories: number;

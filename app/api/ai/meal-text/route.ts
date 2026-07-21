@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
-import { parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
+import { isUnusableCompletion, parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
             "- notes (string breve em pt-BR, deixe claro que é uma estimativa por texto, sem foto)",
         },
       ],
-      max_tokens: 400,
+      max_tokens: 800,
     });
   } catch (e) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
@@ -69,8 +69,17 @@ export async function POST(req: Request) {
 
   await recordAiTokens(supabase, rate.usageId, completion.usage, aiModel());
 
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const rawParsed = parseMealJson(raw);
+  const choice = completion.choices[0];
+  // Falhar explicitamente em vez de devolver a refeição zerada — zero em tudo
+  // é indistinguível de uma estimativa legítima na tela.
+  if (isUnusableCompletion(choice?.message?.content, choice?.finish_reason)) {
+    return NextResponse.json(
+      { error: "A IA não conseguiu estimar essa descrição. Tente descrever de forma mais simples." },
+      { status: 502 }
+    );
+  }
+
+  const rawParsed = parseMealJson(choice?.message?.content ?? "{}");
   const totals = sumMealItems(rawParsed);
 
   return NextResponse.json({
