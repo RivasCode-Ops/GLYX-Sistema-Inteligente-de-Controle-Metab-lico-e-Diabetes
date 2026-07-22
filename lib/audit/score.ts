@@ -298,7 +298,7 @@ function buildPlan(factors: AuditFactor[], metrics: AuditMetrics): AuditPlanItem
       priority: 1,
       title: "Manter o ritmo de registros",
       why: "Controle estável no período — continue glicemia, refeições e atividade.",
-      href: "/insights",
+      href: "/analise/correlacoes",
       actionLabel: "Ver insights",
     });
   }

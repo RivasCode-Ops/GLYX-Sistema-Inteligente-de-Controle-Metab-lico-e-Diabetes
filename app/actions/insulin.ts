@@ -56,7 +56,7 @@ export async function addInsulinLog(formData: FormData): Promise<ActionResult> {
 
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");
-  revalidatePath("/historico");
+  revalidatePath("/analise/linha-do-tempo");
   return { ok: true };
 }
 
@@ -81,6 +81,6 @@ export async function deleteInsulinLog(formData: FormData): Promise<ActionResult
 
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");
-  revalidatePath("/historico");
+  revalidatePath("/analise/linha-do-tempo");
   return { ok: true };
 }

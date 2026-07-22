@@ -5,15 +5,11 @@ import {
   UtensilsCrossed,
   Dumbbell,
   Pill,
-  Lightbulb,
-  Sparkles,
   User,
   FileText,
-  ScrollText,
-  BellRing,
   Plug,
   Radar,
-  Map,
+  LineChart,
 } from "lucide-react";
 
 /** "registrar" = ação do dia a dia; "analises" = telas retrospectivas/IA; "conta" = configuração. */
@@ -41,13 +37,13 @@ export const mainNav: NavItem[] = [
   { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true, group: "registrar" }, // uso: 2º mais registrado
   { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true, group: "registrar" }, // uso: 3º + criticidade clínica (insulina)
   { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true, group: "registrar" }, // uso: o menos registrado do grupo hoje
-  { title: "Mapa de risco", href: "/mapa-risco", icon: Map, mobile: false, group: "analises" }, // importância: score longitudinal + relatório pro médico
-  { title: "Alertas", href: "/alertas", icon: BellRing, mobile: false, group: "analises" }, // importância: segurança (hipo/hiperglicemia), não só clique
-  { title: "IA metabólica", href: "/ia-metabolica", icon: Sparkles, mobile: false, group: "analises" }, // uso: item mais acessado das análises
-  { title: "Insights", href: "/insights", icon: Lightbulb, mobile: false, group: "analises" },
-  { title: "Histórico", href: "/historico", icon: ScrollText, mobile: false, group: "analises" },
-  { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "analises" }, // uso: zero registros até agora
+  // Análises consolidadas: Mapa de risco, Insights, Histórico e Alertas viraram
+  // abas de uma tela só (/analise). A IA metabólica virou chat flutuante global
+  // (ver MetabolicChatFab), então saiu do menu. Exames é gestão de documento —
+  // foi para Conta.
+  { title: "Análise", href: "/analise", icon: LineChart, mobile: false, group: "analises" }, // resumo de risco + correlações + linha do tempo + alertas
   { title: "Perfil", href: "/perfil", icon: User, mobile: false, group: "conta" }, // importância: metas, medicação de referência, dados corporais
+  { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "conta" }, // gestão de documentos (lab / ECG / raio-X)
   { title: "Integrações", href: "/integracoes", icon: Plug, mobile: false, group: "conta" },
   { title: "Sistema", href: "/status", icon: Radar, mobile: false, group: "conta" },
 ];
@@ -76,6 +72,12 @@ export type SubNavItem = { title: string; href: string };
 
 /** Secondary routes per module (desktop subnav + mobile chips) */
 export const moduleSubNav: Record<string, SubNavItem[]> = {
+  "/analise": [
+    { title: "Resumo", href: "/analise" },
+    { title: "Correlações", href: "/analise/correlacoes" },
+    { title: "Linha do tempo", href: "/analise/linha-do-tempo" },
+    { title: "Alertas", href: "/analise/alertas" },
+  ],
   "/glicemia": [
     { title: "Visão geral", href: "/glicemia" },
     { title: "Tendências", href: "/glicemia/tendencias" },

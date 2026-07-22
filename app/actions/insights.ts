@@ -25,7 +25,7 @@ export async function refreshCorrelationInsights(windowDays: number = 14): Promi
 
   if (saved.error) return { error: saved.error };
 
-  revalidatePath("/insights");
+  revalidatePath("/analise/correlacoes");
   revalidatePath("/dashboard");
   return {
     ok: true,

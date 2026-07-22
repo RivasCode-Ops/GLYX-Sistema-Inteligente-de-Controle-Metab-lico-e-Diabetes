@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { AppHeader } from "@/components/shell/app-header";
+import { MetabolicChatFab } from "@/components/ia/metabolic-chat-fab";
 import { SessionGuard } from "@/components/shell/session-guard";
 import { SetupBanner } from "@/components/setup-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
@@ -44,6 +45,7 @@ export default async function AppShellLayout({
           </footer>
         </div>
         <MobileTabBar className="md:hidden" />
+        <MetabolicChatFab />
       </div>
     </ToastProvider>
   );

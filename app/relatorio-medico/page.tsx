@@ -39,13 +39,13 @@ export default async function RelatorioMedicoPage() {
       <main className="mx-auto max-w-xl px-5 py-16 text-center text-zinc-300">
         <h1 className="text-xl font-semibold text-zinc-100">Ainda não há relatório pra gerar</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          O relatório usa os números do Mapa de risco. Gere um mapa primeiro.
+          O relatório usa os números do resumo de risco. Gere um primeiro na Análise.
         </p>
         <Link
-          href="/mapa-risco"
+          href="/analise"
           className="mt-4 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
         >
-          Ir para o Mapa de risco
+          Ir para a Análise
         </Link>
       </main>
     );

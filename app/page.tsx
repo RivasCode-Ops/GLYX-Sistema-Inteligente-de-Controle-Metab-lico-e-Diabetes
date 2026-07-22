@@ -6,7 +6,7 @@ import { mainNav } from "@/lib/navigation";
 
 export default function Home() {
   const modules = mainNav.filter((item) =>
-    ["/dashboard", "/glicemia", "/alimentacao", "/exercicios", "/medicacao", "/insights"].includes(
+    ["/dashboard", "/glicemia", "/alimentacao", "/exercicios", "/medicacao", "/analise"].includes(
       item.href
     )
   );

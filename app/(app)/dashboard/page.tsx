@@ -202,10 +202,10 @@ export default async function DashboardPage() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Link
-          href="/mapa-risco"
+          href="/analise"
           className="block rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-zinc-300 transition hover:border-emerald-500/40 hover:text-zinc-100"
         >
-          Mapa de risco — auditoria metabólica do seu período →
+          Análise — auditoria metabólica do seu período →
         </Link>
         <Link
           href="/status"

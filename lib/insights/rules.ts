@@ -86,7 +86,7 @@ export async function evaluateGlucoseAlert(
   await sendPushToUser(supabase, userId, {
     title,
     body,
-    url: "/alertas",
+    url: "/analise/alertas",
     critical: kind === "hypoglycemia",
   });
 }

@@ -72,7 +72,7 @@ export async function addGlucoseReading(formData: FormData): Promise<ActionResul
   revalidatePath("/glicemia");
   revalidatePath("/glicemia/historico");
   revalidatePath("/glicemia/tendencias");
-  revalidatePath("/alertas");
+  revalidatePath("/analise/alertas");
   return { ok: true };
 }
 

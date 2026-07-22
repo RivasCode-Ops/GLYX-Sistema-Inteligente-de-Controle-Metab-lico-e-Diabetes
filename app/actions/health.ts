@@ -46,6 +46,6 @@ export async function logManualSleep(formData: FormData): Promise<ActionResult> 
 
   revalidatePath("/integracoes");
   revalidatePath("/dashboard");
-  revalidatePath("/mapa-risco");
+  revalidatePath("/analise");
   return { ok: true };
 }
