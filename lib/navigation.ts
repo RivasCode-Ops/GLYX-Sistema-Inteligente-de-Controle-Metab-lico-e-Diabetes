@@ -98,6 +98,11 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Meus medicamentos", href: "/medicacao/medicamentos" },
     { title: "Calculadora", href: "/medicacao/calculadora" },
   ],
+  "/perfil": [
+    { title: "Metabólico", href: "/perfil" },
+    { title: "Corpo & peso", href: "/perfil/corpo" },
+    { title: "Conta", href: "/perfil/conta" },
+  ],
 };
 
 export function getModuleKeyFromPath(pathname: string): string | null {
