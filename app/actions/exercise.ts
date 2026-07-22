@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { MUSCLE_GROUP_IDS } from "@/lib/data/muscle-groups";
+import { ACTIVITY_TYPE_IDS } from "@/lib/data/activity-types";
 import { wallClockToUTC } from "@/lib/time/local-day";
 
 const schema = z.object({
   label: z.string().min(1),
+  activity_type: z.enum(ACTIVITY_TYPE_IDS as [string, ...string[]]).optional(),
   duration_min: z.coerce.number().optional(),
   calories_burned: z.coerce.number().optional(),
   intensity: z.string().optional(),
@@ -142,6 +144,7 @@ export async function addExerciseSession(formData: FormData): Promise<ActionResu
 
   const parsed = schema.safeParse({
     label: formData.get("label"),
+    activity_type: formData.get("activity_type") || undefined,
     duration_min: formData.get("duration_min") || undefined,
     calories_burned: formData.get("calories_burned") || undefined,
     intensity: formData.get("intensity") || undefined,

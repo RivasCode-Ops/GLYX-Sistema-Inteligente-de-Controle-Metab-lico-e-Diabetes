@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
+import { ACTIVITY_TYPES, INTENSITY_LEVELS } from "@/lib/data/activity-types";
+
+const selectClass =
+  "flex h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 export function NewSessionForm() {
   const router = useRouter();
@@ -35,9 +39,20 @@ export function NewSessionForm() {
 
   return (
     <form onSubmit={(e) => void submit(e)} className="grid gap-3 sm:grid-cols-2">
-      <div className="grid gap-1 sm:col-span-2">
+      <div className="grid gap-1">
+        <Label htmlFor="activity_type">Tipo</Label>
+        <select id="activity_type" name="activity_type" defaultValue="" className={selectClass}>
+          <option value="">Não especificado</option>
+          {ACTIVITY_TYPES.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="grid gap-1">
         <Label htmlFor="label">Atividade</Label>
-        <Input id="label" name="label" required placeholder="ex.: Caminhada leve" />
+        <Input id="label" name="label" required placeholder="ex.: Bicicleta regenerativa" />
       </div>
       <div className="grid gap-1">
         <Label htmlFor="duration_min">Duração (min)</Label>
@@ -49,7 +64,14 @@ export function NewSessionForm() {
       </div>
       <div className="grid gap-1 sm:col-span-2">
         <Label htmlFor="intensity">Intensidade</Label>
-        <Input id="intensity" name="intensity" placeholder="leve / moderada / forte" />
+        <select id="intensity" name="intensity" defaultValue="" className={selectClass}>
+          <option value="">Não especificada</option>
+          {INTENSITY_LEVELS.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="grid gap-1 sm:col-span-2">
         <Label htmlFor="started_at_local">Horário real do treino</Label>

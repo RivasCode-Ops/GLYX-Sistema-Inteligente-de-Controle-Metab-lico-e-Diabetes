@@ -1,11 +1,30 @@
 import type { ExerciseSession } from "@/types/database";
 import type { BodyGoal } from "@/lib/health/energy";
+import { activityKind, type ActivityKind } from "@/lib/data/activity-types";
 
 export type WeeklyExerciseGoal = {
   targetMinutes: number;
   targetSessions: number;
   weeklyFocus: string;
 };
+
+export type ActivityBreakdownEntry = {
+  kind: ActivityKind;
+  minutes: number;
+  sessions: number;
+};
+
+/**
+ * Classifica uma sessão em cardio / força / outro. Prioriza o tipo
+ * estruturado; sem ele, uma sessão com grupos musculares (o registro rápido
+ * do painel de recuperação) conta como força, e o resto cai em "outro".
+ */
+export function sessionKind(session: ExerciseSession): ActivityKind {
+  const fromType = activityKind(session.activity_type);
+  if (fromType) return fromType;
+  if (session.muscle_groups && session.muscle_groups.length > 0) return "forca";
+  return "outro";
+}
 
 export type WeeklyExerciseProgress = {
   minutes: number;
@@ -18,6 +37,7 @@ export type WeeklyExerciseProgress = {
   message: string;
   recommendation: string;
   workoutSuggestion: string;
+  breakdown: ActivityBreakdownEntry[];
 };
 
 export type WeeklyExerciseGlucoseContext = {
@@ -71,6 +91,7 @@ export function computeWeeklyExerciseProgress(
   });
 
   const minutes = thisWeek.reduce((sum, session) => sum + (session.duration_min ?? 0), 0);
+  const breakdown = summarizeByKind(thisWeek);
   const activeDays = new Set(thisWeek.map((session) => session.started_at.slice(0, 10))).size;
   const sessionsCount = thisWeek.length;
   const target = getWeeklyExerciseTarget(goal);
@@ -127,5 +148,19 @@ export function computeWeeklyExerciseProgress(
     message,
     recommendation,
     workoutSuggestion,
+    breakdown,
   };
+}
+
+/** Minutos e sessões por tipo (cardio / força / outro), ordenados por minutos. */
+export function summarizeByKind(sessions: ExerciseSession[]): ActivityBreakdownEntry[] {
+  const acc = new Map<ActivityKind, ActivityBreakdownEntry>();
+  for (const session of sessions) {
+    const kind = sessionKind(session);
+    const entry = acc.get(kind) ?? { kind, minutes: 0, sessions: 0 };
+    entry.minutes += session.duration_min ?? 0;
+    entry.sessions += 1;
+    acc.set(kind, entry);
+  }
+  return [...acc.values()].sort((a, b) => b.minutes - a.minutes);
 }

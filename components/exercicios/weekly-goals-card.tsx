@@ -4,6 +4,12 @@ import type { WeeklyExerciseGlucoseContext } from "@/lib/exercicios/weekly-goals
 import type { ExerciseSession } from "@/types/database";
 import type { BodyGoal } from "@/lib/health/energy";
 
+const KIND_LABEL: Record<string, string> = {
+  cardio: "Cardio",
+  forca: "Força",
+  outro: "Outro",
+};
+
 function statusTone(status: "on-track" | "behind" | "ahead") {
   switch (status) {
     case "ahead":
@@ -42,6 +48,19 @@ export function WeeklyGoalsCard({ sessions, goal, glucose }: Props) {
           </div>
           <p className={`text-sm font-medium ${statusTone(progress.status)}`}>{progress.message}</p>
         </div>
+
+        {progress.breakdown.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {progress.breakdown.map((entry) => (
+              <span
+                key={entry.kind}
+                className="rounded-full border border-zinc-700 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-300"
+              >
+                {KIND_LABEL[entry.kind] ?? entry.kind}: {entry.minutes} min · {entry.sessions}×
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-sm text-zinc-400">
           {progress.recommendation}
