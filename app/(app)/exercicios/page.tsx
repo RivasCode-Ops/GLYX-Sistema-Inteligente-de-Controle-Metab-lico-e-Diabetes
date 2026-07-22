@@ -1,5 +1,4 @@
 import { SectionCards } from "@/components/module/section-cards";
-import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
 import { NewSessionForm } from "@/components/exercicios/new-session-form";
 import { WeeklyGoalsCard } from "@/components/exercicios/weekly-goals-card";
 import { startOfWeek } from "@/lib/exercicios/weekly-goals";
@@ -73,7 +72,6 @@ export default async function ExerciciosOverviewPage() {
       <p className="text-sm text-zinc-400">
         Treino e metabolismo — cada subárea tem página própria.
       </p>
-      {!demoMode ? <GoalTrainingCard goal={bodyGoal} /> : null}
       <WeeklyGoalsCard sessions={weekSessions} goal={bodyGoal} glucose={glucose} />
       <SectionCards
         items={[

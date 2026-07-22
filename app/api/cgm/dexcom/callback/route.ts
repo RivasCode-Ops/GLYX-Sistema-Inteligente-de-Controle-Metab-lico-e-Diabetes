@@ -8,7 +8,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 function sensorRedirect(req: Request, query: Record<string, string>) {
-  const url = new URL("/glicemia/sensor", req.url);
+  const url = new URL("/integracoes", req.url);
   for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
   return NextResponse.redirect(url);
 }

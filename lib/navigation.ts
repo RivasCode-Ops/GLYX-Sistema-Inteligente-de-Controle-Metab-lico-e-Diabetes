@@ -44,7 +44,7 @@ export const mainNav: NavItem[] = [
   { title: "Análise", href: "/analise", icon: LineChart, mobile: false, group: "analises" }, // resumo de risco + correlações + linha do tempo + alertas
   { title: "Perfil", href: "/perfil", icon: User, mobile: false, group: "conta" }, // importância: metas, medicação de referência, dados corporais
   { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "conta" }, // gestão de documentos (lab / ECG / raio-X)
-  { title: "Integrações", href: "/integracoes", icon: Plug, mobile: false, group: "conta" },
+  { title: "Conexões", href: "/integracoes", icon: Plug, mobile: false, group: "conta" }, // CGM + Google Fit + sono, unificado
   { title: "Sistema", href: "/status", icon: Radar, mobile: false, group: "conta" },
 ];
 
@@ -80,22 +80,17 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
   ],
   "/glicemia": [
     { title: "Visão geral", href: "/glicemia" },
-    { title: "Tendências", href: "/glicemia/tendencias" },
-    { title: "Sensor", href: "/glicemia/sensor" },
     { title: "Histórico", href: "/glicemia/historico" },
     { title: "Pressão", href: "/glicemia/pressao" },
   ],
   "/alimentacao": [
-    { title: "Visão geral", href: "/alimentacao" },
-    { title: "Refeições", href: "/alimentacao/refeicoes" },
-    { title: "Plano", href: "/alimentacao/plano" },
+    { title: "Refeições", href: "/alimentacao" },
     { title: "Por foto", href: "/alimentacao/foto" },
     { title: "Montar prato", href: "/alimentacao/montar-prato" },
   ],
   "/exercicios": [
     { title: "Visão geral", href: "/exercicios" },
     { title: "Plano", href: "/exercicios/plano" },
-    { title: "Sessões", href: "/exercicios/sessoes" },
     { title: "Recuperação", href: "/exercicios/recuperacao" },
   ],
   "/medicacao": [
