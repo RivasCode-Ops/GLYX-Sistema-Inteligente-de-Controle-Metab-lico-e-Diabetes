@@ -69,7 +69,7 @@ export function SensorRadar() {
         <span aria-hidden>📡</span>
         <span className="min-w-0 flex-1">{friendlyCgmError(health.lastError)}</span>
         <Link
-          href="/glicemia/sensor"
+          href="/integracoes"
           className="shrink-0 rounded-lg border border-red-400/40 px-2 py-1 font-medium transition hover:bg-red-500/20"
         >
           Reconectar →
@@ -92,7 +92,7 @@ export function SensorRadar() {
             : `Sem leitura nova do sensor ${idadeLabel(readingAge)}.`}
         </span>
         <Link
-          href="/glicemia/sensor"
+          href="/integracoes"
           className="shrink-0 rounded-lg border border-amber-400/40 px-2 py-1 font-medium transition hover:bg-amber-500/20"
         >
           Ver sensor →

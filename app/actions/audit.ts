@@ -29,7 +29,7 @@ export async function generateMetabolicAudit(windowDays: number = 14): Promise<A
   const saved = await persistMetabolicAudit(supabase, user.id, report);
   if (saved.error) return { error: saved.error };
 
-  revalidatePath("/mapa-risco");
+  revalidatePath("/analise");
   revalidatePath("/dashboard");
   return { ok: true, report, id: saved.id };
 }

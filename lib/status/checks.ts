@@ -115,7 +115,7 @@ export async function runSystemChecks(
       title: "Sensor de glicose (LibreLinkUp)",
       status: "off",
       detail: "Nenhum sensor conectado. Conecte para receber leituras automáticas.",
-      action: { label: "Conectar sensor", href: "/glicemia/sensor" },
+      action: { label: "Conectar sensor", href: "/integracoes" },
     });
   } else if (
     conn.circuit_open_until &&
@@ -128,7 +128,7 @@ export async function runSystemChecks(
       detail: `Sync automático em pausa (proteção) até ${new Date(conn.circuit_open_until).toLocaleString("pt-BR")}${
         conn.last_error ? ` — último erro: "${conn.last_error}"` : ""
       }.`,
-      action: { label: "Ver sensor", href: "/glicemia/sensor" },
+      action: { label: "Ver sensor", href: "/integracoes" },
     });
   } else if (conn.last_error) {
     checks.push({
@@ -136,7 +136,7 @@ export async function runSystemChecks(
       title: "Sensor de glicose (LibreLinkUp)",
       status: "fail",
       detail: `A sincronização está falhando: "${conn.last_error}". Reconecte informando a senha de novo.`,
-      action: { label: "Reconectar agora", href: "/glicemia/sensor" },
+      action: { label: "Reconectar agora", href: "/integracoes" },
     });
   } else {
     const syncAge = conn.last_sync_at ? ageMinutes(conn.last_sync_at) : null;
@@ -156,7 +156,7 @@ export async function runSystemChecks(
               syncAge == null
                 ? "Conectado, mas nenhuma sincronização aconteceu ainda."
                 : `Conectado, mas a última sincronização foi ${idade(syncAge)} (esperado: a cada 15 min).`,
-            action: { label: "Ver sensor", href: "/glicemia/sensor" },
+            action: { label: "Ver sensor", href: "/integracoes" },
           }
     );
   }
@@ -183,7 +183,7 @@ export async function runSystemChecks(
             title: "Leituras de glicemia",
             status: age > 24 * 60 ? "fail" : "warn",
             detail: `Última leitura (${fonte}): ${reading.value_mg_dl} mg/dL ${idade(age)}. Com sensor ativo, o esperado é uma leitura nova a cada ~15 min.`,
-            action: { label: "Ver sensor", href: "/glicemia/sensor" },
+            action: { label: "Ver sensor", href: "/integracoes" },
           }
         : {
             id: "readings",

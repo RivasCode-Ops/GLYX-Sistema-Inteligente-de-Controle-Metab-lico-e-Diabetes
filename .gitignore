@@ -42,3 +42,6 @@ tsconfig.tsbuildinfo
 .env*
 
 .env.vercel.pull
+
+# metadado local de ferramenta (caminho da pasta varia por maquina)
+projeto.manifest.json

@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { parseMealJson, sumMealItems } from "./parse-meal";
+import { isUnusableCompletion, parseMealJson, sumMealItems } from "./parse-meal";
+
+describe("isUnusableCompletion", () => {
+  it("rejeita resposta cortada no teto de tokens", () => {
+    // Caso real: modelo de raciocínio gastou todo o max_tokens pensando.
+    expect(isUnusableCompletion("", "length")).toBe(true);
+    expect(isUnusableCompletion('{"items":[', "length")).toBe(true);
+  });
+
+  it("rejeita conteúdo vazio ou ausente", () => {
+    expect(isUnusableCompletion(null)).toBe(true);
+    expect(isUnusableCompletion(undefined)).toBe(true);
+    expect(isUnusableCompletion("   ")).toBe(true);
+  });
+
+  it("aceita resposta completa", () => {
+    expect(isUnusableCompletion('{"items":[]}', "stop")).toBe(false);
+    expect(isUnusableCompletion('```json\n{"items":[]}\n```', "stop")).toBe(false);
+  });
+});
 
 describe("parseMealJson", () => {
   it("parseia JSON puro", () => {

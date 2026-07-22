@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { isMuscleGroupId, type MuscleGroupId } from "@/lib/data/muscle-groups";
+import { isMuscleGroupId, resolveMuscleGroupIds, type MuscleGroupId } from "@/lib/data/muscle-groups";
 
 /** Data/hora do treino mais recente de cada grupo muscular do usuário logado. */
 export async function getLastTrainedByMuscleGroup(): Promise<Partial<Record<MuscleGroupId, string>>> {
@@ -22,7 +22,10 @@ export async function getLastTrainedByMuscleGroup(): Promise<Partial<Record<Musc
   const result: Partial<Record<MuscleGroupId, string>> = {};
   for (const row of (data ?? []) as { muscle_groups: string[] | null; started_at: string }[]) {
     for (const g of row.muscle_groups ?? []) {
-      if (isMuscleGroupId(g) && !result[g]) result[g] = row.started_at;
+      // resolveMuscleGroupIds expande "pernas" legado em quadríceps + posterior.
+      for (const id of resolveMuscleGroupIds(g)) {
+        if (!result[id]) result[id] = row.started_at;
+      }
     }
   }
   return result;

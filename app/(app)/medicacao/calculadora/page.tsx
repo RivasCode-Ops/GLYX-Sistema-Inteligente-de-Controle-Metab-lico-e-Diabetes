@@ -9,6 +9,7 @@ export default async function CalculadoraDosePage() {
   let correctionFactor: number | null = null;
   let targetGlucose: number | null = null;
   let latestGlucose: number | null = null;
+  let targetGlucoseMin: number | null = null;
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -20,7 +21,7 @@ export default async function CalculadoraDosePage() {
         const [{ data: profile }, { data: glucose }] = await Promise.all([
           supabase
             .from("profiles")
-            .select("carb_ratio, correction_factor, target_glucose_bolus")
+            .select("carb_ratio, correction_factor, target_glucose_bolus, target_glucose_min")
             .eq("id", user.id)
             .maybeSingle(),
           supabase
@@ -34,6 +35,7 @@ export default async function CalculadoraDosePage() {
         carbRatio = profile?.carb_ratio ?? null;
         correctionFactor = profile?.correction_factor ?? null;
         targetGlucose = profile?.target_glucose_bolus ?? null;
+        targetGlucoseMin = profile?.target_glucose_min ?? null;
         latestGlucose = glucose?.value_mg_dl ?? null;
       }
     }
@@ -56,6 +58,7 @@ export default async function CalculadoraDosePage() {
               correctionFactor={correctionFactor}
               targetGlucose={targetGlucose}
               latestGlucose={latestGlucose}
+              targetGlucoseMin={targetGlucoseMin}
             />
           ) : (
             <p className="rounded-xl border border-amber-900/60 bg-amber-950/40 p-3 text-xs text-amber-200">

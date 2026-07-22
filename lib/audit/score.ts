@@ -61,7 +61,7 @@ export function scoreFromMetrics(
           priority: 2,
           title: "Conectar sensor (CGM)",
           why: "Leituras densas melhoram a auditoria sem esforço manual.",
-          href: "/glicemia/sensor",
+          href: "/integracoes",
           actionLabel: "Ver sensor",
         },
       ],
@@ -234,7 +234,7 @@ function buildPlan(factors: AuditFactor[], metrics: AuditMetrics): AuditPlanItem
       priority: plan.length + 1,
       title: "Acompanhar tendência na faixa",
       why: `TIR atual ${metrics.tirPercent ?? "—"}%. Ajuste hábitos e conversa com a equipe clínica.`,
-      href: "/glicemia/tendencias",
+      href: "/glicemia",
       actionLabel: "Ver tendências",
     });
   }
@@ -243,7 +243,7 @@ function buildPlan(factors: AuditFactor[], metrics: AuditMetrics): AuditPlanItem
       priority: plan.length + 1,
       title: "Reduzir variabilidade da glicemia",
       why: "Oscilação alta entre leituras pesa tanto quanto ficar fora da faixa — regularidade em refeições e doses ajuda.",
-      href: "/glicemia/tendencias",
+      href: "/glicemia",
       actionLabel: "Ver tendências",
     });
   }
@@ -298,7 +298,7 @@ function buildPlan(factors: AuditFactor[], metrics: AuditMetrics): AuditPlanItem
       priority: 1,
       title: "Manter o ritmo de registros",
       why: "Controle estável no período — continue glicemia, refeições e atividade.",
-      href: "/insights",
+      href: "/analise/correlacoes",
       actionLabel: "Ver insights",
     });
   }

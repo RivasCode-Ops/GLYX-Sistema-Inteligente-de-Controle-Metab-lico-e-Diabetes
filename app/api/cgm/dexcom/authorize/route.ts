@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     const login = new URL("/login", req.url);
-    login.searchParams.set("next", "/glicemia/sensor");
+    login.searchParams.set("next", "/integracoes");
     return NextResponse.redirect(login);
   }
 

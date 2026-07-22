@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
-import { parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
+import { isUnusableCompletion, parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -98,8 +98,17 @@ export async function POST(req: Request) {
 
   await recordAiTokens(supabase, rate.usageId, completion.usage, aiModel());
 
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = parseMealJson(raw);
+  const choice = completion.choices[0];
+  // Mesma armadilha da estimativa por texto: sem essa checagem, uma resposta
+  // vazia ou cortada vira uma refeição com tudo zerado, sem erro na tela.
+  if (isUnusableCompletion(choice?.message?.content, choice?.finish_reason)) {
+    return NextResponse.json(
+      { error: "A IA não conseguiu analisar essa foto. Tente uma imagem mais nítida ou registre manualmente." },
+      { status: 502 }
+    );
+  }
+
+  const parsed = parseMealJson(choice?.message?.content ?? "{}");
   const totals = sumMealItems(parsed);
   // Carga glicêmica é por item agora (a bebida pode pesar diferente do
   // prato) — a média dá só um resumo geral pra quem quiser um número único.

@@ -71,8 +71,8 @@ export async function addGlucoseReading(formData: FormData): Promise<ActionResul
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");
   revalidatePath("/glicemia/historico");
-  revalidatePath("/glicemia/tendencias");
-  revalidatePath("/alertas");
+  revalidatePath("/glicemia");
+  revalidatePath("/analise/alertas");
   return { ok: true };
 }
 
@@ -98,6 +98,6 @@ export async function deleteGlucoseReading(formData: FormData): Promise<ActionRe
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");
   revalidatePath("/glicemia/historico");
-  revalidatePath("/glicemia/tendencias");
+  revalidatePath("/glicemia");
   return { ok: true };
 }

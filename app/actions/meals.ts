@@ -185,7 +185,7 @@ export async function saveMealPhotoItems(formData: FormData): Promise<ActionResu
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
-  revalidatePath("/alimentacao/refeicoes");
+  revalidatePath("/alimentacao");
   return { ok: true };
 }
 
@@ -227,6 +227,6 @@ export async function deleteMeal(formData: FormData): Promise<ActionResult> {
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
-  revalidatePath("/alimentacao/refeicoes");
+  revalidatePath("/alimentacao");
   return { ok: true };
 }

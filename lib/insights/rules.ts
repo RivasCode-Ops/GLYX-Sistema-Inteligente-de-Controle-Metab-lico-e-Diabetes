@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendPushToUser } from "@/lib/push/send";
+import { hypoThresholdFor } from "@/lib/health/glucose-thresholds";
 
 const HYPER_MG_DL = 250;
-const DEFAULT_HYPO_MG_DL = 70;
 /** Faixa acima da meta mínima que ainda merece um aviso preventivo (não crítico). */
 const NEAR_LOW_BUFFER_MG_DL = 10;
 
@@ -33,7 +33,7 @@ export async function evaluateGlucoseAlert(
     .select("target_glucose_min")
     .eq("id", userId)
     .maybeSingle();
-  const hypoThreshold = profile?.target_glucose_min ?? DEFAULT_HYPO_MG_DL;
+  const hypoThreshold = hypoThresholdFor(profile?.target_glucose_min);
 
   const kind: "hyperglycemia" | "hypoglycemia" | "near_low" | null =
     reading.valueMgDl >= HYPER_MG_DL
@@ -86,7 +86,7 @@ export async function evaluateGlucoseAlert(
   await sendPushToUser(supabase, userId, {
     title,
     body,
-    url: "/alertas",
+    url: "/analise/alertas",
     critical: kind === "hypoglycemia",
   });
 }

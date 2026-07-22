@@ -74,7 +74,7 @@ export function getNextStepInsight(input: {
   return {
     text: "Glicemia dentro da meta. Continue assim.",
     actionLabel: "Ver tendências",
-    actionHref: "/glicemia/tendencias",
+    actionHref: "/glicemia",
     tone: "success",
   };
 }

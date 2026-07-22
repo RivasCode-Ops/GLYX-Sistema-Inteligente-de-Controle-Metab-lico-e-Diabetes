@@ -89,7 +89,7 @@ export function suggestMuscleFocus(statuses: MuscleRecoveryStatus[]): MuscleReco
   );
 }
 
-function isAvailable(s: MuscleRecoveryStatus): boolean {
+export function isAvailable(s: MuscleRecoveryStatus): boolean {
   return s.status === "ready" || s.status === "never";
 }
 
@@ -97,7 +97,7 @@ function isAvailable(s: MuscleRecoveryStatus): boolean {
  * critério de `suggestMuscleFocus`, usado aqui pra ordenar `available` para
  * que "pegar os N primeiros" (filtro de tempo) sempre priorize quem está
  * mais atrasado, não a ordem arbitrária de cadastro do grupo. */
-function byPriority(a: MuscleRecoveryStatus, b: MuscleRecoveryStatus): number {
+export function byPriority(a: MuscleRecoveryStatus, b: MuscleRecoveryStatus): number {
   if (a.status === "never" && b.status !== "never") return -1;
   if (b.status === "never" && a.status !== "never") return 1;
   return (b.hoursReady ?? 0) - (a.hoursReady ?? 0);
@@ -111,7 +111,7 @@ export type MuscleSplitDef = { id: MuscleSplitId; label: string; groups: MuscleG
 export const MUSCLE_SPLITS: MuscleSplitDef[] = [
   { id: "push", label: "Push (empurrar)", groups: ["peito", "ombros", "triceps"] },
   { id: "pull", label: "Pull (puxar)", groups: ["costas", "biceps", "antebracos"] },
-  { id: "pernas", label: "Pernas", groups: ["pernas", "panturrilhas", "abdomen"] },
+  { id: "pernas", label: "Pernas", groups: ["quadriceps", "posterior", "panturrilhas", "abdomen"] },
 ];
 
 export type MuscleSplitSuggestion = {

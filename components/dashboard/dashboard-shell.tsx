@@ -4,11 +4,9 @@ import {
   UtensilsCrossed,
   Dumbbell,
   Pill,
-  Lightbulb,
-  Sparkles,
   BellRing,
   Plug,
-  Map,
+  LineChart,
   FileText,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,13 +107,16 @@ export function DashboardShell({
             />
             <ModuleRow
               title="Exercícios"
-              href="/exercicios/recuperacao"
+              // A métrica agora é o treino do dia, então o destino é o plano —
+              // clicar em "Hoje: Inferior A" e cair na tela de recuperação
+              // deixava a recomendação sem continuidade.
+              href="/exercicios/plano"
               icon={Dumbbell}
               metric={muscleFocusLabel ?? `${activeMinutes} min · hoje`}
             />
             <ModuleRow title="Medicação" href="/medicacao" icon={Pill} metric="Ver agenda" />
             <ModuleRow title="Exames" href="/exames" icon={FileText} metric="Lab · ECG · Raio-X" />
-            <ModuleRow title="Mapa de risco" href="/mapa-risco" icon={Map} metric="Auditoria" />
+            <ModuleRow title="Análise" href="/analise" icon={LineChart} metric="Risco · correlações" />
             <ModuleRow
               title="Integrações"
               href="/integracoes"
@@ -124,8 +125,6 @@ export function DashboardShell({
                 stepsToday != null ? `${stepsToday.toLocaleString("pt-BR")} passos` : "Conectar fontes"
               }
             />
-            <ModuleRow title="Insights" href="/insights" icon={Lightbulb} />
-            <ModuleRow title="IA metabólica" href="/ia-metabolica" icon={Sparkles} />
           </CardContent>
         </Card>
       </section>
@@ -137,7 +136,7 @@ export function DashboardShell({
             <CardTitle className="text-base">Alertas recentes</CardTitle>
           </div>
           <CardDescription>
-            <Link href="/alertas" className="text-emerald-400 hover:underline">
+            <Link href="/analise/alertas" className="text-emerald-400 hover:underline">
               Ver todos os alertas →
             </Link>
           </CardDescription>

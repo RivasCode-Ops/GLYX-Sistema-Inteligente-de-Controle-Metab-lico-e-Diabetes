@@ -3,6 +3,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { ExerciseSession } from "@/types/database";
 import { demoExercises } from "@/lib/demo/data";
+import { activityTypeLabel } from "@/lib/data/activity-types";
 
 export default async function ExerciciosSessoesPage() {
   let sessions: ExerciseSession[] = [];
@@ -42,6 +43,11 @@ export default async function ExerciciosSessoesPage() {
               >
                 <div>
                   <span className="text-zinc-200">{s.label}</span>
+                  {activityTypeLabel(s.activity_type) ? (
+                    <span className="ml-2 rounded-full border border-zinc-700 bg-zinc-900/60 px-2 py-0.5 text-[11px] text-zinc-400">
+                      {activityTypeLabel(s.activity_type)}
+                    </span>
+                  ) : null}
                   <p className="text-xs text-zinc-500">
                     {new Date(s.started_at).toLocaleDateString("pt-BR", {
                       day: "2-digit",

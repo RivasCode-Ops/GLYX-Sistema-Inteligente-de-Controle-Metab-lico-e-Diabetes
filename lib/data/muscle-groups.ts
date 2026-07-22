@@ -1,7 +1,8 @@
 export type MuscleGroupId =
   | "peito"
   | "costas"
-  | "pernas"
+  | "quadriceps"
+  | "posterior"
   | "ombros"
   | "biceps"
   | "triceps"
@@ -25,7 +26,11 @@ export type MuscleGroupDef = {
 export const MUSCLE_GROUPS: MuscleGroupDef[] = [
   { id: "peito", label: "Peito", recoveryHours: 48 },
   { id: "costas", label: "Costas", recoveryHours: 60 },
-  { id: "pernas", label: "Pernas", recoveryHours: 72 },
+  // Quadríceps e posterior são grupos separados porque um treino de perna
+  // não recupera o outro: dar 72h ao "pernas" inteiro fazia um plano legítimo
+  // (quadríceps na segunda, posterior na quarta) aparecer como conflito.
+  { id: "quadriceps", label: "Quadríceps", recoveryHours: 72 },
+  { id: "posterior", label: "Posterior de coxa", recoveryHours: 72 },
   { id: "ombros", label: "Ombros", recoveryHours: 48 },
   { id: "biceps", label: "Bíceps", recoveryHours: 36 },
   { id: "triceps", label: "Tríceps", recoveryHours: 48 },
@@ -38,4 +43,19 @@ export const MUSCLE_GROUP_IDS: MuscleGroupId[] = MUSCLE_GROUPS.map((g) => g.id);
 
 export function isMuscleGroupId(v: string): v is MuscleGroupId {
   return (MUSCLE_GROUP_IDS as string[]).includes(v);
+}
+
+/**
+ * Sessões gravadas antes da separação usavam um único grupo "pernas". Elas
+ * contam como treino de quadríceps E de posterior — quem treinou "pernas"
+ * mexeu nos dois, e descartar a linha faria o grupo parecer nunca treinado.
+ */
+const LEGACY_GROUP_MAP: Record<string, MuscleGroupId[]> = {
+  pernas: ["quadriceps", "posterior"],
+};
+
+/** Ids atuais correspondentes a um valor gravado no banco (1 para 1, exceto legados). */
+export function resolveMuscleGroupIds(stored: string): MuscleGroupId[] {
+  if (isMuscleGroupId(stored)) return [stored];
+  return LEGACY_GROUP_MAP[stored] ?? [];
 }

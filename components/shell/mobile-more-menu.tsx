@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-const HIGHLIGHT = new Set(["/exames", "/mapa-risco"]);
+const HIGHLIGHT = new Set(["/exames", "/analise"]);
 
 const DEFAULT_TRIGGER = (
   <button
@@ -57,7 +57,7 @@ export function MobileMoreMenu({
         <DialogHeader className="text-left">
           <DialogTitle>Mais no GLyX</DialogTitle>
           <DialogDescription>
-            Exames (ECG / Raio-X), mapa de risco e o restante do app.
+            Exames (ECG / Raio-X), análise metabólica e o restante do app.
           </DialogDescription>
         </DialogHeader>
         <nav className="mt-2 grid gap-3">

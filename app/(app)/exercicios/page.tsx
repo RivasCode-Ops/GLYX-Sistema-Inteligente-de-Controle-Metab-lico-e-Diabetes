@@ -1,6 +1,8 @@
 import { SectionCards } from "@/components/module/section-cards";
-import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
 import { NewSessionForm } from "@/components/exercicios/new-session-form";
+import { WeeklyGoalsCard } from "@/components/exercicios/weekly-goals-card";
+import { startOfWeek } from "@/lib/exercicios/weekly-goals";
+import type { WeeklyExerciseGlucoseContext } from "@/lib/exercicios/weekly-goals";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +13,14 @@ import { demoExercises } from "@/lib/demo/data";
 
 export default async function ExerciciosOverviewPage() {
   let sessions: ExerciseSession[] = [];
+  let weekSessions: ExerciseSession[] = [];
   let bodyGoal: BodyGoal | null = null;
+  let glucose: WeeklyExerciseGlucoseContext | undefined;
   const demoMode = !isSupabaseConfigured();
 
   if (demoMode) {
     sessions = demoExercises;
+    weekSessions = demoExercises;
   } else {
     const supabase = await createClient();
     if (supabase) {
@@ -23,19 +28,41 @@ export default async function ExerciciosOverviewPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase
-          .from("exercise_sessions")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("started_at", { ascending: false })
-          .limit(8);
+        const weekStart = startOfWeek(new Date()).toISOString();
+        const [{ data }, { data: week }, { data: p }, { data: lastGlucose }] = await Promise.all([
+          supabase
+            .from("exercise_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("started_at", { ascending: false })
+            .limit(8),
+          supabase
+            .from("exercise_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("started_at", weekStart)
+            .order("started_at", { ascending: false }),
+          supabase
+            .from("profiles")
+            .select("body_goal, target_glucose_min, target_glucose_max")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("glucose_readings")
+            .select("value_mg_dl")
+            .eq("user_id", user.id)
+            .order("recorded_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
         sessions = (data ?? []) as ExerciseSession[];
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("body_goal")
-          .eq("id", user.id)
-          .maybeSingle();
+        weekSessions = (week ?? []) as ExerciseSession[];
         bodyGoal = (p?.body_goal as typeof bodyGoal) ?? null;
+        glucose = {
+          latestGlucose: lastGlucose?.value_mg_dl ?? null,
+          targetMin: p?.target_glucose_min ?? 70,
+          targetMax: p?.target_glucose_max ?? 180,
+        };
       }
     }
   }
@@ -45,7 +72,7 @@ export default async function ExerciciosOverviewPage() {
       <p className="text-sm text-zinc-400">
         Treino e metabolismo — cada subárea tem página própria.
       </p>
-      {!demoMode ? <GoalTrainingCard goal={bodyGoal} /> : null}
+      <WeeklyGoalsCard sessions={weekSessions} goal={bodyGoal} glucose={glucose} />
       <SectionCards
         items={[
           {

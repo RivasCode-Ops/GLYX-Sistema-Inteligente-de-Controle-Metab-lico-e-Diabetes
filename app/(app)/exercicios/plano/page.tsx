@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
+import { TrainingPlanCard } from "@/components/exercicios/training-plan-card";
+import { computeMuscleRecovery } from "@/lib/exercicios/muscle-recovery";
+import type { MuscleRecoveryStatus } from "@/lib/exercicios/muscle-recovery";
+import { getActiveMusclePauses, getLastTrainedByMuscleGroup } from "@/lib/queries/muscle-recovery";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { BodyGoal } from "@/lib/health/energy";
@@ -7,6 +11,7 @@ import type { BodyGoal } from "@/lib/health/energy";
 export default async function ExerciciosPlanoPage() {
   const demoMode = !isSupabaseConfigured();
   let bodyGoal: BodyGoal | null = null;
+  let statuses: MuscleRecoveryStatus[] = [];
 
   if (!demoMode) {
     const supabase = await createClient();
@@ -15,14 +20,17 @@ export default async function ExerciciosPlanoPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("body_goal")
-          .eq("id", user.id)
-          .maybeSingle();
+        const [{ data }, lastTrained, pausedGroups] = await Promise.all([
+          supabase.from("profiles").select("body_goal").eq("id", user.id).maybeSingle(),
+          getLastTrainedByMuscleGroup(),
+          getActiveMusclePauses(),
+        ]);
         bodyGoal = (data?.body_goal as typeof bodyGoal) ?? null;
+        statuses = computeMuscleRecovery(lastTrained, pausedGroups);
       }
     }
+  } else {
+    statuses = computeMuscleRecovery({}, {});
   }
 
   return (
@@ -37,6 +45,7 @@ export default async function ExerciciosPlanoPage() {
           plano personalizado ao seu objetivo real.
         </p>
       ) : null}
+      <TrainingPlanCard statuses={statuses} />
       <GoalTrainingCard goal={demoMode ? "maintain" : bodyGoal} />
       {!demoMode ? (
         <p className="text-xs text-zinc-500">
