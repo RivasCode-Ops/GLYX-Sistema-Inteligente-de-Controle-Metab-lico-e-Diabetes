@@ -94,8 +94,8 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Recuperação", href: "/exercicios/recuperacao" },
   ],
   "/medicacao": [
-    { title: "Visão geral", href: "/medicacao" },
-    { title: "Agenda", href: "/medicacao/agenda" },
+    { title: "Doses de hoje", href: "/medicacao" },
+    { title: "Meus medicamentos", href: "/medicacao/medicamentos" },
     { title: "Calculadora", href: "/medicacao/calculadora" },
   ],
 };
