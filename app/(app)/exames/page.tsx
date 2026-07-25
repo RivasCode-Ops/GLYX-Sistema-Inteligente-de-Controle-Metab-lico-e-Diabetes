@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { demoExams } from "@/lib/demo/data";
 import { EXAM_TYPE_LABEL, parseExamType } from "@/lib/exams/types";
+import { buildExamParameterSeries } from "@/lib/exams/parameter-series";
+import { ExamParameterChart } from "@/components/exams/exam-parameter-chart";
 
 export default async function ExamesPage() {
   let exams: { id: string; title: string | null; created_at: string; exam_type?: string | null }[] =
     [];
+  let parameterSeries: ReturnType<typeof buildExamParameterSeries> = [];
   const demoMode = !isSupabaseConfigured();
 
   async function saveExamDraftAction(formData: FormData): Promise<void> {
@@ -36,6 +39,15 @@ export default async function ExamesPage() {
           .order("created_at", { ascending: false })
           .limit(20);
         exams = data ?? [];
+
+        const { data: labExams } = await supabase
+          .from("exams")
+          .select("created_at, parsed_summary")
+          .eq("user_id", user.id)
+          .eq("exam_type", "lab")
+          .order("created_at", { ascending: true })
+          .limit(50);
+        parameterSeries = buildExamParameterSeries(labExams ?? []);
       }
     }
   }
@@ -93,6 +105,17 @@ export default async function ExamesPage() {
           </form>
         </CardContent>
       </Card>
+
+      {parameterSeries.length > 0 ? (
+        <div>
+          <h2 className="mb-3 text-lg font-semibold">📈 Evolução dos exames</h2>
+          <div className="space-y-6">
+            {parameterSeries.map((series) => (
+              <ExamParameterChart key={series.parameter} series={series} />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Salvos</h2>
