@@ -10,6 +10,7 @@ import {
   Plug,
   Radar,
   LineChart,
+  HelpCircle,
 } from "lucide-react";
 
 /** "registrar" = ação do dia a dia; "analises" = telas retrospectivas/IA; "conta" = configuração. */
@@ -46,6 +47,7 @@ export const mainNav: NavItem[] = [
   { title: "Exames", href: "/exames", icon: FileText, mobile: false, group: "conta" }, // gestão de documentos (lab / ECG / raio-X)
   { title: "Conexões", href: "/integracoes", icon: Plug, mobile: false, group: "conta" }, // CGM + Google Fit + sono, unificado
   { title: "Sistema", href: "/status", icon: Radar, mobile: false, group: "conta" },
+  { title: "Ajuda", href: "/ajuda", icon: HelpCircle, mobile: false, group: "conta" }, // manual do usuário, tela por tela
 ];
 
 export const mobileNav = mainNav.filter((i) => i.mobile);
