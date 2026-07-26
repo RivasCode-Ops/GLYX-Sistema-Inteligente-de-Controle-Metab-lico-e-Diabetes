@@ -6,7 +6,7 @@ exames, água, peso e um copiloto de IA metabólica — com backend em Supabase 
 Storage + cron).
 
 **Raiz única do repositório:**
-`C:\_PROJETOS\GLYX — Sistema Inteligente de Controle Metabólico e Diabetes`
+`D:\PROJETOS\04_LABS\GLYX-Sistema-Inteligente-de-Controle-Metab-lico-e-Diabetes`
 
 **Planejamento:** [ROADMAP.md](ROADMAP.md) · **DPIA (LGPD):** [docs/DPIA.md](docs/DPIA.md) · **Produção:** [docs/PRODUCAO.md](docs/PRODUCAO.md) (`npm run check:prod`)
 

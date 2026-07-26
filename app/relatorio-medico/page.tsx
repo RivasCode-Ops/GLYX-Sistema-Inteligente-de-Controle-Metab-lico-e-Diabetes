@@ -193,6 +193,7 @@ export default async function RelatorioMedicoPage() {
                   <th className="border-b border-zinc-300 py-1">Dose</th>
                   <th className="border-b border-zinc-300 py-1">Esperado ({report.audit.window_days}d)</th>
                   <th className="border-b border-zinc-300 py-1">Registrado no app</th>
+                  <th className="border-b border-zinc-300 py-1">Fora do horário</th>
                 </tr>
               </thead>
               <tbody>
@@ -202,6 +203,7 @@ export default async function RelatorioMedicoPage() {
                     <td className="border-b border-zinc-200 py-1">{med.dosage ?? "—"}</td>
                     <td className="border-b border-zinc-200 py-1">{med.expectedDoses}</td>
                     <td className="border-b border-zinc-200 py-1">{med.loggedDoses}</td>
+                    <td className="border-b border-zinc-200 py-1">{med.extraLogs || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -209,7 +211,10 @@ export default async function RelatorioMedicoPage() {
             <div className="mt-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
               <strong>Importante:</strong> esta contagem é de doses registradas no aplicativo, não de doses
               confirmadamente tomadas ou não tomadas. Uma diferença grande entre esperado e registrado pode
-              refletir falha em abrir o app pra registrar, não necessariamente a dose não aplicada.
+              refletir falha em abrir o app pra registrar, não necessariamente a dose não aplicada. Cada
+              registro casa com no máximo um horário agendado (janela de 1h antes até o horário seguinte);
+              registros fora de qualquer janela aparecem na última coluna e podem ser dose extra de correção
+              ou duplicidade de clique.
             </div>
           </>
         )}

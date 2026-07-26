@@ -170,6 +170,9 @@ export default function AlimentacaoFotoPage() {
         setStatus(res.error);
         return;
       }
+      // Salvou, mas a foto pode ter se perdido no caminho — antes isso passava
+      // em silêncio e a refeição ficava sem imagem sem ninguém saber por quê.
+      if (res.warning) setStatus(res.warning);
       setSaved(true);
       setItems([]);
       setAiItems([]);

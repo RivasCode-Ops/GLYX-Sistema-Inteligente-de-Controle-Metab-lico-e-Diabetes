@@ -1,11 +1,10 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { logWeight } from "@/app/actions/profile";
 import { GoalFeasibilityCard } from "@/components/perfil/goal-feasibility-card";
 import { ProfileForm } from "@/components/perfil/profile-form";
+import { WeightForm } from "@/components/perfil/weight-form";
 import { WeightChart } from "@/components/perfil/weight-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GOAL_LABEL, ACTIVITY_LABEL, adaptiveAdjustment, smoothedWeight } from "@/lib/health/energy";
@@ -17,11 +16,6 @@ export default async function PerfilCorpoPage() {
   let profile: Profile | null = null;
   let weights: WeightLog[] = [];
   const demoMode = !isSupabaseConfigured();
-
-  async function logWeightAction(formData: FormData): Promise<void> {
-    "use server";
-    await logWeight(formData);
-  }
 
   if (demoMode) {
     profile = demoProfile;
@@ -159,22 +153,7 @@ export default async function PerfilCorpoPage() {
           <CardDescription>Pese-se 1x por semana, de manhã — a análise usa a tendência.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {!demoMode ? (
-            <form action={logWeightAction} className="flex items-center gap-2">
-              <Input
-                name="weight_kg"
-                type="number"
-                step="0.1"
-                min={20}
-                placeholder="peso de hoje (kg)"
-                className="h-9 w-44"
-                required
-              />
-              <Button type="submit" variant="outline" size="sm">
-                Registrar
-              </Button>
-            </form>
-          ) : null}
+          {!demoMode ? <WeightForm /> : null}
           <WeightChart logs={weights} targetKg={profile?.target_weight_kg} />
           {weights.length ? (
             <div className="flex flex-wrap gap-2">

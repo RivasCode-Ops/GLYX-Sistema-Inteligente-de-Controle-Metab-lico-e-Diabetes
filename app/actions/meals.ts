@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
+import {
+  uploadPrivatePhotoResult,
+  UPLOAD_FAIL_MESSAGE,
+} from "@/lib/storage/upload-private-photo";
 import { wallClockToUTC } from "@/lib/time/local-day";
 
 /** "2026-07-18T13:04" (sem fuso, do <input type="datetime-local">) → ISO UTC. */
@@ -27,7 +30,12 @@ const schema = z.object({
   eaten_at_local: z.string().optional(),
 });
 
-export type ActionResult = { ok?: true; error?: string };
+/**
+ * `warning` existe para o caso em que o registro FOI salvo mas algo secundário
+ * falhou (a foto se perdeu). Falhar tudo perderia a refeição que o usuário
+ * acabou de revisar; ficar calado esconde que a foto sumiu.
+ */
+export type ActionResult = { ok?: true; error?: string; warning?: string };
 
 export async function addMeal(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
@@ -109,7 +117,7 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
   });
   if (!parsed.success) return { error: "Preencha pelo menos o nome da refeição." };
 
-  const photoPath = await uploadPrivatePhoto(
+  const upload = await uploadPrivatePhotoResult(
     supabase,
     "meal-photos",
     user.id,
@@ -120,7 +128,7 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
   const { error } = await supabase.from("meals").insert({
     user_id: user.id,
     ...parsed.data,
-    photo_path: photoPath,
+    photo_path: upload.status === "uploaded" ? upload.path : null,
     eaten_at: new Date().toISOString(),
   });
 
@@ -128,6 +136,12 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
+  if (upload.status === "failed") {
+    return {
+      ok: true,
+      warning: `Refeição salva, mas a foto não foi guardada: ${UPLOAD_FAIL_MESSAGE[upload.reason]}.`,
+    };
+  }
   return { ok: true };
 }
 
@@ -164,7 +178,7 @@ export async function saveMealPhotoItems(formData: FormData): Promise<ActionResu
   const parsed = photoItemsSchema.safeParse(itemsRaw);
   if (!parsed.success) return { error: "Marque pelo menos um item com nome preenchido." };
 
-  const photoPath = await uploadPrivatePhoto(
+  const upload = await uploadPrivatePhotoResult(
     supabase,
     "meal-photos",
     user.id,
@@ -176,7 +190,7 @@ export async function saveMealPhotoItems(formData: FormData): Promise<ActionResu
   const rows = parsed.data.map((item) => ({
     user_id: user.id,
     ...item,
-    photo_path: photoPath,
+    photo_path: upload.status === "uploaded" ? upload.path : null,
     eaten_at: eatenAt,
   }));
 
@@ -185,7 +199,12 @@ export async function saveMealPhotoItems(formData: FormData): Promise<ActionResu
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
-  revalidatePath("/alimentacao");
+  if (upload.status === "failed") {
+    return {
+      ok: true,
+      warning: `Itens salvos, mas a foto não foi guardada: ${UPLOAD_FAIL_MESSAGE[upload.reason]}.`,
+    };
+  }
   return { ok: true };
 }
 

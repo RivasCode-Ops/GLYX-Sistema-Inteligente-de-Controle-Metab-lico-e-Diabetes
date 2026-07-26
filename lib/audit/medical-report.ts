@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
+import { computePeriodAdherence } from "@/lib/medications/adherence";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import type { MetabolicAuditRow } from "@/lib/audit/types";
 
@@ -11,6 +12,8 @@ export type ReportMedAdherence = {
   timesPerDay: number;
   expectedDoses: number;
   loggedDoses: number;
+  /** Registros que não casaram com nenhuma dose agendada (dose extra ou duplicidade). */
+  extraLogs: number;
 };
 
 export type MedicalReportData = {
@@ -103,29 +106,43 @@ export async function buildMedicalReportData(
     .not("reminder_times", "is", null);
 
   const medIds = (meds ?? []).map((m) => m.id as string);
-  const logCounts = new Map<string, number>();
+  const logsByMed = new Map<string, { taken_at: string }[]>();
   if (medIds.length) {
     const { data: logs } = await supabase
       .from("medication_logs")
-      .select("medication_id")
+      .select("medication_id, taken_at")
       .eq("user_id", userId)
       .in("medication_id", medIds)
       .gte("taken_at", startISO)
       .lt("taken_at", endISO);
-    for (const l of logs ?? []) {
-      const id = l.medication_id as string;
-      logCounts.set(id, (logCounts.get(id) ?? 0) + 1);
+    for (const l of (logs ?? []) as { medication_id: string; taken_at: string }[]) {
+      const list = logsByMed.get(l.medication_id) ?? [];
+      list.push({ taken_at: l.taken_at });
+      logsByMed.set(l.medication_id, list);
     }
   }
 
+  // Mesma regra da tela do dia (lib/medications/adherence.ts): registro casa
+  // com dose agendada por janela, e cada registro conta uma vez só. Antes aqui
+  // era contagem bruta de logs, que inflava a adesão de quem clicou duas vezes
+  // ou registrou dose extra — e o número frouxo era justamente o que ia para o
+  // médico.
   const medications: ReportMedAdherence[] = (meds ?? []).map((m) => {
     const times = (m.reminder_times as string[] | null) ?? [];
+    const adherence = computePeriodAdherence(
+      times,
+      logsByMed.get(m.id as string) ?? [],
+      tz,
+      audit.period_start,
+      audit.period_end
+    );
     return {
       name: m.name as string,
       dosage: (m.dosage as string | null) ?? null,
       timesPerDay: times.length,
-      expectedDoses: times.length * audit.window_days,
-      loggedDoses: logCounts.get(m.id as string) ?? 0,
+      expectedDoses: adherence.expectedDoses,
+      loggedDoses: adherence.takenDoses,
+      extraLogs: adherence.unmatchedLogs,
     };
   });
 

@@ -646,11 +646,23 @@ limiar do perfil, carregado por `lib/health/load-glucose-targets.ts` nos dois sy
 mostra os dois com o rótulo certo. O **score não mudou**: hiper severa é exibida, não pontuada —
 mudar peso de score é decisão clínica, não refatoração.
 
-### 10.5 🟠 URL de produção hardcoded em 22 pontos das migrações
+### 10.5 ✅ URL de produção hardcoded — resolvido em 26/07/2026
 
-As funções de cron chamam `https://glyx-sistema-inteligente-de-control.vercel.app/api/...` em
-literal. Não há variável de ambiente nem GUC. **Troca de domínio quebra todo o agendamento em
-silêncio** — nenhum job falha visivelmente, eles simplesmente chamam um host que não responde.
+**Estado original:** as funções de cron chamavam
+`https://glyx-sistema-inteligente-de-control.vercel.app/api/...` em literal, sem variável de
+ambiente nem GUC. Troca de domínio quebraria todo o agendamento **em silêncio** — nenhum job falha
+visivelmente, eles só passam a chamar um host que não responde.
+
+**Correção** (`20260726020000_cron_base_url_from_vault`): a URL virou o segredo `app_base_url` no
+Vault, lido por `public.app_base_url()`. Sem o segredo, a função devolve o domínio atual — ambiente
+novo continua funcionando igual, e trocar de domínio passou a ser **uma linha no Vault**.
+
+A migração **transforma a definição existente** de cada função (`pg_get_functiondef` → `replace`
+→ `execute`) em vez de redigitar os corpos: são 6 funções com janela horária, dedupe e agregação de
+payload, e redigitar cada uma para trocar uma string é a forma mais fácil de introduzir um bug sutil
+numa função que ninguém olha até o dia em que o push não chega. O laço é idempotente.
+
+Verificado após aplicar: 6 funções usando o helper, **0** com o literal.
 
 ### 10.6 ✅ Faixa-alvo sem validação de coerência — resolvido em 26/07/2026
 
@@ -668,23 +680,37 @@ um wrapper `Promise<void>`, então **todo** `{ error }` era descartado em silên
 recarregava como se tivesse salvado. `components/perfil/profile-form.tsx` (useActionState) passou a
 exibir erro e confirmação.
 
-### 10.7 🟡 Adesão medicamentosa usa duas regras diferentes
+### 10.7 ✅ Adesão medicamentosa com duas regras — resolvido em 26/07/2026
 
-A UI casa dose com log por janela de horário
-(`components/medicacao/daily-doses-card.tsx:56-82`); o relatório médico usa **contagem bruta de logs**
-(`lib/audit/medical-report.ts:119-128`). Os dois números podem divergir para o mesmo período.
+**Estado original:** a UI casava dose com log por janela de horário; o relatório médico usava
+**contagem bruta de logs**. Para o mesmo período os dois números divergiam — e o que ia para o
+médico era o mais frouxo: dois registros no mesmo horário (clique duplicado ou dose extra) contavam
+como duas doses de adesão, inflando a adesão de quem esqueceu metade das doses.
 
-### 10.8 🟡 Falha silenciosa no upload de foto
+**Correção:** a regra virou módulo único (`lib/medications/adherence.ts`) usado pelos dois lados.
+`computePeriodAdherence` aplica a mesma janela dia a dia no período do relatório, com `usedLogs`
+global — nenhum registro cobre duas doses. Registro que não casa com janela nenhuma virou coluna
+própria ("fora do horário") em vez de sumir: pode ser dose extra de correção, e isso é informação
+clínica.
 
-`lib/storage/upload-private-photo.ts:25` retorna `null` em qualquer erro, e `app/actions/meals.ts`
-salva a refeição com `photo_path: null` **sem avisar** que a foto se perdeu.
+### 10.8 ✅ Falha silenciosa no upload de foto — resolvido em 26/07/2026
+
+**Estado original:** `uploadPrivatePhoto` devolvia `null` em qualquer erro, e "sem caminho" tinha dois
+significados indistinguíveis que o app tratava como sucesso: **não veio foto** e **a foto se perdeu**.
+
+**Correção:** `uploadPrivatePhotoResult` devolve `uploaded | empty | failed` com motivo. As ações de
+refeição **salvam o registro mesmo assim** — falhar tudo perderia a refeição que o usuário acabou de
+revisar — e devolvem `warning`, que a tela exibe. `ActionResult` ganhou o campo para isso.
+
+Mesma classe, também corrigida: o formulário de peso em `/perfil/corpo` chamava a action num wrapper
+`Promise<void>` e engolia "Informe um peso válido em kg". Virou `components/perfil/weight-form.tsx`.
 
 ### 10.9 🟡 Deriva de documentação
 
 - `ROADMAP.md` (atualizado 18/07) lista como fora de escopo uma feature que entrou em 18/07
 - Tipos em `types/database.ts` são manuais — divergem do schema se alguém esquecer
-- `README.md` aponta uma raiz de repositório (`C:\_PROJETOS\...`) diferente da atual
-  (`D:\PROJETOS\04_LABS\...`)
+- ~~`README.md` aponta uma raiz de repositório diferente da atual~~ — corrigido em 26/07/2026
+  no `README.md` e no `AGENTS.md`, que carregava a mesma raiz velha
 
 ---
 

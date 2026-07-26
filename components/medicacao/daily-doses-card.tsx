@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { localDateKey, localDayRangeUTC, wallClockToUTC } from "@/lib/time/local-day";
+import { localDateKey } from "@/lib/time/local-day";
+import { computeDoseStatus, doseWindows } from "@/lib/medications/adherence";
 import type { Medication } from "@/types/database";
 
 // Painel do dia: uma linha por dose agendada, com estado visível — era a
@@ -10,13 +11,7 @@ import type { Medication } from "@/types/database";
 export type TodayLog = { medication_id: string | null; taken_at: string };
 export type TodaySnooze = { medication_id: string; snoozed_until: string };
 
-type DoseStatus =
-  | { state: "tomada"; at: string }
-  | { state: "adiada"; until: string }
-  | { state: "agendada" }
-  | { state: "pendente" };
-
-const MATCH_BEFORE_MS = 60 * 60 * 1000;
+export { computeDoseStatus } from "@/lib/medications/adherence";
 
 function hora(iso: string, tz: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", {
@@ -24,61 +19,6 @@ function hora(iso: string, tz: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-/**
- * Horários agendados de um remédio no dia, cada um com o instante UTC e o
- * fim da janela de casamento com registros — o próximo horário do mesmo
- * remédio (ou o fim do dia local, na última dose). Sem isso, uma dose
- * registrada bem depois do horário (ex.: estatina às 23h54 agendada pras
- * 19h) nunca casava com nenhuma janela fixa e ficava "pendente" pra sempre.
- */
-function doseWindows(
-  times: string[],
-  y: number,
-  mo: number,
-  d: number,
-  tz: string
-): { time: string; scheduledUTC: Date; windowEndUTC: Date }[] {
-  const sorted = [...times].sort();
-  const scheduled = sorted.map((time) => {
-    const [hh, mm] = time.split(":").map(Number);
-    return { time, scheduledUTC: wallClockToUTC(y, mo, d, hh, mm, 0, tz) };
-  });
-  const dateStr = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  const endOfDayUTC = new Date(localDayRangeUTC(dateStr, tz).endISO);
-  return scheduled.map((s, i) => ({
-    ...s,
-    windowEndUTC: scheduled[i + 1]?.scheduledUTC ?? endOfDayUTC,
-  }));
-}
-
-export function computeDoseStatus(
-  scheduledUTC: Date,
-  windowEndUTC: Date,
-  medLogs: TodayLog[],
-  medSnoozes: TodaySnooze[],
-  usedLogs: Set<string>,
-  now: number
-): DoseStatus {
-  // Um registro cobre uma dose agendada se caiu entre 1h antes do horário e
-  // o próximo horário agendado (ou o fim do dia) — e cada registro só conta
-  // para uma dose.
-  const t = scheduledUTC.getTime();
-  const end = windowEndUTC.getTime();
-  const match = medLogs.find((l) => {
-    if (usedLogs.has(l.taken_at)) return false;
-    const lt = new Date(l.taken_at).getTime();
-    return lt >= t - MATCH_BEFORE_MS && lt <= end;
-  });
-  if (match) {
-    usedLogs.add(match.taken_at);
-    return { state: "tomada", at: match.taken_at };
-  }
-  const snooze = medSnoozes.find((s) => new Date(s.snoozed_until).getTime() > now);
-  if (snooze && t <= now) return { state: "adiada", until: snooze.snoozed_until };
-  if (t > now) return { state: "agendada" };
-  return { state: "pendente" };
 }
 
 /**
