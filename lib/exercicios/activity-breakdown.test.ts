@@ -1,20 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { makeExerciseSession } from "@/lib/demo/rows";
 import type { ExerciseSession } from "@/types/database";
 import { computeWeeklyExerciseProgress, sessionKind, summarizeByKind } from "./weekly-goals";
 
 function session(over: Partial<ExerciseSession>): ExerciseSession {
-  return {
+  return makeExerciseSession({
     id: "x",
     user_id: "u",
     label: "Sessão",
-    duration_min: null,
-    calories_burned: null,
-    intensity: null,
     started_at: "2026-07-14T07:00:00.000Z",
-    notes: null,
     created_at: "2026-07-14T07:00:00.000Z",
     ...over,
-  };
+  });
 }
 
 describe("classificação de atividade", () => {

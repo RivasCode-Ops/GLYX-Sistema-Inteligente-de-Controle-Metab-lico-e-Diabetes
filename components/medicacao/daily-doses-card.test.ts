@@ -1,22 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { computeMedicationDoseSummary } from "./daily-doses-card";
+import { makeMedication } from "@/lib/demo/rows";
 import type { Medication } from "@/types/database";
 
 const TZ = "America/Sao_Paulo";
 
 function med(reminderTimes: string[]): Medication {
-  return {
+  return makeMedication({
     id: "med-1",
     user_id: "user-1",
     name: "Rosuvastatina Cálcica 20 mg",
     dosage: "1 comprimido",
-    schedule_hint: null,
-    active: true,
-    notes: null,
     reminder_times: reminderTimes,
-    kind: "med",
     created_at: "2026-01-01T00:00:00Z",
-  };
+  });
 }
 
 describe("computeMedicationDoseSummary", () => {

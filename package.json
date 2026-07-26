@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "verify": "npm run lint && npm run build && npm run test",
     "check:prod": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/check-prod-ready.ps1",
+    "types:gen": "npx --yes supabase@latest gen types typescript --project-id ajlbtahvmirdgiwycecb --schema public > types/supabase.generated.ts",
     "sync:env:vercel": "echo Use o painel: Sensitive vars nao baixam via CLI. Ver docs/PRODUCAO.md"
   },
   "dependencies": {

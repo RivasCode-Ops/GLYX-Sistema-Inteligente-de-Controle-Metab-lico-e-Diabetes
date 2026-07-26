@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeWeeklyExerciseProgress, getWeeklyExerciseTarget } from "./weekly-goals";
+import { makeExerciseSession } from "@/lib/demo/rows";
 
 describe("weekly exercise goals", () => {
   it("returns a sensible target for each body goal", () => {
@@ -13,9 +14,9 @@ describe("weekly exercise goals", () => {
 
     const progress = computeWeeklyExerciseProgress(
       [
-        { started_at: "2026-07-14T07:00:00.000Z", duration_min: 30, id: "1", user_id: "u", label: "Caminhada", calories_burned: null, intensity: null, notes: null, created_at: "2026-07-14T07:00:00.000Z" },
-        { started_at: "2026-07-16T18:00:00.000Z", duration_min: 20, id: "2", user_id: "u", label: "Yoga", calories_burned: null, intensity: null, notes: null, created_at: "2026-07-16T18:00:00.000Z" },
-        { started_at: "2026-07-12T19:00:00.000Z", duration_min: 40, id: "3", user_id: "u", label: "Treino antigo", calories_burned: null, intensity: null, notes: null, created_at: "2026-07-12T19:00:00.000Z" },
+        makeExerciseSession({ id: "1", user_id: "u", label: "Caminhada", started_at: "2026-07-14T07:00:00.000Z", duration_min: 30 }),
+        makeExerciseSession({ id: "2", user_id: "u", label: "Yoga", started_at: "2026-07-16T18:00:00.000Z", duration_min: 20 }),
+        makeExerciseSession({ id: "3", user_id: "u", label: "Treino antigo", started_at: "2026-07-12T19:00:00.000Z", duration_min: 40 }),
       ],
       now,
       "lose"

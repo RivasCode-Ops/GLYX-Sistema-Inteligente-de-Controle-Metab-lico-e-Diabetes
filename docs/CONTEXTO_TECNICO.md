@@ -190,8 +190,11 @@ mesmo tipo de informação.**
 
 ## 5. Modelo de dados
 
-28 tabelas, todas com RLS por `auth.uid() = user_id`. Tipos manuais em `types/database.ts` (não
-gerados pelo CLI do Supabase — precisam ser atualizados à mão quando o schema muda).
+28 tabelas, todas com RLS por `auth.uid() = user_id`. Os tipos da aplicação são **derivados do
+schema real**: `types/supabase.generated.ts` (gerado, `npm run types:gen`) é a fonte, e
+`types/database.ts` só aplica os **estreitamentos** que nenhum gerador consegue inferir — CHECK de
+`severity`, `sex`, `kind`, `pose` viram união de literais. Coluna renomeada ou removida passou a ser
+erro de compilação.
 
 ### Núcleo clínico
 `glucose_readings` · `meals` · `insulin_logs` · `medications` · `medication_logs` ·
@@ -708,7 +711,11 @@ Mesma classe, também corrigida: o formulário de peso em `/perfil/corpo` chamav
 ### 10.9 🟡 Deriva de documentação
 
 - `ROADMAP.md` (atualizado 18/07) lista como fora de escopo uma feature que entrou em 18/07
-- Tipos em `types/database.ts` são manuais — divergem do schema se alguém esquecer
+- ~~Tipos em `types/database.ts` são manuais — divergem do schema se alguém esquecer~~ — resolvido
+  em 26/07/2026: passaram a ser derivados de `types/supabase.generated.ts`. Efeito colateral útil: a
+  linha do banco agora tem **todas** as colunas (o que `select("*")` devolve de fato), o que quebrou
+  as fixtures parciais de demo e teste — daí `lib/demo/rows.ts`, onde o default de cada coluna mora
+  num lugar só, para que coluna nova não quebre fixture nenhuma
 - ~~`README.md` aponta uma raiz de repositório diferente da atual~~ — corrigido em 26/07/2026
   no `README.md` e no `AGENTS.md`, que carregava a mesma raiz velha
 

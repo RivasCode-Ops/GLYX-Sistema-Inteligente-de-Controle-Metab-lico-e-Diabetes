@@ -1,3 +1,4 @@
+import { makeExerciseSession, makeMeal, makeMedication, makeProfile } from "@/lib/demo/rows";
 import type {
   ExerciseSession,
   GlucoseReading,
@@ -24,7 +25,7 @@ function day(daysAgo: number): string {
   return at(daysAgo, 12).slice(0, 10);
 }
 
-export const demoProfile: Profile = {
+export const demoProfile: Profile = makeProfile({
   id: userId,
   full_name: "Marina Costa",
   diabetes_type: "DM2 - acompanhamento metabólico",
@@ -33,7 +34,7 @@ export const demoProfile: Profile = {
   timezone: "America/Sao_Paulo",
   created_at: at(60, 9),
   updated_at: at(0, 8),
-};
+});
 
 const glucosePattern = [
   [112, 128, 137],
@@ -69,7 +70,7 @@ export const demoGlucoseReadings: GlucoseReading[] = glucosePattern.flatMap((val
 );
 
 export const demoMeals: Meal[] = [
-  {
+  makeMeal({
     id: "meal-1",
     user_id: userId,
     name: "Café da manhã proteico",
@@ -82,8 +83,8 @@ export const demoMeals: Meal[] = [
     photo_path: null,
     eaten_at: at(0, 7, 45),
     created_at: at(0, 7, 50),
-  },
-  {
+  }),
+  makeMeal({
     id: "meal-2",
     user_id: userId,
     name: "Almoço mediterrâneo",
@@ -96,8 +97,8 @@ export const demoMeals: Meal[] = [
     photo_path: null,
     eaten_at: at(0, 12, 35),
     created_at: at(0, 12, 45),
-  },
-  {
+  }),
+  makeMeal({
     id: "meal-3",
     user_id: userId,
     name: "Jantar leve",
@@ -110,11 +111,11 @@ export const demoMeals: Meal[] = [
     photo_path: null,
     eaten_at: at(1, 19, 20),
     created_at: at(1, 19, 25),
-  },
+  }),
 ];
 
 export const demoExercises: ExerciseSession[] = [
-  {
+  makeExerciseSession({
     id: "session-1",
     user_id: userId,
     label: "Caminhada rápida",
@@ -125,8 +126,8 @@ export const demoExercises: ExerciseSession[] = [
     started_at: at(0, 18, 10),
     notes: "Glicemia estabilizou 40 min após o almoço.",
     created_at: at(0, 19),
-  },
-  {
+  }),
+  makeExerciseSession({
     id: "session-2",
     user_id: userId,
     label: "Treino de força - superiores",
@@ -137,11 +138,11 @@ export const demoExercises: ExerciseSession[] = [
     started_at: at(2, 7, 15),
     notes: "Sem hipoglicemia no pós-treino.",
     created_at: at(2, 8, 10),
-  },
+  }),
 ];
 
 export const demoMedications: Medication[] = [
-  {
+  makeMedication({
     id: "med-1",
     user_id: userId,
     name: "Metformina",
@@ -150,8 +151,8 @@ export const demoMedications: Medication[] = [
     active: true,
     notes: "Acompanhamento médico obrigatório.",
     created_at: at(50, 9),
-  },
-  {
+  }),
+  makeMedication({
     id: "med-2",
     user_id: userId,
     name: "Vitamina D",
@@ -160,7 +161,7 @@ export const demoMedications: Medication[] = [
     active: true,
     notes: null,
     created_at: at(45, 9),
-  },
+  }),
 ];
 
 export const demoMedicationLogs = [

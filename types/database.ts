@@ -1,199 +1,113 @@
-export type GlucoseReading = {
-  id: string;
-  user_id: string;
-  value_mg_dl: number;
-  context: string | null;
-  source: string;
-  recorded_at: string;
-  notes: string | null;
-  /** CGM: id do fabricante para dedup */
-  external_id?: string | null;
-  trend?: string | null;
-  metadata?: Record<string, unknown> | null;
-  created_at: string;
-};
+/**
+ * Tipos da aplicação, **derivados do schema real** (`types/supabase.generated.ts`).
+ *
+ * Antes eram escritos à mão e divergiam do banco silenciosamente sempre que
+ * alguém esquecia de atualizá-los — risco registrado em §10.9 do contexto
+ * técnico. Agora a linha vem do gerador: coluna renomeada, removida ou com tipo
+ * trocado vira **erro de compilação**, não bug de execução.
+ *
+ * O que continua sendo escrito à mão é só o **estreitamento**: o Postgres
+ * guarda `severity text` com um CHECK, e nenhum gerador consegue transformar
+ * CHECK em união de literais. Cada estreitamento abaixo é uma promessa que o
+ * banco garante por constraint e que o TypeScript passa a cobrar no código.
+ *
+ * Regenerar depois de migration: `npm run types:gen`.
+ */
 
-export type Meal = {
-  id: string;
-  user_id: string;
-  name: string | null;
-  calories: number | null;
-  carbs_g: number | null;
-  protein_g: number | null;
-  fat_g: number | null;
-  glycemic_load_estimate: number | null;
-  notes: string | null;
-  photo_path: string | null;
-  glucose_spike?: boolean | null;
-  /** Usuário ajustou algum valor estimado pela IA antes de salvar. */
-  ai_corrected?: boolean | null;
-  eaten_at: string;
-  created_at: string;
-};
-
-export type WaterLog = {
-  id: string;
-  user_id: string;
-  amount_ml: number;
-  logged_at: string;
-};
-
-export type Medication = {
-  id: string;
-  user_id: string;
-  name: string;
-  dosage: string | null;
-  schedule_hint: string | null;
-  active: boolean;
-  notes: string | null;
-  reminder_times?: string[] | null;
-  stock_units?: number | null;
-  stock_updated_on?: string | null;
-  kind?: "med" | "supplement";
-  label_photo_path?: string | null;
-  created_at: string;
-};
-
-export type ExerciseSession = {
-  id: string;
-  user_id: string;
-  label: string;
-  duration_min: number | null;
-  calories_burned: number | null;
-  intensity: string | null;
-  started_at: string;
-  notes: string | null;
-  created_at: string;
-  muscle_groups?: string[] | null;
-  activity_type?: string | null;
-};
-
-export type MetabolicAlert = {
-  id: string;
-  user_id: string;
-  severity: "info" | "warning" | "critical";
-  title: string;
-  body: string | null;
-  context: Record<string, unknown> | null;
-  read_at: string | null;
-  created_at: string;
-};
-
-export type InsightFinding = {
-  id: string;
-  user_id: string;
-  slug: string;
-  title: string;
-  body: string;
-  severity: "info" | "warning" | "critical";
-  metrics: Record<string, unknown> | null;
-  computed_at: string;
-};
-
-export type MetabolicAudit = {
-  id: string;
-  user_id: string;
-  window_days: number;
-  period_start: string;
-  period_end: string;
-  score: number;
-  label: "Estável" | "Atenção" | "Alerta" | "Dados insuficientes";
-  metrics: Record<string, unknown>;
-  factors: unknown[];
-  plan: unknown[];
-  computed_at: string;
-};
-
-export type HealthSnapshot = {
-  id: string;
-  user_id: string;
-  snapshot_date: string;
-  source: "apple_health" | "google_fit" | "manual" | "mock";
-  steps: number | null;
-  sleep_hours: number | null;
-  resting_hr: number | null;
-  active_calories: number | null;
-  stress_score: number | null;
-  metadata: Record<string, unknown> | null;
-  updated_at: string;
-  created_at: string;
-};
-
-export type Profile = {
-  id: string;
-  full_name: string | null;
-  diabetes_type: string | null;
-  target_glucose_min: number | null;
-  target_glucose_max: number | null;
-  timezone: string | null;
-  sex?: "m" | "f" | null;
-  birth_year?: number | null;
-  height_cm?: number | null;
-  activity_level?: "sedentary" | "light" | "moderate" | "very" | null;
-  body_goal?: "lose" | "gain" | "maintain" | "recomp" | null;
-  target_weight_kg?: number | null;
-  family_history?: string | null;
-  primary_focus?: "diabetes" | "lose" | "gain" | null;
-  onboarding_done?: boolean;
-  /** Gramas de carboidrato compensados por 1 unidade de insulina rápida. */
-  carb_ratio?: number | null;
-  /** mg/dL que 1 unidade de insulina reduz. */
-  correction_factor?: number | null;
-  /** Meta de glicemia usada só na calculadora de bolus (distinta de target_glucose_min/max). */
-  target_glucose_bolus?: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type BloodPressureLog = {
-  id: string;
-  user_id: string;
-  systolic: number;
-  diastolic: number;
-  pulse: number | null;
-  recorded_at: string;
-  notes: string | null;
-  created_at: string;
-};
-
-export type WeightLog = {
-  id: string;
-  user_id: string;
-  weight_kg: number;
-  logged_on: string;
-  created_at: string;
-};
+import type { Json, Tables } from "@/types/supabase.generated";
 
 /**
- * Medidas corporais. As 21 colunas de medida vivem em `lib/body/fields.ts`
- * (catálogo com rótulo, unidade e papel) — repeti-las aqui só criaria uma
- * segunda lista para esquecer de atualizar.
+ * Troca campos da linha gerada por versões mais estreitas, preservando todo o
+ * resto. Se a coluna estreitada sumir do schema, `Omit` não a encontra e o tipo
+ * passa a ter um campo que o banco não tem — por isso cada uso vem acompanhado
+ * de `ColumnOf`, que falha na compilação se o nome deixar de existir.
  */
-export type BodyMeasurementRow = {
-  id: string;
-  user_id: string;
-  measured_on: string;
-  notes: string | null;
-  created_at: string;
-} & Partial<Record<string, number | null>>;
+type Narrow<Row, Fields extends Partial<Record<keyof Row, unknown>>> = Omit<Row, keyof Fields> &
+  Fields;
 
-export type BodyGoalRowDb = {
-  id: string;
-  user_id: string;
-  metric: string;
-  target_value: number;
-  start_value: number | null;
-  start_on: string;
-  target_date: string | null;
-  created_at: string;
-  updated_at: string;
-};
+export type { Json };
 
-export type BodyPhoto = {
-  id: string;
-  user_id: string;
-  taken_on: string;
-  pose: "frente" | "costas" | "perfil_esq" | "perfil_dir";
-  photo_path: string;
-  created_at: string;
-};
+export type AlertSeverity = "info" | "warning" | "critical";
+export type HealthSnapshotSourceName = "apple_health" | "google_fit" | "manual" | "mock";
+export type AuditLabelName = "Estável" | "Atenção" | "Alerta" | "Dados insuficientes";
+export type MedicationKind = "med" | "supplement";
+export type BodyPhotoPose = "frente" | "costas" | "perfil_esq" | "perfil_dir";
+
+export type GlucoseReading = Narrow<
+  Tables<"glucose_readings">,
+  { metadata: Record<string, unknown> | null }
+>;
+
+export type Meal = Tables<"meals">;
+
+export type WaterLog = Tables<"water_logs">;
+
+export type Medication = Narrow<Tables<"medications">, { kind: MedicationKind }>;
+
+export type ExerciseSession = Tables<"exercise_sessions">;
+
+export type MetabolicAlert = Narrow<
+  Tables<"metabolic_alerts">,
+  { severity: AlertSeverity; context: Record<string, unknown> | null }
+>;
+
+export type InsightFinding = Narrow<
+  Tables<"insight_findings">,
+  { severity: AlertSeverity; metrics: Record<string, unknown> | null }
+>;
+
+export type MetabolicAudit = Narrow<
+  Tables<"metabolic_audits">,
+  {
+    label: AuditLabelName;
+    metrics: Record<string, unknown>;
+    factors: unknown[];
+    plan: unknown[];
+  }
+>;
+
+export type HealthSnapshot = Narrow<
+  Tables<"health_snapshots">,
+  { source: HealthSnapshotSourceName; metadata: Record<string, unknown> | null }
+>;
+
+/**
+ * `profiles` é o centro da configuração: identidade, alvos clínicos, parâmetros
+ * de bolus, corpo, fuso e flags. Os quatro estreitamentos abaixo correspondem a
+ * CHECKs da tabela.
+ */
+export type Profile = Narrow<
+  Tables<"profiles">,
+  {
+    sex: "m" | "f" | null;
+    activity_level: "sedentary" | "light" | "moderate" | "very" | null;
+    body_goal: "lose" | "gain" | "maintain" | "recomp" | null;
+    primary_focus: "diabetes" | "lose" | "gain" | null;
+  }
+>;
+
+export type BloodPressureLog = Tables<"blood_pressure_logs">;
+
+export type WeightLog = Tables<"weight_logs">;
+
+export type StrengthLog = Tables<"strength_logs">;
+
+export type MusclePause = Tables<"muscle_pauses">;
+
+export type Exam = Tables<"exams">;
+
+export type InsulinLog = Tables<"insulin_logs">;
+
+export type MedicationLog = Tables<"medication_logs">;
+
+export type MedicationSnooze = Tables<"medication_snoozes">;
+
+/**
+ * Medidas corporais. As 21 colunas de medida têm catálogo próprio em
+ * `lib/body/fields.ts` (rótulo, unidade, papel) — aqui fica só a linha crua.
+ */
+export type BodyMeasurementRow = Tables<"body_measurements">;
+
+export type BodyGoalRowDb = Tables<"body_goals">;
+
+export type BodyPhoto = Narrow<Tables<"body_photos">, { pose: BodyPhotoPose }>;
