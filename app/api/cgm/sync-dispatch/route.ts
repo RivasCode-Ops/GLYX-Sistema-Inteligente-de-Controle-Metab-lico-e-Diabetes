@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { secretsMatch } from "@/lib/auth/constant-time";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import {
   breakerStateForCount,
@@ -14,8 +15,9 @@ const THROTTLE_MS = 10 * 60 * 1000;
 type ConnRow = CgmConnectionRow & { provider?: string | null };
 
 export async function POST(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("x-cron-secret") !== secret) {
+  // Comparação em tempo constante: `!==` sai no primeiro byte diferente e
+  // vaza, pelo tempo de resposta, quanto do segredo o atacante já acertou.
+  if (!secretsMatch(req.headers.get("x-cron-secret"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

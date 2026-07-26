@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildBodyContextLines } from "@/lib/ai/body-context";
+import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
@@ -168,7 +169,7 @@ export async function buildUserContext(
     }[];
     const topFactors = factors
       .slice(0, 3)
-      .map((f) => `${f.label ?? "fator"}${f.severity ? ` (${f.severity})` : ""}`)
+      .map((f) => `${sanitizeForPrompt(f.label ?? "fator", 60)}${f.severity ? ` (${f.severity})` : ""}`)
       .join(", ");
     linhas.push(
       `Mapa de risco (auditoria longitudinal mais recente, ${new Date(audit.computed_at).toLocaleDateString("pt-BR")}): score ${audit.score}/100, classificação "${audit.label}"${topFactors ? `. Principais fatores: ${topFactors}` : ""}.`
@@ -179,7 +180,7 @@ export async function buildUserContext(
   if (alerts.length) {
     linhas.push(
       `Alertas metabólicos recentes (48h, já notificados ao usuário no app): ${alerts
-        .map((a) => `${a.title} (${a.severity}) às ${HORA(a.created_at, tz)}`)
+        .map((a) => `${sanitizeForPrompt(a.title, 80)} (${a.severity}) às ${HORA(a.created_at, tz)}`)
         .join("; ")}.`
     );
   }
@@ -191,7 +192,7 @@ export async function buildUserContext(
           const times = (m.reminder_times as string[] | null) ?? [];
           const expected = times.length * 7;
           const logged = medLogCounts.get(m.id as string) ?? 0;
-          return `${m.name}${m.dosage ? ` (${m.dosage})` : ""} — ${times.length}×/dia, ${logged}/${expected} doses registradas`;
+          return `${sanitizeForPrompt(m.name, 60)}${m.dosage ? ` (${sanitizeForPrompt(m.dosage, 30)})` : ""} — ${times.length}×/dia, ${logged}/${expected} doses registradas`;
         })
         .join("; ")}.`
     );
@@ -210,7 +211,7 @@ export async function buildUserContext(
   if (meals.length) {
     linhas.push(
       `Refeições de hoje: ${meals
-        .map((m) => `${m.name ?? "refeição"} (${m.carbs_g ?? "?"} g carb) às ${HORA(m.eaten_at, tz)}`)
+        .map((m) => `${sanitizeForPrompt(m.name ?? "refeição", 80)} (${m.carbs_g ?? "?"} g carb) às ${HORA(m.eaten_at, tz)}`)
         .join("; ")}.`
     );
   }
@@ -268,7 +269,7 @@ export async function buildUserContext(
   if (spikes.length) {
     linhas.push(
       `Refeições que causaram PICO glicêmico (72h, subida ≥50 mg/dL ou acima de 180 em até 2h): ${spikes
-        .map((s) => `${s.name ?? "refeição"} (${s.carbs_g ?? "?"} g carb) às ${HORA(s.eaten_at, tz)}`)
+        .map((s) => `${sanitizeForPrompt(s.name ?? "refeição", 80)} (${s.carbs_g ?? "?"} g carb) às ${HORA(s.eaten_at, tz)}`)
         .join("; ")}.`
     );
   }
@@ -277,7 +278,7 @@ export async function buildUserContext(
   if (ex.length) {
     linhas.push(
       `Exercício (48h): ${ex
-        .map((e) => `${e.label}${e.duration_min ? ` ${e.duration_min} min` : ""} em ${HORA(e.started_at, tz)}`)
+        .map((e) => `${sanitizeForPrompt(e.label, 60)}${e.duration_min ? ` ${e.duration_min} min` : ""} em ${HORA(e.started_at, tz)}`)
         .join("; ")}.`
     );
   }

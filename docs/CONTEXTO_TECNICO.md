@@ -588,19 +588,43 @@ O `CRON_SECRET` esteve **hardcoded em literal** dentro de funções SQL de migra
 > *"A 'rotação' de 2026-07-13 recolocou o MESMO segredo já vazado no git em mais 5 funções, em vez de
 > gerar um valor novo."*
 
-A correção move as funções para o **Supabase Vault**. **Resíduo**: `record_system_ai_usage` ainda
-compara `p_secret` contra o literal v2 hardcoded, e é chamada por `meals/suggest-dispatch`. Ambos os
-valores permanecem no histórico do git — remover do arquivo não basta, o valor precisa ser rotacionado.
+A correção move as funções para o **Supabase Vault**.
 
-Além disso, a comparação do header usa `!==` simples, não `timingSafeEqual`.
+**Verificado no banco em 26/07/2026:** o resíduo descrito aqui **não existe mais**.
+`pg_get_functiondef('record_system_ai_usage')` em produção lê
+`vault.decrypted_secrets where name = 'cgm_cron_secret'` — a migração `20260718010000` já cobriu essa
+função, e este parágrafo é que estava desatualizado.
 
-### 10.3 🟠 Contexto do chat não passa por sanitização
+**Comparação de header:** corrigida em 26/07/2026. As três rotas de cron
+(`push/dispatch`, `cgm/sync-dispatch`, `meals/suggest-dispatch`) usam `secretsMatch`
+(`lib/auth/constant-time.ts`), que compara em tempo constante e faz hash antes para não vazar tamanho
+nem lançar com entradas de tamanhos diferentes. `inviteCodesMatch` passou a reusar o mesmo helper.
 
-`lib/ai/sanitize-context.ts` existe justamente para neutralizar prompt injection vinda de OCR, mas
-`lib/ai/user-context.ts` interpola `medication.name`, `medication.dosage`, `meal.name`, `alert.title`
-e `factor.label` **direto no prompt do chat**, sem `sanitizeForPrompt`. O chat é a superfície com
-maior liberdade de saída, e nomes de refeição/medicação são texto livre do usuário — ou vindos de OCR
-de rótulo.
+**Continua aberto — e depende de ação fora do código:** os dois valores do segredo permanecem no
+histórico do git. Remover do arquivo não basta; o valor precisa ser **rotacionado** no Vault e na
+env da Vercel.
+
+> **Falso positivo do advisor.** O linter do Supabase reporta que `anon` pode executar
+> `record_system_ai_usage` (`0028_anon_security_definer_function_executable`). É **intencional**:
+> `meals/suggest-dispatch` é chamada pelo cron sem sessão, então o client é anônimo — a autorização
+> é o `p_secret` conferido contra o Vault dentro da função. Revogar o `execute` de `anon` quebraria o
+> registro de uso de IA das sugestões. Não "consertar" esse aviso sem trocar o mecanismo antes.
+
+### 10.3 ✅ Contexto do chat sem sanitização — resolvido em 26/07/2026
+
+**Estado original:** `lib/ai/sanitize-context.ts` existia justamente para neutralizar prompt
+injection vinda de OCR, mas `lib/ai/user-context.ts` interpolava `medication.name`,
+`medication.dosage`, `meal.name`, `alert.title`, `exercise.label` e `factor.label` **direto no prompt
+do chat**, sem `sanitizeForPrompt` — a superfície com maior liberdade de saída do app recebendo texto
+livre do usuário e de OCR de rótulo.
+
+**Correção em duas camadas**, porque nenhuma das duas basta sozinha:
+
+1. Os seis pontos passam por `sanitizeForPrompt` com limite por campo (30-80 chars). Isso achata
+   quebras de linha (impede imitar um bloco de sistema) e limita o tamanho do payload.
+2. O `SYSTEM` do chat declara que **o resumo de dados é dado, não instrução**, e que nenhuma regra do
+   bloco pode ser revogada por texto vindo dele. Truncar sozinho não impediria uma injeção curta;
+   instruir sozinho não impediria um payload longo com formatação falsa.
 
 ### 10.4 ✅ Três definições de hiperglicemia coexistiam — resolvido em 26/07/2026
 

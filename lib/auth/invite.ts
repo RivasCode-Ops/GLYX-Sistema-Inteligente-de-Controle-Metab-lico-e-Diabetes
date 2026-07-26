@@ -1,10 +1,8 @@
-import { createHash, timingSafeEqual } from "crypto";
+import { secretsMatch } from "@/lib/auth/constant-time";
 
 /** Compara códigos de convite sem vazar tempo relativo ao tamanho/conteúdo. */
 export function inviteCodesMatch(provided: string, expected: string): boolean {
-  const a = createHash("sha256").update(provided.trim()).digest();
-  const b = createHash("sha256").update(expected.trim()).digest();
-  return timingSafeEqual(a, b);
+  return secretsMatch(provided, expected);
 }
 
 export function getConfiguredInviteCode(): string | null {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { secretsMatch } from "@/lib/auth/constant-time";
 import { z } from "zod";
 import { reportCronOutcome } from "@/lib/observability";
 import { sendToSubscription } from "@/lib/push/send";
@@ -18,8 +19,9 @@ const itemSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("x-cron-secret") !== secret) {
+  // Comparação em tempo constante: `!==` sai no primeiro byte diferente e
+  // vaza, pelo tempo de resposta, quanto do segredo o atacante já acertou.
+  if (!secretsMatch(req.headers.get("x-cron-secret"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
