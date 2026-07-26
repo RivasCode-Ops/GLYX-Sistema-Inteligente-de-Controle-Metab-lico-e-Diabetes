@@ -365,6 +365,22 @@ melhor carga da primeira metade da janela com a da segunda — um dia ruim no fi
 antes do botão (ver DPIA §3 e §6). O prompt proíbe estimar peso/gordura por imagem e qualquer
 comentário estético.
 
+**Ponte com o plano de treino** (`lib/exercicios/plan-prescription.ts`): o plano decidia *o que*
+treinar hoje (por recuperação) mas nunca *quanto*, e o déficit de volume morria como texto de alerta.
+A prescrição fecha o circuito com uma conta que aparece na tela:
+
+```
+séries hoje = alvo semanal do grupo ÷ vezes que o grupo aparece na semana
+```
+
+O alvo é o **piso** da faixa de referência em manutenção e o **topo** quando o grupo sustenta uma meta
+de crescimento não atingida (`MEASURE_TO_MUSCLE` liga medida → músculo). Limites de 2 a 8 séries por
+grupo/sessão: déficit grande se resolve com frequência na semana, não com uma sessão gigante. Volume
+acima de 1,5× o ótimo inverte o sinal e manda reduzir. A prescrição só cobre os grupos que a
+recuperação já liberou — nunca ressuscita grupo vetado. `/exercicios/plano` consome o **mesmo**
+`loadBodySnapshot` do módulo de composição, para as duas telas nunca discordarem sobre quantas séries
+foram feitas na semana.
+
 **Água**: `peso × 35 ml`, fallback 2000 ml. Só bebidas hidratantes contam (água, água c/ gás, chá —
 café e refrigerante diet não).
 

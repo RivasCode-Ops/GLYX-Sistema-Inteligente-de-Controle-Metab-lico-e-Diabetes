@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { GoalTrainingCard } from "@/components/exercicios/goal-training-card";
 import { TrainingPlanCard } from "@/components/exercicios/training-plan-card";
+import { SessionPrescriptionCard } from "@/components/exercicios/session-prescription-card";
 import { computeMuscleRecovery } from "@/lib/exercicios/muscle-recovery";
 import type { MuscleRecoveryStatus } from "@/lib/exercicios/muscle-recovery";
+import { suggestFromPlan } from "@/lib/exercicios/training-plan";
+import {
+  prescribeForSession,
+  uncoveredGoalMuscles,
+  type GroupPrescription,
+} from "@/lib/exercicios/plan-prescription";
+import type { ExerciseProgression } from "@/lib/exercicios/weekly-volume";
+import { loadBodySnapshot } from "@/lib/queries/body-composition";
 import { getActiveMusclePauses, getLastTrainedByMuscleGroup } from "@/lib/queries/muscle-recovery";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -12,6 +21,9 @@ export default async function ExerciciosPlanoPage() {
   const demoMode = !isSupabaseConfigured();
   let bodyGoal: BodyGoal | null = null;
   let statuses: MuscleRecoveryStatus[] = [];
+  let prescriptions: GroupPrescription[] = [];
+  let progressions: ExerciseProgression[] = [];
+  let uncovered: ReturnType<typeof uncoveredGoalMuscles> = [];
 
   if (!demoMode) {
     const supabase = await createClient();
@@ -20,13 +32,28 @@ export default async function ExerciciosPlanoPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const [{ data }, lastTrained, pausedGroups] = await Promise.all([
+        const [{ data }, lastTrained, pausedGroups, snapshot] = await Promise.all([
           supabase.from("profiles").select("body_goal").eq("id", user.id).maybeSingle(),
           getLastTrainedByMuscleGroup(),
           getActiveMusclePauses(),
+          // Mesmo snapshot que o módulo de composição usa: se o plano montasse o
+          // próprio cálculo de volume, as duas telas acabariam discordando sobre
+          // quantas séries de costas o usuário fez na semana.
+          loadBodySnapshot(supabase, user.id),
         ]);
         bodyGoal = (data?.body_goal as typeof bodyGoal) ?? null;
         statuses = computeMuscleRecovery(lastTrained, pausedGroups);
+        progressions = snapshot.progressions;
+        uncovered = uncoveredGoalMuscles(snapshot.volume, snapshot.goals);
+
+        // A prescrição só cobre o que a recuperação já liberou para hoje —
+        // nunca ressuscita um grupo que o plano vetou por não ter descansado.
+        const suggestion = suggestFromPlan(statuses);
+        prescriptions = prescribeForSession(
+          suggestion.included.map((s) => ({ id: s.id, label: s.label })),
+          snapshot.volume,
+          snapshot.goals
+        );
       }
     }
   } else {
@@ -46,6 +73,13 @@ export default async function ExerciciosPlanoPage() {
         </p>
       ) : null}
       <TrainingPlanCard statuses={statuses} />
+      {!demoMode ? (
+        <SessionPrescriptionCard
+          prescriptions={prescriptions}
+          progressions={progressions}
+          uncovered={uncovered}
+        />
+      ) : null}
       <GoalTrainingCard goal={demoMode ? "maintain" : bodyGoal} />
       {!demoMode ? (
         <p className="text-xs text-zinc-500">
