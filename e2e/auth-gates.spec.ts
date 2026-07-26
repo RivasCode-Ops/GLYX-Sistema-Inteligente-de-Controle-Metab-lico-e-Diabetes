@@ -17,6 +17,8 @@ test.describe("portões de autenticação (negativo)", () => {
       // Composição corporal: medidas, metas e sobretudo as FOTOS de corpo — o
       // dado mais sensível do app. Rota nova sem portão testado é exatamente
       // como um vazamento entra sem ninguém perceber.
+      // Resumo semanal: expõe TIR, hipoglicemias e média do usuário.
+      "/analise/semana",
       "/composicao",
       "/composicao/medidas",
       "/composicao/fotos",

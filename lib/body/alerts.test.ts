@@ -24,6 +24,21 @@ describe("findStagnantMeasures", () => {
     expect(findStagnantMeasures(history, ["waist_cm"], 8, NOW)).toHaveLength(0);
   });
 
+  it("compara com a medição mais recente antes do corte, não com a mais antiga", () => {
+    // Braço cresceu bem no começo do ano e travou nos últimos dois meses.
+    // Comparar com janeiro daria +3 cm e esconderia a estagnação atual.
+    const longo: BodyMeasurement[] = [
+      { measured_on: "2026-01-10", arm_right_flexed_cm: 30 },
+      { measured_on: "2026-05-10", arm_right_flexed_cm: 33 },
+      { measured_on: "2026-07-20", arm_right_flexed_cm: 33.2 },
+    ];
+    const stagnant = findStagnantMeasures(longo, ["arm_right_flexed_cm"], 8, NOW);
+    expect(stagnant).toHaveLength(1);
+    expect(stagnant[0].delta).toBe(0.2);
+    // E a janela relatada é a real (maio → julho), não desde janeiro.
+    expect(stagnant[0].weeks).toBeLessThan(15);
+  });
+
   it("sem medição antiga na janela não conclui nada", () => {
     const recente: BodyMeasurement[] = [
       { measured_on: "2026-07-10", chest_cm: 110 },

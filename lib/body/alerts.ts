@@ -80,7 +80,12 @@ export function findStagnantMeasures(
     const withValue = sorted.filter((m) => measurementValue(m, key) != null);
     if (withValue.length < 2) continue;
 
-    const old = withValue.find((m) => m.measured_on <= cutoff);
+    // A medição mais RECENTE anterior ao corte, não a mais antiga do histórico.
+    // `.find()` numa lista ascendente devolveria a primeira de todas: com um ano
+    // de medições, a comparação viraria "hoje contra um ano atrás", a variação
+    // passaria do piso de ruído e a estagnação dos últimos dois meses — que é o
+    // que este alerta existe para pegar — nunca apareceria.
+    const old = withValue.filter((m) => m.measured_on <= cutoff).at(-1);
     const latest = withValue[withValue.length - 1];
     if (!old || old.measured_on === latest.measured_on) continue;
 

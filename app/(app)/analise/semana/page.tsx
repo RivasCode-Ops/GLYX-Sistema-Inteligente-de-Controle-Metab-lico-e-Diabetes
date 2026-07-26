@@ -41,11 +41,19 @@ function Tile({
   label,
   d,
   unit = "",
+  /**
+   * Unidade da VARIAÇÃO, quando difere da do valor. Existe por causa do TIR:
+   * o valor é 66%, mas a variação é de 8 **pontos percentuais**, não de 8% —
+   * são grandezas diferentes, e trocar uma pela outra é o erro clássico de
+   * material sobre diabetes.
+   */
+  deltaUnit,
   suffix,
 }: {
   label: string;
   d: WeeklyDelta;
   unit?: string;
+  deltaUnit?: string;
   suffix?: string;
 }) {
   return (
@@ -55,7 +63,7 @@ function Tile({
         <span className="text-lg font-semibold text-zinc-100">
           {d.current != null ? `${d.current}${unit}` : "—"}
         </span>
-        <DeltaBadge d={d} unit={unit} />
+        <DeltaBadge d={d} unit={deltaUnit ?? unit} />
       </div>
       {suffix ? <div className="mt-0.5 text-[11px] text-zinc-500">{suffix}</div> : null}
     </div>
@@ -118,7 +126,7 @@ export default async function ResumoSemanalPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <Tile label="Tempo no alvo" d={summary.tirPercent} unit="%" />
+                <Tile label="Tempo no alvo" d={summary.tirPercent} unit="%" deltaUnit=" pp" />
                 <Tile label="Média" d={summary.avgGlucose} unit=" mg/dL" />
                 <Tile label="Abaixo da meta" d={summary.hypoCount} />
                 <Tile label="Acima da meta" d={summary.hyperCount} />
@@ -135,8 +143,9 @@ export default async function ResumoSemanalPage() {
               </div>
               <p className="mt-2 text-[11px] leading-snug text-zinc-500">
                 Tempo no alvo é o percentual de <strong>leituras</strong> dentro da faixa, não de
-                tempo — com sensor as duas coisas se aproximam, com registro manual não. Variação é
-                mostrada em pontos percentuais.
+                tempo — com sensor as duas coisas se aproximam, com registro manual não. A variação
+                aparece em <strong>pp</strong> (pontos percentuais): sair de 58% para 66% é +8 pp,
+                não +8%.
               </p>
             </CardContent>
           </Card>
