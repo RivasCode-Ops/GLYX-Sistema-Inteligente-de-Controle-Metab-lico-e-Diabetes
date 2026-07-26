@@ -135,8 +135,10 @@ Get-ChildItem -LiteralPath $migDir -Filter "*.sql" |
 Write-Host "`n-- Checklist manual Auth / cron --" -ForegroundColor Cyan
 Write-Host "  [ ] Supabase Auth: Allow new users to sign up = OFF"
 Write-Host "  [ ] Site URL + Redirect URLs (/auth/callback) corretos"
-Write-Host "  [ ] Funcoes pg_cron: URL Vercel atual + x-cron-secret = CRON_SECRET"
+Write-Host "  [ ] Vault: segredo app_base_url = dominio atual da Vercel (as funcoes de cron leem dele)"
+Write-Host "  [ ] Vault: segredo cgm_cron_secret = CRON_SECRET desta env"
 Write-Host "  [ ] Rotacionar secret se ja vazou em migration antiga do git"
+Write-Host "  [ ] Conferir entrega real do cron: select status_code, count(*) from net._http_response where created > now() - interval '6 hours' group by 1"
 Write-Host "  [ ] Deploy Vercel com as mesmas env vars"
 Write-Host "  [ ] Smoke: login, /status, export/wipe, sync CGM"
 Write-Host "  Guia: docs\PRODUCAO.md"
