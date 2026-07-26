@@ -57,6 +57,49 @@ export function reportMessage(
   });
 }
 
+/**
+ * Alerta de quebra do provedor de CGM — UM por rodada, não um por usuário.
+ *
+ * O alerta por usuário já existe e continua útil para senha errada. Este aqui
+ * responde outra pergunta, que N alertas individuais não respondem: "a API
+ * mudou?". Vai com prioridade maior porque a ação é do operador (atualizar o
+ * cliente, avisar os usuários), não do usuário.
+ */
+export async function reportProviderOutage(outage: {
+  provider: string;
+  kind: string | null;
+  affectedUsers: number;
+  attemptedUsers: number;
+  reason: string;
+}): Promise<void> {
+  const message = `CGM ${outage.provider}: possível quebra do provedor (${outage.kind ?? "?"}) — ${outage.affectedUsers}/${outage.attemptedUsers} conexões`;
+
+  reportMessage(message, {
+    level: "error",
+    tags: { job: "cgm-outage", surface: "cron", provider: outage.provider },
+    extra: { ...outage },
+  });
+
+  const webhook = process.env.OPS_ALERT_WEBHOOK_URL?.trim();
+  if (!webhook) return;
+
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `[GLYX] ${message}\n${outage.reason}`,
+        job: "cgm-outage",
+        outage,
+        at: new Date().toISOString(),
+        commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+      }),
+    });
+  } catch (e) {
+    reportException(e, { tags: { job: "ops-webhook" }, level: "error" });
+  }
+}
+
 export type CronJob = "cgm-sync" | "push-dispatch" | "meal-suggest";
 
 export type CronStats = {

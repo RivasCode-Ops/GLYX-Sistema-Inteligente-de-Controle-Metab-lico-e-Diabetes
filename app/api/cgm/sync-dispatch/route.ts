@@ -8,7 +8,13 @@ import {
 } from "@/lib/cgm/circuit-breaker";
 import { syncDexcomConnection } from "@/lib/cgm/sync-dexcom";
 import { syncLibreConnection, type CgmConnectionRow } from "@/lib/cgm/sync";
-import { reportCronOutcome, reportException, reportMessage } from "@/lib/observability";
+import {
+  reportCronOutcome,
+  reportException,
+  reportMessage,
+  reportProviderOutage,
+} from "@/lib/observability";
+import { detectProviderOutage, type OutageVerdict, type SyncFailure } from "@/lib/cgm/outage";
 
 const THROTTLE_MS = 10 * 60 * 1000;
 
@@ -69,6 +75,9 @@ export async function POST(req: Request) {
 
   let synced = 0;
   let failed = 0;
+  // Falhas da rodada, para distinguir "a API mudou" de "a senha de fulano
+  // está errada" — diagnóstico que nenhum alerta por usuário consegue dar.
+  const failures: SyncFailure[] = [];
   for (const conn of due) {
     const provider = conn.provider === "dexcom" ? "dexcom" : "librelinkup";
     try {
@@ -91,6 +100,8 @@ export async function POST(req: Request) {
         msg,
         now
       );
+
+      failures.push({ userId: conn.user_id, provider, kind });
 
       reportException(e, {
         tags: { job: "cgm-sync", surface: "cron", provider, error_kind: kind },
@@ -127,6 +138,20 @@ export async function POST(req: Request) {
     }
   }
 
+  // Um alerta por provedor quebrado, em vez de N alertas idênticos por usuário.
+  const outages: OutageVerdict[] = [];
+  for (const provider of ["librelinkup", "dexcom"]) {
+    const attempted = due.filter(
+      (c) => (c.provider === "dexcom" ? "dexcom" : "librelinkup") === provider
+    ).length;
+    if (!attempted) continue;
+    const verdict = detectProviderOutage(failures, provider, attempted);
+    if (verdict.isOutage) {
+      outages.push(verdict);
+      await reportProviderOutage(verdict);
+    }
+  }
+
   await reportCronOutcome("cgm-sync", {
     synced,
     failed,
@@ -139,6 +164,7 @@ export async function POST(req: Request) {
     failed,
     total: due.length,
     circuitSkipped,
+    outages: outages.map((o) => ({ provider: o.provider, kind: o.kind, affected: o.affectedUsers })),
   });
 }
 

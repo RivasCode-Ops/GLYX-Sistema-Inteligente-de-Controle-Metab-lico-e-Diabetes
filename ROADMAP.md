@@ -52,7 +52,7 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 6. Decisão estratégica: **só paciente** vs **compartilhamento com cuidador** (consentimento granular, escopos). Sem isso, não começar multi-tenant clínico.
 7. ~~Métricas educativas: TIR / resumo semanal exportável (não AGP clínico).~~ — entregue em 26/07/2026 em `/analise/semana`: 7 dias contra os 7 anteriores, destaques determinísticos e export em texto puro. Comparação só aparece quando as DUAS semanas passam do piso de dados.
 8. Modelo de negócio (freemium IA / convite pago) — hoje só controle de custo.
-9. Resiliência Libre: monitorar quebras da API não oficial; fallback CSV sempre documentado.
+9. ~~Resiliência Libre: monitorar quebras da API não oficial; fallback CSV sempre documentado.~~ — entregue em 26/07/2026: `lib/cgm/outage.ts` separa quebra do provedor de problema individual e dispara **um** alerta ops por rodada (não um por usuário); a tela de Conexões passa a apontar o import por CSV quando o erro é do lado do fabricante. **Depende de `OPS_ALERT_WEBHOOK_URL`** para o alerta sair do Sentry.
 
 ### Fora de escopo (até nova decisão)
 

@@ -6,6 +6,7 @@ import { IntegrationPanel } from "@/components/integrations/integration-panel";
 import { GoogleFitConnect } from "@/components/integrations/google-fit-connect";
 import { ManualSleepForm } from "@/components/integrations/manual-sleep-form";
 import { LibreCsvImport } from "@/components/glicemia/libre-csv-import";
+import { ProviderIssueNotice } from "@/components/integrations/provider-issue-notice";
 import { LibreLinkConnect } from "@/components/glicemia/libre-link-connect";
 import { DexcomConnect } from "@/components/glicemia/dexcom-connect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,6 +87,10 @@ export default async function ConexoesPage() {
         <Suspense fallback={null}>
           <DexcomConnect connection={dexcomConnection} oauthConfigured={isDexcomOAuthConfigured()} />
         </Suspense>
+        <ProviderIssueNotice
+          libreErrorKind={libreConnection?.lastErrorKind}
+          dexcomErrorKind={dexcomConnection?.lastErrorKind}
+        />
         <LibreCsvImport />
       </section>
 

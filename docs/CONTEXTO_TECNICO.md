@@ -496,6 +496,26 @@ com validade de 15 min. O callback confere `user.id === verified.userId` — o s
 Ingestão dedupa por `(user_id, source, external_id)`; em colisão de índice único, faz retry linha a
 linha. Sync grava alerta e dispara **push preditivo de hipoglicemia**.
 
+### 7.2.1 Quebra do provedor vs. problema do usuário
+
+`lib/cgm/outage.ts` — o circuit breaker protege cada conexão, mas alerta **por usuário**: quando a
+API não oficial do Libre muda, o operador recebe N alertas idênticos e nenhum diz a única coisa que
+importa, que é "não é culpa de ninguém, a Abbott mexeu". `detectProviderOutage` roda uma vez por
+rodada do cron e emite **um** alerta.
+
+A regra é conservadora por assimetria de custo:
+
+| Tipo | Vira quebra? | Por quê |
+|---|---|---|
+| `client_version` | sim, com 1 usuário | nenhuma ação do usuário resolve |
+| `unavailable`, `rate_limit`, `unknown` | só com ≥ 2 usuários **e** ≥ metade das conexões tentadas | um usuário com rede caída não é quebra |
+| `auth`, `crypto` | **nunca** | são individualmente acionáveis (senha, chave) |
+
+Errar para "quebra" quando era senha errada custa um alerta inútil; errar para "problema seu" quando
+a API mudou faz o usuário reconferir uma senha correta várias vezes e perder dias de leitura sem
+descobrir o import por CSV. Daí `ProviderIssueNotice` na tela de Conexões, que aparece só nos tipos
+que o usuário não resolve e aponta o CSV — que já existia logo abaixo, sem nada ligando um ao outro.
+
 ### 7.3 Cron e push
 
 7 jobs `pg_cron`, todos chamando rotas HTTP com header `x-cron-secret`:
