@@ -50,7 +50,7 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 ### P2 — produto
 
 6. Decisão estratégica: **só paciente** vs **compartilhamento com cuidador** (consentimento granular, escopos). Sem isso, não começar multi-tenant clínico.
-7. Métricas educativas: TIR / resumo semanal exportável (não AGP clínico).
+7. ~~Métricas educativas: TIR / resumo semanal exportável (não AGP clínico).~~ — entregue em 26/07/2026 em `/analise/semana`: 7 dias contra os 7 anteriores, destaques determinísticos e export em texto puro. Comparação só aparece quando as DUAS semanas passam do piso de dados.
 8. Modelo de negócio (freemium IA / convite pago) — hoje só controle de custo.
 9. Resiliência Libre: monitorar quebras da API não oficial; fallback CSV sempre documentado.
 

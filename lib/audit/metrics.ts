@@ -30,6 +30,27 @@ export type AuditRawInputs = {
   examAlteredCount: number;
 };
 
+/**
+ * Piso de dados para qualquer leitura agregada de glicemia (score, resumo
+ * semanal). Abaixo disto o número existe mas não significa nada: 3 leituras em
+ * 1 dia produzem uma "TIR" que descreve uma tarde, não um período.
+ *
+ * Vive aqui porque mais de uma tela precisa da MESMA régua — foi cravado só no
+ * score.ts até 26/07/2026, e um segundo consumidor com piso próprio faria duas
+ * telas discordarem sobre o mesmo período.
+ */
+export const MIN_READINGS_FOR_ANALYSIS = 7;
+export const MIN_DAYS_FOR_ANALYSIS = 3;
+
+export function hasEnoughGlucoseData(m: {
+  readingCount: number;
+  daysWithGlucose: number;
+}): boolean {
+  return (
+    m.readingCount >= MIN_READINGS_FOR_ANALYSIS && m.daysWithGlucose >= MIN_DAYS_FOR_ANALYSIS
+  );
+}
+
 function mean(nums: number[]): number | null {
   if (nums.length === 0) return null;
   return nums.reduce((a, b) => a + b, 0) / nums.length;

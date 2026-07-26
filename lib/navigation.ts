@@ -80,6 +80,7 @@ export type SubNavItem = { title: string; href: string };
 export const moduleSubNav: Record<string, SubNavItem[]> = {
   "/analise": [
     { title: "Resumo", href: "/analise" },
+    { title: "Semana", href: "/analise/semana" },
     { title: "Correlações", href: "/analise/correlacoes" },
     { title: "Linha do tempo", href: "/analise/linha-do-tempo" },
     { title: "Alertas", href: "/analise/alertas" },

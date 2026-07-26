@@ -15,7 +15,7 @@ refeições, medicação, exercício, água, peso e exames, com sincronização 
 análise assistida por IA e alarmes push.
 
 **Não é dispositivo médico.** Não faz diagnóstico e não prescreve. Essa posição é reafirmada em
-código, não só em documento — ver §6.7.
+código, não só em documento — ver §6.8.
 
 Acesso é **invite-only** (`SIGNUP_INVITE_CODE` + allowlist de e-mail), com signup público do Supabase
 Auth desligado.
@@ -387,7 +387,30 @@ foram feitas na semana.
 **Água**: `peso × 35 ml`, fallback 2000 ml. Só bebidas hidratantes contam (água, água c/ gás, chá —
 café e refrigerante diet não).
 
-### 6.6 Score metabólico (auditoria)
+### 6.6 Resumo semanal educativo
+
+`lib/audit/weekly-summary.ts` — os últimos 7 dias locais contra os 7 anteriores, em
+`/analise/semana`. **Não é AGP** e não tenta ser: AGP exige densidade de CGM, percentis por hora e
+leitura treinada. A pergunta aqui é "minha semana foi melhor que a passada, e no quê?".
+
+Três regras que o código impõe:
+
+- **Sem dado mínimo, sem número.** Mesmo piso do score (`hasEnoughGlucoseData`: 7 leituras em 3
+  dias), extraído para `metrics.ts` justamente para as duas telas não divergirem.
+- **Comparação exige as DUAS semanas acima do piso** (`comparable`). Semana anterior sem leitura
+  nenhuma é tratada como "não houve semana anterior", não como zero — senão quem começou a usar o
+  app há 5 dias veria uma queda inventada.
+- **TIR varia em pontos percentuais**, nunca em "%": "subiu 8%" e "subiu 8 pontos" são coisas
+  diferentes, e confundir as duas é clássico.
+
+Os destaques são determinísticos (sem IA) e ordenados por risco: hipoglicemia primeiro e sempre,
+mesmo isolada. A exportação é **texto puro** copiado para a área de transferência — o destino real
+é WhatsApp/e-mail, e há fallback visível quando a Clipboard API falha.
+
+`lib/queries/weekly-summary.ts` carrega as duas janelas fechadas; `loadAuditDayGrid` não serve
+porque a janela dele termina sempre **agora** e é aberta em cima (só `gte`).
+
+### 6.7 Score metabólico (auditoria)
 
 `lib/audit/score.ts` — escala 0–100, **começa em 100 e subtrai**.
 
@@ -413,7 +436,7 @@ impacto — decisão registrada em comentário.
 inferência causal**: sono vs glicemia, carboidrato vs glicemia, exercício vs glicemia, todos com
 exigência de amostra mínima e delta mínimo.
 
-### 6.7 Onde o produto se recusa a agir
+### 6.8 Onde o produto se recusa a agir
 
 Guardrails no prompt de IA (regras negativas explícitas): não diagnosticar, não alterar dose, não
 recomendar medicamento, classificar valor de exame só quando a faixa de referência estiver no texto,

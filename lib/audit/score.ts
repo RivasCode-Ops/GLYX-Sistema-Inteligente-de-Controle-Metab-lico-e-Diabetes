@@ -5,6 +5,11 @@ import type {
   AuditPlanItem,
   MetabolicAuditReport,
 } from "@/lib/audit/types";
+import {
+  hasEnoughGlucoseData,
+  MIN_DAYS_FOR_ANALYSIS,
+  MIN_READINGS_FOR_ANALYSIS,
+} from "@/lib/audit/metrics";
 
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
@@ -31,8 +36,7 @@ export function scoreFromMetrics(
   const factors: AuditFactor[] = [];
   let score = 100;
 
-  const insufficient =
-    metrics.readingCount < 7 || metrics.daysWithGlucose < 3;
+  const insufficient = !hasEnoughGlucoseData(metrics);
 
   if (insufficient) {
     return {
@@ -45,7 +49,7 @@ export function scoreFromMetrics(
           label: "Poucos dados no período",
           severity: "info",
           weight: 1,
-          evidence: `${metrics.readingCount} leituras em ${metrics.daysWithGlucose} dias. Precisa de pelo menos 7 leituras em 3 dias.`,
+          evidence: `${metrics.readingCount} leituras em ${metrics.daysWithGlucose} dias. Precisa de pelo menos ${MIN_READINGS_FOR_ANALYSIS} leituras em ${MIN_DAYS_FOR_ANALYSIS} dias.`,
           scoreImpact: 0,
         },
       ],

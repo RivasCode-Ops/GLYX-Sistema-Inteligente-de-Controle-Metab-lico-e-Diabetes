@@ -213,8 +213,14 @@ export default function AjudaPage() {
         </p>
       </CollapsibleSection>
 
-      <CollapsibleSection title="📊 Análise" description="Resumo, correlações, linha do tempo, alertas">
+      <CollapsibleSection title="📊 Análise" description="Resumo, semana, correlações, linha do tempo, alertas">
         <p className="text-sm text-zinc-300">
+          Em <strong>Semana</strong> você vê os últimos 7 dias comparados com os 7 anteriores —
+          tempo no alvo, média, hipos e hábitos — e pode copiar o resumo em texto para mandar a
+          quem acompanha você. Se a semana (ou a anterior) tiver poucos registros, o app diz isso
+          em vez de mostrar um número que descreve uma tarde.
+        </p>
+        <p className="mt-2 text-sm text-zinc-300">
           Consolida as visões retrospectivas em abas: mapa de risco (<strong>Resumo</strong>),
           relações encontradas nos seus dados (<strong>Correlações</strong>), histórico cronológico
           (<strong>Linha do tempo</strong>) e hiper/hipoglicemia identificadas (<strong>Alertas</strong>).
