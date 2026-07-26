@@ -182,6 +182,22 @@ export default function AjudaPage() {
         </ScreenPreview>
       </CollapsibleSection>
 
+      <CollapsibleSection title="🔔 Alarmes que você escuta" description="Som, vibração e o teste de verdade">
+        <p className="text-sm text-zinc-300">
+          Em <strong>Medicação → Meus medicamentos</strong>, no fim da tela, ficam os alarmes. Ali
+          você ativa o aparelho, testa o <strong>som do app</strong> e envia uma{" "}
+          <strong>notificação de teste</strong> — que chega como crítica, igual a um alerta de
+          hipoglicemia. Para o teste que vale, bloqueie a tela antes de enviar.
+        </p>
+        <p className="mt-2 text-sm text-zinc-300">
+          Com o app aberto, alerta crítico toca um alarme próprio e abre um aviso vermelho que só
+          sai quando você toca em &quot;Parar alarme&quot;. Com a tela apagada, quem faz barulho é o
+          sistema: nenhum site pode forçar som ou volume de notificação. Se chegar calado, ajuste a
+          importância da notificação para <em>Urgente</em> no Android, ou ative <em>Sons</em> no
+          iPhone — o passo a passo está na própria tela de alarmes.
+        </p>
+      </CollapsibleSection>
+
       <CollapsibleSection
         title="📏 Composição corporal"
         description="Medidas, fotos, metas e leitura de músculo x gordura"

@@ -25,7 +25,12 @@ self.addEventListener("push", (event) => {
     tag: data.critical ? "glyx-critical" : undefined,
     renotify: Boolean(data.critical),
     requireInteraction: Boolean(data.critical),
-    vibrate: data.critical ? [300, 100, 300, 100, 300] : [200, 100, 200],
+    // Vibração longa e entrecortada no crítico: em celular no silencioso, a
+    // vibração é o único canal que sobra.
+    vibrate: data.critical ? [500, 200, 500, 200, 500, 200, 500] : [200, 100, 200],
+    // Explícito de propósito: `silent: true` em qualquer lugar da cadeia mataria
+    // o som do sistema sem deixar rastro.
+    silent: false,
     data: { url: data.url, medId: data.medId },
   };
 
@@ -38,7 +43,24 @@ self.addEventListener("push", (event) => {
     ];
   }
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  // Com o app aberto, avisa a página para tocar o alarme próprio. O som da
+  // notificação é decidido pelo sistema operacional e pode estar mudo, baixo ou
+  // em "não perturbe" — e alerta de hipoglicemia despercebido é problema de
+  // segurança. Com a tela na frente do usuário, quem faz barulho é o app.
+  const notifyOpenClients = data.critical
+    ? self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({
+            type: "glyx-critical",
+            payload: { title: data.title, body: data.body, url: data.url, critical: true },
+          });
+        }
+      })
+    : Promise.resolve();
+
+  event.waitUntil(
+    Promise.all([self.registration.showNotification(data.title, options), notifyOpenClients])
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
