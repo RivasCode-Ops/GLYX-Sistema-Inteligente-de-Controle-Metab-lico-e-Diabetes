@@ -7,6 +7,10 @@ import {
   PRIVATE_PHOTO_BUCKETS,
   USER_DATA_DELETE_ORDER,
 } from "@/lib/privacy/user-data";
+import {
+  DEFAULT_TARGET_MAX_MG_DL,
+  DEFAULT_TARGET_MIN_MG_DL,
+} from "@/lib/health/glucose-thresholds";
 
 export type PrivacyActionResult = { ok?: true; error?: string };
 
@@ -54,8 +58,8 @@ export async function deleteAllMyData(): Promise<PrivacyActionResult> {
     .update({
       full_name: null,
       diabetes_type: null,
-      target_glucose_min: 70,
-      target_glucose_max: 180,
+      target_glucose_min: DEFAULT_TARGET_MIN_MG_DL,
+      target_glucose_max: DEFAULT_TARGET_MAX_MG_DL,
       sex: null,
       birth_year: null,
       height_cm: null,

@@ -44,4 +44,18 @@ describe("isPredictedHypo", () => {
     const t = predictTrend(series([120, 130, 140, 150]));
     expect(isPredictedHypo(t)).toBe(false);
   });
+
+  it("usa o limiar do perfil, não 70 fixo", () => {
+    // Queda que projeta ~77 mg/dL: não cruza 70, mas cruza a meta mínima 110
+    // de quem combinou uma faixa mais alta com o médico. Antes o preditivo
+    // ignorava isso e só o alerta reativo (já abaixo) disparava.
+    const t = predictTrend(series([140, 133, 126, 119]));
+    expect(isPredictedHypo(t)).toBe(false);
+    expect(isPredictedHypo(t, 110)).toBe(true);
+  });
+
+  it("não alerta quando a leitura já está abaixo do limiar do perfil", () => {
+    const t = predictTrend(series([108, 100, 92, 85]));
+    expect(isPredictedHypo(t, 110)).toBe(false);
+  });
 });

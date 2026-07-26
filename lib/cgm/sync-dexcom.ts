@@ -9,6 +9,7 @@ import {
 import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
 import { sendPushToUser } from "@/lib/push/send";
 import { isPredictedHypo, predictTrend } from "@/lib/cgm/trend";
+import { loadGlucoseTargets } from "@/lib/health/load-glucose-targets";
 import { evaluateGlucoseAlert } from "@/lib/insights/rules";
 import type { CgmConnectionRow } from "@/lib/cgm/sync";
 
@@ -73,10 +74,11 @@ export async function syncDexcomConnection(
     );
   }
 
+  const { hypoThreshold } = await loadGlucoseTargets(supabase, conn.user_id);
   const trend = predictTrend(
     readings.map((r) => ({ valueMgDl: r.valueMgDl, recordedAt: r.recordedAt }))
   );
-  if (isPredictedHypo(trend)) {
+  if (isPredictedHypo(trend, hypoThreshold)) {
     const { data: freshTrend } = await supabase
       .from("push_dispatch_log")
       .insert({

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { getTodayHealthBest } from "@/lib/queries/health-today";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { MetabolicAlert } from "@/types/database";
@@ -30,8 +31,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
     .eq("id", user.id)
     .maybeSingle();
   const startOfDayISO = startOfLocalDayISO(profile?.timezone);
-  const targetMin = profile?.target_glucose_min ?? 70;
-  const targetMax = profile?.target_glucose_max ?? 180;
+  const { targetMin, targetMax } = resolveGlucoseTargets(profile);
 
   const [glucoseRes, mealsRes, exercisesRes, alertsRes] = await Promise.all([
     supabase

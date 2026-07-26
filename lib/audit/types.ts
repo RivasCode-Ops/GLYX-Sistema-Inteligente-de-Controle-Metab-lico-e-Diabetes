@@ -31,7 +31,10 @@ export const auditMetricsSchema = z.object({
   daysWithGlucose: z.number().int(),
   tirPercent: z.number().nullable(),
   hypoCount: z.number().int(),
+  /** Leituras acima da META do usuário (base do TIR) — não é hiper severa. */
   hyperCount: z.number().int(),
+  /** Leituras >= 250 mg/dL. Opcional: auditorias gravadas antes de 26/07/2026 não têm. */
+  severeHyperCount: z.number().int().optional(),
   avgGlucose: z.number().nullable(),
   stdDev: z.number().nullable(),
   avgCarbsPerDay: z.number().nullable(),

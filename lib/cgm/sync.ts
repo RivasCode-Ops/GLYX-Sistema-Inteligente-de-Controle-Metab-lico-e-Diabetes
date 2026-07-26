@@ -11,6 +11,7 @@ import { ingestUnifiedReadings } from "@/lib/cgm/ingest";
 import { normalizeLibreMeasurements } from "@/lib/cgm/normalize/libre";
 import { sendPushToUser } from "@/lib/push/send";
 import { isPredictedHypo, predictTrend } from "@/lib/cgm/trend";
+import { loadGlucoseTargets } from "@/lib/health/load-glucose-targets";
 import { evaluateGlucoseAlert } from "@/lib/insights/rules";
 
 export type CgmConnectionRow = {
@@ -100,10 +101,11 @@ export async function syncLibreConnection(
     );
   }
 
-  // Alerta PREDITIVO: ainda acima de 70, mas em queda que cruza a hipo em
-  // ~30 min. Dedupe por leitura para não repetir a cada sync.
+  // Alerta PREDITIVO: ainda acima do limiar de hipo do usuário, mas em queda
+  // que o cruza em ~30 min. Dedupe por leitura para não repetir a cada sync.
+  const { hypoThreshold } = await loadGlucoseTargets(supabase, conn.user_id);
   const trend = predictTrend(readings.map((r) => ({ valueMgDl: r.valueMgDl, recordedAt: r.recordedAt })));
-  if (isPredictedHypo(trend)) {
+  if (isPredictedHypo(trend, hypoThreshold)) {
     const { data: freshTrend } = await supabase
       .from("push_dispatch_log")
       .insert({

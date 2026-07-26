@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { buildMedicalReportData } from "@/lib/audit/medical-report";
+import { SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { PrintButton } from "@/components/relatorio/print-button";
 
 export const metadata = { title: "Relatório para o médico — GLYX" };
@@ -108,7 +109,15 @@ export default async function RelatorioMedicoPage() {
           </div>
           <div className="min-w-[110px]">
             <div className="text-xl font-bold">{m.hyperCount}</div>
-            <div className="text-[11px] uppercase tracking-wide text-zinc-600">Leituras ≥250 mg/dL</div>
+            <div className="text-[11px] uppercase tracking-wide text-zinc-600">
+              Acima da meta (&gt;{report.targetMax})
+            </div>
+          </div>
+          <div className="min-w-[110px]">
+            <div className="text-xl font-bold">{m.severeHyperCount ?? "—"}</div>
+            <div className="text-[11px] uppercase tracking-wide text-zinc-600">
+              Leituras ≥{SEVERE_HYPER_MG_DL} mg/dL
+            </div>
           </div>
         </div>
         <p className="mt-2 text-xs text-zinc-600">
@@ -129,14 +138,16 @@ export default async function RelatorioMedicoPage() {
           Extremos glicêmicos
         </h2>
         {report.hyperDays.length === 0 && report.hypoDays.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-600">Nenhuma leitura fora da meta no período.</p>
+          <p className="mt-2 text-sm text-zinc-600">
+            Nenhum extremo no período (hipoglicemia ou leitura ≥{SEVERE_HYPER_MG_DL} mg/dL).
+          </p>
         ) : (
           <table className="mt-2 w-full border-collapse text-[13px]">
             <thead>
               <tr className="text-left text-[11px] uppercase text-zinc-600">
                 <th className="border-b border-zinc-300 py-1">Data</th>
                 <th className="border-b border-zinc-300 py-1">Tipo</th>
-                <th className="border-b border-zinc-300 py-1">Leituras fora da meta</th>
+                <th className="border-b border-zinc-300 py-1">Leituras no dia</th>
                 <th className="border-b border-zinc-300 py-1">Primeiro horário</th>
                 <th className="border-b border-zinc-300 py-1">Pico do dia</th>
               </tr>
@@ -145,7 +156,9 @@ export default async function RelatorioMedicoPage() {
               {report.hyperDays.map((d) => (
                 <tr key={`hyper-${d.day}`}>
                   <td className="border-b border-zinc-200 py-1">{fmtDate(d.day)}</td>
-                  <td className="border-b border-zinc-200 py-1 font-medium text-[#a13b00]">Hiper (≥250)</td>
+                  <td className="border-b border-zinc-200 py-1 font-medium text-[#a13b00]">
+                    Hiper (≥{SEVERE_HYPER_MG_DL})
+                  </td>
                   <td className="border-b border-zinc-200 py-1">{d.count}</td>
                   <td className="border-b border-zinc-200 py-1">{fmtDateTime(d.firstAt, tz)}</td>
                   <td className="border-b border-zinc-200 py-1">{d.peak} mg/dL</td>

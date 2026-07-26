@@ -10,6 +10,7 @@ import Link from "next/link";
 import type { ExerciseSession } from "@/types/database";
 import type { BodyGoal } from "@/lib/health/energy";
 import { demoExercises } from "@/lib/demo/data";
+import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 
 export default async function ExerciciosOverviewPage() {
   let sessions: ExerciseSession[] = [];
@@ -58,10 +59,11 @@ export default async function ExerciciosOverviewPage() {
         sessions = (data ?? []) as ExerciseSession[];
         weekSessions = (week ?? []) as ExerciseSession[];
         bodyGoal = (p?.body_goal as typeof bodyGoal) ?? null;
+        const targets = resolveGlucoseTargets(p);
         glucose = {
           latestGlucose: lastGlucose?.value_mg_dl ?? null,
-          targetMin: p?.target_glucose_min ?? 70,
-          targetMax: p?.target_glucose_max ?? 180,
+          targetMin: targets.targetMin,
+          targetMax: targets.targetMax,
         };
       }
     }

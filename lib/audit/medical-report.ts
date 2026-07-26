@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import type { MetabolicAuditRow } from "@/lib/audit/types";
 
@@ -24,12 +25,14 @@ export type MedicalReportData = {
   generatedAt: string;
 };
 
-const HYPER_THRESHOLD = 250;
-
 /** Junta o que o Mapa de risco já calcula (score.ts) com o que falta pra um
  * médico ler em 90s: extremos com data/hora (não só contagem), e adesão à
  * medicação real (medications x medication_logs) — nenhum dos dois dado
- * aparece hoje em nenhuma tela do app. */
+ * aparece hoje em nenhuma tela do app.
+ *
+ * Os "extremos" de hiper usam `SEVERE_HYPER_MG_DL` (fixo), não a meta do
+ * usuário: aqui é evento clínico, não tempo fora do alvo. Ver
+ * lib/health/glucose-thresholds.ts. */
 export async function buildMedicalReportData(
   supabase: SupabaseClient,
   userId: string
@@ -50,8 +53,7 @@ export async function buildMedicalReportData(
   if (!audit) return null;
 
   const tz = profile?.timezone || "America/Sao_Paulo";
-  const targetMin = profile?.target_glucose_min ?? 70;
-  const targetMax = profile?.target_glucose_max ?? 180;
+  const { targetMin, targetMax } = resolveGlucoseTargets(profile);
 
   const { startISO } = localDayRangeUTC(audit.period_start, tz);
   const { endISO } = localDayRangeUTC(audit.period_end, tz);
@@ -69,7 +71,7 @@ export async function buildMedicalReportData(
     const value = Number(r.value_mg_dl);
     const recordedAt = r.recorded_at as string;
     const day = localDateKey(recordedAt, tz);
-    if (value >= HYPER_THRESHOLD) {
+    if (value >= SEVERE_HYPER_MG_DL) {
       const cur = hyperByDay.get(day);
       if (!cur) hyperByDay.set(day, { count: 1, firstAt: recordedAt, peak: value });
       else {

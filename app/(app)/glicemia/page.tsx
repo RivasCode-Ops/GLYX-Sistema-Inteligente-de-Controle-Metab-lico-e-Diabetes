@@ -4,14 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getGlucoseReadingsSince } from "@/lib/queries/glucose-series";
 import { GlucoseTrendChart } from "@/components/glicemia/glucose-trend-chart";
 import { demoGlucosePoints } from "@/lib/demo/data";
+import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 
 // Visão geral + Tendências fundidas: antes eram duas telas mostrando a mesma
 // "última leitura" e a mesma fonte (glucose_readings). Agora uma só traz os
 // tiles resumo e o gráfico dos últimos 14 dias.
 export default async function GlicemiaOverviewPage() {
   let readings: Awaited<ReturnType<typeof getGlucoseReadingsSince>> = [];
-  let targetMin = 70;
-  let targetMax = 180;
+  let { targetMin, targetMax } = resolveGlucoseTargets(null);
 
   if (!isSupabaseConfigured()) {
     readings = demoGlucosePoints;
@@ -27,8 +27,7 @@ export default async function GlicemiaOverviewPage() {
         .select("target_glucose_min, target_glucose_max")
         .eq("id", user.id)
         .maybeSingle();
-      targetMin = p?.target_glucose_min ?? 70;
-      targetMax = p?.target_glucose_max ?? 180;
+      ({ targetMin, targetMax } = resolveGlucoseTargets(p));
     }
   }
 

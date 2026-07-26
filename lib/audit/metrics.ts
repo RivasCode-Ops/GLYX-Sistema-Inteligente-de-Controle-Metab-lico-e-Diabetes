@@ -1,4 +1,5 @@
 import type { AuditMetrics } from "@/lib/audit/types";
+import { SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 
 export type GlucoseSample = { value_mg_dl: number; recorded_at: string; day: string };
 export type MealSample = {
@@ -53,13 +54,19 @@ export function computeAuditMetrics(input: AuditRawInputs): AuditMetrics {
   const values = input.glucose.map((g) => g.value_mg_dl);
   const daysWithGlucose = new Set(input.glucose.map((g) => g.day)).size;
 
+  // `hyperCount` conta leituras ACIMA DA META do usuário (base do TIR), não
+  // hiperglicemia severa — os dois viviam sob o mesmo nome e o relatório médico
+  // chegou a exibir um com o rótulo do outro. `severeHyperCount` é o evento
+  // clínico (>= 250), contado à parte e com limiar fixo.
   let inRange = 0;
   let hypoCount = 0;
   let hyperCount = 0;
+  let severeHyperCount = 0;
   for (const v of values) {
     if (v < input.targetMin) hypoCount += 1;
     else if (v > input.targetMax) hyperCount += 1;
     else inRange += 1;
+    if (v >= SEVERE_HYPER_MG_DL) severeHyperCount += 1;
   }
 
   const tirPercent = values.length > 0 ? Math.round((inRange / values.length) * 1000) / 10 : null;
@@ -103,6 +110,7 @@ export function computeAuditMetrics(input: AuditRawInputs): AuditMetrics {
     tirPercent,
     hypoCount,
     hyperCount,
+    severeHyperCount,
     avgGlucose: avgGlucose != null ? Math.round(avgGlucose) : null,
     stdDev: sd != null ? Math.round(sd) : null,
     avgCarbsPerDay: avgCarbsPerDay != null ? round1(avgCarbsPerDay) : null,

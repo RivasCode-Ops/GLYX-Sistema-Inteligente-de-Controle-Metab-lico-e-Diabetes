@@ -5,6 +5,8 @@
  * Estimativa educativa — não substitui o alarme do próprio sensor.
  */
 
+import { DEFAULT_HYPO_MG_DL } from "@/lib/health/glucose-thresholds";
+
 export type TrendPoint = { valueMgDl: number; recordedAt: string };
 
 export type TrendPrediction = {
@@ -52,14 +54,24 @@ export function predictTrend(points: TrendPoint[], horizonMin = 30): TrendPredic
   };
 }
 
-export const HYPO_MG_DL = 70;
-
-/** Alerta preditivo: ainda acima de 70, mas caindo rumo à hipo no horizonte. */
-export function isPredictedHypo(t: TrendPrediction | null): boolean {
+/**
+ * Alerta preditivo: ainda acima do limiar de hipo, mas caindo rumo a ele no
+ * horizonte.
+ *
+ * O limiar vem do perfil (`target_glucose_min`) — antes era 70 fixo aqui,
+ * enquanto o alerta por leitura (lib/insights/rules.ts) já respeitava a meta
+ * pessoal. Para um usuário com meta mínima 80, o alerta reativo disparava em 79
+ * e o preditivo só considerava queda rumo a 70: dois caminhos de hipo com
+ * limiares diferentes para a mesma pessoa.
+ */
+export function isPredictedHypo(
+  t: TrendPrediction | null,
+  hypoThreshold: number = DEFAULT_HYPO_MG_DL
+): boolean {
   return (
     t !== null &&
-    t.currentMgDl >= HYPO_MG_DL &&
-    t.projectedMgDl < HYPO_MG_DL &&
+    t.currentMgDl >= hypoThreshold &&
+    t.projectedMgDl < hypoThreshold &&
     t.slopePerMin <= -0.5
   );
 }

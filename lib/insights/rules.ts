@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendPushToUser } from "@/lib/push/send";
-import { hypoThresholdFor } from "@/lib/health/glucose-thresholds";
+import { SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
+import { loadGlucoseTargets } from "@/lib/health/load-glucose-targets";
 
-const HYPER_MG_DL = 250;
 /** Faixa acima da meta mínima que ainda merece um aviso preventivo (não crítico). */
 const NEAR_LOW_BUFFER_MG_DL = 10;
 
@@ -28,15 +28,10 @@ export async function evaluateGlucoseAlert(
   reading: { valueMgDl: number; recordedAt: string },
   source: GlucoseAlertSource
 ): Promise<void> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("target_glucose_min")
-    .eq("id", userId)
-    .maybeSingle();
-  const hypoThreshold = hypoThresholdFor(profile?.target_glucose_min);
+  const { hypoThreshold } = await loadGlucoseTargets(supabase, userId);
 
   const kind: "hyperglycemia" | "hypoglycemia" | "near_low" | null =
-    reading.valueMgDl >= HYPER_MG_DL
+    reading.valueMgDl >= SEVERE_HYPER_MG_DL
       ? "hyperglycemia"
       : reading.valueMgDl < hypoThreshold
         ? "hypoglycemia"
@@ -74,7 +69,7 @@ export async function evaluateGlucoseAlert(
       ? `${reading.valueMgDl} mg/dL. Corrija com carboidrato rápido e meça de novo em 15 min; busque ajuda se os sintomas persistirem.`
       : kind === "near_low"
         ? `${reading.valueMgDl} mg/dL — perto do limite inferior da meta. Considere um lanche leve com carboidrato e monitore de perto nos próximos minutos.`
-        : `Leitura ${reading.valueMgDl} mg/dL. Monitore sintomas e siga o plano acordado com seu médico.`;
+        : `Leitura ${reading.valueMgDl} mg/dL (limiar de alerta: ${SEVERE_HYPER_MG_DL}). Monitore sintomas e siga o plano acordado com seu médico.`;
 
   await supabase.from("metabolic_alerts").insert({
     user_id: userId,

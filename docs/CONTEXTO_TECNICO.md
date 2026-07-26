@@ -237,16 +237,20 @@ Imagem de exame **não é persistida** — trafega como data-URL em base64 diret
 
 ### 6.1 Glicemia
 
-**Faixa-alvo**: default 70–180 mg/dL, sobrescrita por `profiles.target_glucose_min/max`. O comentário
-em `lib/queries/dashboard.ts:79` registra a intenção: *"faixa definida com o médico; 70–180 é só o
-padrão inicial"*.
+**Faixa-alvo**: default 70–180 mg/dL, sobrescrita por `profiles.target_glucose_min/max`. Fonte única
+em `lib/health/glucose-thresholds.ts`; quem lê o perfil chama `resolveGlucoseTargets(profile)` em vez
+de repetir `?? 70 / ?? 180` (era literal em 10 arquivos até 26/07/2026 — ver §10.4). Faixa incoerente
+gravada antes da validação é descartada na leitura e cai para o padrão.
 
-⚠️ O par 70/180 é **literal repetido em 5 arquivos**, sem constante compartilhada
-(`lib/queries/dashboard.ts:33`, `lib/audit/day-grid.ts:36`, `lib/audit/medical-report.ts:53`,
-`lib/exercicios/weekly-goals.ts:99`, `lib/ai/user-context.ts:252`).
+**Dois conceitos distintos, deliberadamente:**
 
-**Classificação de uma leitura** (`lib/insights/rules.ts:36-45`):
-- `>= 250` → hiperglicemia (warning)
+| Conceito | Regra | Uso |
+|---|---|---|
+| Acima da meta | `> targetMax` (individual) | TIR, risco, score |
+| Hiperglicemia severa | `>= 250` (fixo) | alerta push, extremos do relatório médico |
+
+**Classificação de uma leitura** (`lib/insights/rules.ts`):
+- `>= SEVERE_HYPER_MG_DL` (250) → hiperglicemia (warning)
 - `< target_min` (ou 70) → hipoglicemia (**critical**, dispara push)
 - `< limiar + 10` → near-low (info, 1×/dia)
 
@@ -261,9 +265,10 @@ estratifica nível 1/2 da ADA.
 `eaten_at`, houver pico `>= 180` **ou** subida `>= 50 mg/dL` sobre a leitura imediatamente anterior.
 Avaliado por cron a cada 30 min.
 
-**Predição de hipo (CGM)** — `lib/cgm/trend.ts:20-65`: regressão linear sobre 25 min, mínimo 3
-pontos, horizonte 30 min. Alerta se atual ≥70, projetado <70 e slope ≤ −0,5 mg/dL/min. Disclaimer no
-código: *"não substitui o alarme do próprio sensor"*.
+**Predição de hipo (CGM)** — `lib/cgm/trend.ts`: regressão linear sobre 25 min, mínimo 3 pontos,
+horizonte 30 min. Alerta se atual ≥ limiar, projetado < limiar e slope ≤ −0,5 mg/dL/min. O limiar é o
+`target_glucose_min` do perfil (era 70 fixo até 26/07/2026), carregado pelos syncs via
+`loadGlucoseTargets`. Disclaimer no código: *"não substitui o alarme do próprio sensor"*.
 
 ### 6.2 Dose de insulina (bolus)
 
@@ -486,7 +491,9 @@ que as exporia via `/rest/v1/rpc/...` para qualquer visitante.
 
 ## 10. Riscos e inconsistências abertas
 
-Achados de leitura de código, ordenados por gravidade. Nenhum foi corrigido neste levantamento.
+Achados de leitura de código, ordenados por gravidade do levantamento original (21/07/2026). Os que
+já foram corrigidos ficam registrados aqui com o estado anterior — o histórico é o que explica por
+que a regra atual é assim.
 
 ### 10.1 🟠 Calculadora de bolus: trava de hipo resolvida, teto de dose ainda ausente
 
@@ -535,17 +542,25 @@ e `factor.label` **direto no prompt do chat**, sem `sanitizeForPrompt`. O chat �
 maior liberdade de saída, e nomes de refeição/medicação são texto livre do usuário — ou vindos de OCR
 de rótulo.
 
-### 10.4 🟠 Três definições de hiperglicemia coexistem
+### 10.4 ✅ Três definições de hiperglicemia coexistiam — resolvido em 26/07/2026
 
-| Contexto | Limiar | Arquivo |
-|---|---|---|
-| Alerta | `>= 250` | `lib/insights/rules.ts:4` |
-| TIR / risco | `> targetMax` (180) | `lib/audit/metrics.ts:61` |
-| Relatório médico | `>= 250` | `lib/audit/medical-report.ts:27` |
+**Estado original:** `>= 250` no alerta, `> targetMax` no TIR e `>= 250` no relatório médico, cada
+um com o literal no próprio arquivo. Pior sintoma: `app/relatorio-medico/page.tsx` exibia
+`metrics.hyperCount` (leituras acima da **meta**) sob o rótulo "Leituras ≥250 mg/dL" — número de uma
+definição com o rótulo da outra, numa tela feita para o médico ler.
 
-Relacionado: `lib/cgm/trend.ts:55` fixa `HYPO_MG_DL = 70` e **ignora** `target_glucose_min` do perfil,
-enquanto `lib/insights/rules.ts:36` respeita. Dois caminhos de alerta de hipo com limiares
-potencialmente diferentes para o mesmo usuário.
+Relacionado: `lib/cgm/trend.ts` fixava `HYPO_MG_DL = 70` e **ignorava** `target_glucose_min`,
+enquanto `lib/insights/rules.ts` respeitava. Para uma meta mínima de 110, o alerta reativo disparava
+em 109 e o preditivo só considerava queda rumo a 70.
+
+**Correção:** `lib/health/glucose-thresholds.ts` virou fonte única e nomeia os dois conceitos
+separadamente — *acima da meta* (`> targetMax`, base do TIR, individual) e *hiperglicemia severa*
+(`>= SEVERE_HYPER_MG_DL`, fixo, evento clínico). `resolveGlucoseTargets(profile)` substitui os
+`?? 70 / ?? 180` que estavam espalhados em 10 arquivos; `isPredictedHypo(t, hypoThreshold)` recebe o
+limiar do perfil, carregado por `lib/health/load-glucose-targets.ts` nos dois syncs de CGM.
+`computeAuditMetrics` passou a devolver `severeHyperCount` à parte de `hyperCount`, e o relatório
+mostra os dois com o rótulo certo. O **score não mudou**: hiper severa é exibida, não pontuada —
+mudar peso de score é decisão clínica, não refatoração.
 
 ### 10.5 🟠 URL de produção hardcoded em 22 pontos das migrações
 
@@ -553,10 +568,21 @@ As funções de cron chamam `https://glyx-sistema-inteligente-de-control.vercel.
 literal. Não há variável de ambiente nem GUC. **Troca de domínio quebra todo o agendamento em
 silêncio** — nenhum job falha visivelmente, eles simplesmente chamam um host que não responde.
 
-### 10.6 🟡 Sem validação de coerência da faixa-alvo
+### 10.6 ✅ Faixa-alvo sem validação de coerência — resolvido em 26/07/2026
 
-`app/actions/profile.ts:10-11` aceita `target_glucose_min`/`max` como número livre — inclusive
-`min > max` ou valores negativos. Isso propaga para todo o cálculo de TIR, alertas e risco.
+**Estado original:** `app/actions/profile.ts` aceitava `target_glucose_min`/`max` como número livre —
+inclusive `min > max` ou negativo — e isso propagava para TIR, alertas e risco.
+
+**Correção em duas camadas:** `updateProfile` recusa a faixa com mensagem específica
+(limites de sanidade + `MIN_TARGET_SPAN_MG_DL` entre mínima e máxima), e `resolveGlucoseTargets`
+descarta faixa incoerente **inteira** na leitura, caindo para o padrão — necessário porque linhas
+gravadas antes desta validação podem estar quebradas. Aproveitar só o lado "válido" de um par
+incoerente inventaria uma faixa que nem o usuário nem o médico definiram.
+
+Efeito colateral descoberto no caminho: as três formas do Perfil chamavam a server action dentro de
+um wrapper `Promise<void>`, então **todo** `{ error }` era descartado em silêncio — a página
+recarregava como se tivesse salvado. `components/perfil/profile-form.tsx` (useActionState) passou a
+exibir erro e confirmação.
 
 ### 10.7 🟡 Adesão medicamentosa usa duas regras diferentes
 

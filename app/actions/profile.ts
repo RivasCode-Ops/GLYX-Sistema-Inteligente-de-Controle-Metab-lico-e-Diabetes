@@ -3,6 +3,38 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isCoherentTargetRange,
+  MIN_TARGET_SPAN_MG_DL,
+  TARGET_MAX_CEIL_MG_DL,
+  TARGET_MAX_FLOOR_MG_DL,
+  TARGET_MIN_CEIL_MG_DL,
+  TARGET_MIN_FLOOR_MG_DL,
+} from "@/lib/health/glucose-thresholds";
+
+/**
+ * Faixa-alvo aceitava número livre: `min > max`, negativo ou 5000 entravam no
+ * banco e vazavam para TIR, mapa de risco, alerta de hipo e prompt da IA — o
+ * app inteiro passa a calcular sobre uma faixa que não existe. Os limites são
+ * de sanidade, não conduta clínica: a faixa real é combinada com o médico
+ * dentro desses limites.
+ */
+const targetRangeIssue = (min?: number, max?: number): string | null => {
+  if (min == null && max == null) return null;
+  if (min == null || max == null) {
+    return "Informe a meta mínima e a máxima juntas.";
+  }
+  if (min < TARGET_MIN_FLOOR_MG_DL || min > TARGET_MIN_CEIL_MG_DL) {
+    return `Meta mínima deve ficar entre ${TARGET_MIN_FLOOR_MG_DL} e ${TARGET_MIN_CEIL_MG_DL} mg/dL.`;
+  }
+  if (max < TARGET_MAX_FLOOR_MG_DL || max > TARGET_MAX_CEIL_MG_DL) {
+    return `Meta máxima deve ficar entre ${TARGET_MAX_FLOOR_MG_DL} e ${TARGET_MAX_CEIL_MG_DL} mg/dL.`;
+  }
+  if (!isCoherentTargetRange(min, max)) {
+    return `A meta máxima precisa ficar pelo menos ${MIN_TARGET_SPAN_MG_DL} mg/dL acima da mínima.`;
+  }
+  return null;
+};
 
 const schema = z.object({
   full_name: z.string().optional(),
@@ -49,6 +81,12 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     target_glucose_bolus: formData.get("target_glucose_bolus") || undefined,
   });
   if (!parsed.success) return { error: "Dados inválidos." };
+
+  const rangeIssue = targetRangeIssue(
+    parsed.data.target_glucose_min,
+    parsed.data.target_glucose_max
+  );
+  if (rangeIssue) return { error: rangeIssue };
 
   const { error } = await supabase.from("profiles").upsert(
     {

@@ -1,12 +1,20 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { updateProfile } from "@/app/actions/profile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ProfileForm } from "@/components/perfil/profile-form";
 import type { Profile } from "@/types/database";
 import { demoProfile } from "@/lib/demo/data";
+import {
+  DEFAULT_TARGET_MAX_MG_DL,
+  DEFAULT_TARGET_MIN_MG_DL,
+  MIN_TARGET_SPAN_MG_DL,
+  TARGET_MAX_CEIL_MG_DL,
+  TARGET_MAX_FLOOR_MG_DL,
+  TARGET_MIN_CEIL_MG_DL,
+  TARGET_MIN_FLOOR_MG_DL,
+} from "@/lib/health/glucose-thresholds";
 
 // Perfil dividido em abas (Metabólico / Corpo & peso / Conta) — antes eram 8
 // blocos heterogêneos empilhados numa página só. Esta é a aba Metabólico:
@@ -14,11 +22,6 @@ import { demoProfile } from "@/lib/demo/data";
 export default async function PerfilMetabolicoPage() {
   let profile: Profile | null = null;
   const demoMode = !isSupabaseConfigured();
-
-  async function updateProfileAction(formData: FormData): Promise<void> {
-    "use server";
-    await updateProfile(formData);
-  }
 
   if (demoMode) {
     profile = demoProfile;
@@ -51,7 +54,7 @@ export default async function PerfilMetabolicoPage() {
               Perfil fictício da demo para validar campos e metas clínicas iniciais.
             </p>
           ) : null}
-          <form action={updateProfileAction} className="grid gap-4">
+          <ProfileForm submitLabel="Salvar perfil">
             <div className="grid gap-1">
               <Label htmlFor="full_name">Nome</Label>
               <Input
@@ -77,7 +80,9 @@ export default async function PerfilMetabolicoPage() {
                   id="target_glucose_min"
                   name="target_glucose_min"
                   type="number"
-                  defaultValue={profile?.target_glucose_min ?? 70}
+                  min={TARGET_MIN_FLOOR_MG_DL}
+                  max={TARGET_MIN_CEIL_MG_DL}
+                  defaultValue={profile?.target_glucose_min ?? DEFAULT_TARGET_MIN_MG_DL}
                 />
               </div>
               <div className="grid gap-1">
@@ -86,12 +91,18 @@ export default async function PerfilMetabolicoPage() {
                   id="target_glucose_max"
                   name="target_glucose_max"
                   type="number"
-                  defaultValue={profile?.target_glucose_max ?? 180}
+                  min={TARGET_MAX_FLOOR_MG_DL}
+                  max={TARGET_MAX_CEIL_MG_DL}
+                  defaultValue={profile?.target_glucose_max ?? DEFAULT_TARGET_MAX_MG_DL}
                 />
               </div>
             </div>
-            <Button type="submit">Salvar perfil</Button>
-          </form>
+            <p className="text-xs text-zinc-400">
+              Faixa combinada com seu médico. A máxima precisa ficar ao menos{" "}
+              {MIN_TARGET_SPAN_MG_DL} mg/dL acima da mínima — ela alimenta o tempo no alvo, o
+              mapa de risco e o alerta de hipoglicemia.
+            </p>
+          </ProfileForm>
         </CardContent>
       </Card>
       <Card>
@@ -103,7 +114,12 @@ export default async function PerfilMetabolicoPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={updateProfileAction} className="grid gap-4 sm:grid-cols-3">
+          <ProfileForm
+            submitLabel="Salvar parâmetros"
+            successMessage="Parâmetros salvos."
+            className="grid gap-4 sm:grid-cols-3"
+            spanClassName="sm:col-span-3"
+          >
             <div className="grid gap-1">
               <Label htmlFor="carb_ratio">Razão carbo/insulina (g por 1U)</Label>
               <Input
@@ -136,10 +152,7 @@ export default async function PerfilMetabolicoPage() {
                 placeholder="ex.: 100"
               />
             </div>
-            <div className="sm:col-span-3">
-              <Button type="submit">Salvar parâmetros</Button>
-            </div>
-          </form>
+          </ProfileForm>
         </CardContent>
       </Card>
     </div>

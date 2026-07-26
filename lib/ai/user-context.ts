@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
+import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 
@@ -153,8 +154,9 @@ export async function buildUserContext(
     if (foco) linhas.push(`Foco do usuário: ${foco}.`);
   }
   if (weightRes.data?.weight_kg) linhas.push(`Peso atual: ${weightRes.data.weight_kg} kg.`);
+  const targets = resolveGlucoseTargets(profile);
   linhas.push(
-    `Faixa alvo de glicemia definida no app: ${profile?.target_glucose_min ?? 70}–${profile?.target_glucose_max ?? 180} mg/dL (ajustes de meta são decisão médica).`
+    `Faixa alvo de glicemia definida no app: ${targets.targetMin}–${targets.targetMax} mg/dL (ajustes de meta são decisão médica).`
   );
 
   const audit = auditRes.data as { score: number; label: string; factors: unknown; computed_at: string } | null;
@@ -249,8 +251,7 @@ export async function buildUserContext(
 
   const history = historyRes.data ?? [];
   if (history.length >= 20) {
-    const targetMax = profile?.target_glucose_max ?? 180;
-    const piores = worstHours(computeHourlyPattern(history, tz, targetMax));
+    const piores = worstHours(computeHourlyPattern(history, tz, targets.targetMax));
     if (piores.length) {
       linhas.push(
         `Padrão por hora do dia (14 dias, fuso do usuário) — janelas com mais leituras ACIMA da meta: ${piores

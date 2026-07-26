@@ -1,7 +1,8 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { logWeight, updateProfile } from "@/app/actions/profile";
+import { logWeight } from "@/app/actions/profile";
 import { GoalFeasibilityCard } from "@/components/perfil/goal-feasibility-card";
+import { ProfileForm } from "@/components/perfil/profile-form";
 import { WeightChart } from "@/components/perfil/weight-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,11 +17,6 @@ export default async function PerfilCorpoPage() {
   let profile: Profile | null = null;
   let weights: WeightLog[] = [];
   const demoMode = !isSupabaseConfigured();
-
-  async function updateProfileAction(formData: FormData): Promise<void> {
-    "use server";
-    await updateProfile(formData);
-  }
 
   async function logWeightAction(formData: FormData): Promise<void> {
     "use server";
@@ -60,7 +56,12 @@ export default async function PerfilCorpoPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={updateProfileAction} className="grid gap-4 sm:grid-cols-2">
+          <ProfileForm
+            submitLabel="Salvar objetivo"
+            successMessage="Objetivo salvo."
+            className="grid gap-4 sm:grid-cols-2"
+            spanClassName="sm:col-span-2"
+          >
             <div className="grid gap-1">
               <Label htmlFor="body_goal">Objetivo</Label>
               <select
@@ -146,10 +147,7 @@ export default async function PerfilCorpoPage() {
                 placeholder="ex.: diabetes e hipertensão na família"
               />
             </div>
-            <div className="sm:col-span-2">
-              <Button type="submit">Salvar objetivo</Button>
-            </div>
-          </form>
+          </ProfileForm>
         </CardContent>
       </Card>
 

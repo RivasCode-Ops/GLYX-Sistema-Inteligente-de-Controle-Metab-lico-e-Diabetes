@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditRawInputs } from "@/lib/audit/metrics";
 import { countAlteredSignals } from "@/lib/exams/types";
+import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import type { HealthSnapshotSource } from "@/lib/health/types";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 
@@ -33,8 +34,7 @@ export async function loadAuditDayGrid(
 
   const p = (profile ?? null) as ProfileTargets | null;
   const timezone = p?.timezone ?? null;
-  const targetMin = p?.target_glucose_min ?? 70;
-  const targetMax = p?.target_glucose_max ?? 180;
+  const { targetMin, targetMax } = resolveGlucoseTargets(p);
 
   // Janela alinhada ao dia LOCAL do usuário, não ao instante exato — senão
   // leituras feitas de madrugada (fuso local) no primeiro dia da janela

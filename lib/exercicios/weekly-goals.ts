@@ -1,6 +1,10 @@
 import type { ExerciseSession } from "@/types/database";
 import type { BodyGoal } from "@/lib/health/energy";
 import { activityKind, type ActivityKind } from "@/lib/data/activity-types";
+import {
+  DEFAULT_TARGET_MAX_MG_DL,
+  DEFAULT_TARGET_MIN_MG_DL,
+} from "@/lib/health/glucose-thresholds";
 
 export type WeeklyExerciseGoal = {
   targetMinutes: number;
@@ -117,8 +121,8 @@ export function computeWeeklyExerciseProgress(
         : `Faça uma sessão curta hoje para fechar ${missingMinutes} min de atividade.`;
 
   const latestGlucose = glucoseContext?.latestGlucose ?? null;
-  const targetMin = glucoseContext?.targetMin ?? 70;
-  const targetMax = glucoseContext?.targetMax ?? 180;
+  const targetMin = glucoseContext?.targetMin ?? DEFAULT_TARGET_MIN_MG_DL;
+  const targetMax = glucoseContext?.targetMax ?? DEFAULT_TARGET_MAX_MG_DL;
 
   let workoutSuggestion =
     goal === "lose"

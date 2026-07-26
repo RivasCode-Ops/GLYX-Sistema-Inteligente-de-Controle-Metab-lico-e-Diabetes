@@ -38,6 +38,23 @@ describe("computeAuditMetrics", () => {
     expect(metrics.hyperCount).toBe(1);
     expect(metrics.tirPercent).toBe(50);
   });
+
+  it("separa 'acima da meta' de hiperglicemia severa", () => {
+    // 200 conta como acima da meta (>180) mas NÃO como hiper severa; 260 conta
+    // nas duas. Os dois números viviam sob o mesmo nome e o relatório médico
+    // exibia o contador da meta com o rótulo de ≥250.
+    const metrics = computeAuditMetrics(
+      baseInput({
+        glucose: [
+          { value_mg_dl: 200, recorded_at: "2026-07-01T10:00:00Z", day: "2026-07-01" },
+          { value_mg_dl: 260, recorded_at: "2026-07-02T10:00:00Z", day: "2026-07-02" },
+          { value_mg_dl: 120, recorded_at: "2026-07-03T10:00:00Z", day: "2026-07-03" },
+        ],
+      })
+    );
+    expect(metrics.hyperCount).toBe(2);
+    expect(metrics.severeHyperCount).toBe(1);
+  });
 });
 
 describe("scoreFromMetrics", () => {
