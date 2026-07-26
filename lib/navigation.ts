@@ -10,6 +10,7 @@ import {
   Plug,
   Radar,
   LineChart,
+  Ruler,
   HelpCircle,
 } from "lucide-react";
 
@@ -38,6 +39,9 @@ export const mainNav: NavItem[] = [
   { title: "Alimentação", href: "/alimentacao", icon: UtensilsCrossed, mobile: true, group: "registrar" }, // uso: 2º mais registrado
   { title: "Medicação", href: "/medicacao", icon: Pill, mobile: true, group: "registrar" }, // uso: 3º + criticidade clínica (insulina)
   { title: "Exercícios", href: "/exercicios", icon: Dumbbell, mobile: true, group: "registrar" }, // uso: o menos registrado do grupo hoje
+  // Composição corporal: registro mensal (fita/foto), não diário — fica fora da
+  // barra inferior de propósito, para não competir com o que se registra todo dia.
+  { title: "Composição", href: "/composicao", icon: Ruler, mobile: false, group: "registrar" },
   // Análises consolidadas: Mapa de risco, Insights, Histórico e Alertas viraram
   // abas de uma tela só (/analise). A IA metabólica virou chat flutuante global
   // (ver MetabolicChatFab), então saiu do menu. Exames é gestão de documento —
@@ -94,6 +98,13 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Visão geral", href: "/exercicios" },
     { title: "Plano", href: "/exercicios/plano" },
     { title: "Recuperação", href: "/exercicios/recuperacao" },
+  ],
+  "/composicao": [
+    { title: "Resumo", href: "/composicao" },
+    { title: "Medidas", href: "/composicao/medidas" },
+    { title: "Fotos", href: "/composicao/fotos" },
+    { title: "Metas", href: "/composicao/metas" },
+    { title: "Histórico", href: "/composicao/historico" },
   ],
   "/medicacao": [
     { title: "Doses de hoje", href: "/medicacao" },

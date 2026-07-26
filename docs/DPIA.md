@@ -19,6 +19,8 @@ O GLYX permite que a pessoa titular registre e visualize dados de saúde metabó
 |-----------|----------|------------------|
 | Identificação | e-mail, nome, id Auth | Não (pessoal) |
 | Saúde | glicemia, CGM, refeições, exames, meds, atividade | **Sim** |
+| Composição corporal | medidas de fita, dobras cutâneas, metas | **Sim** |
+| Imagem corporal | fotos de progresso (frente/costas/perfis) | **Sim** — ver §6 |
 | Credenciais de terceiros | senha LibreLinkUp / tokens Dexcom (cifrados) | Sim (acesso a saúde) |
 | Técnicos | push endpoints, uso de IA (tokens), logs de erro | Parcial |
 | Não coletados | geolocalização contínua, biometria, dados de terceiros sem consentimento | — |
@@ -29,6 +31,7 @@ O GLYX permite que a pessoa titular registre e visualize dados de saúde metabó
 - **Não há** papéis de médico/cuidador com acesso cruzado no produto atual.
 - **Cadastro:** convite + consentimento explícito na UI de registro.
 - **IA:** processamento só quando o titular aciona a função (foto, chat, exame, etc.).
+- **Fotos de progresso corporal:** ficam no Storage privado e **não** são enviadas à IA por padrão. Só saem do servidor quando o titular pede explicitamente a comparação de duas fotos (`/api/ai/body-photo-compare`), com aviso na tela antes do botão. Nenhum job de fundo lê esse bucket.
 
 ## 4. Sistemas e operadores
 
@@ -43,7 +46,7 @@ O GLYX permite que a pessoa titular registre e visualize dados de saúde metabó
 ## 5. Medidas de segurança (estado atual)
 
 - Isolamento **RLS** por `auth.uid()` nas tabelas clínicas
-- Storage privado (fotos de refeição / rótulo) com pasta por usuário
+- Storage privado (fotos de refeição / rótulo / progresso corporal) com pasta por usuário e URL assinada de 1 h
 - Credenciais CGM com **AES-256-GCM** (`CGM_CREDENTIALS_SECRET`)
 - Signup público desligável; cadastro via Admin API + convite
 - Rate-limit de IA **fail-closed**
@@ -61,6 +64,8 @@ O GLYX permite que a pessoa titular registre e visualize dados de saúde metabó
 | Wipe incompleto (históricos) | Alto | Inventário em `lib/privacy/user-data.ts` + teste RLS/LGPD |
 | Bypass de convite | Médio | Fechar signup Auth + SERVICE_ROLE no register |
 | Over-trust em alertas/IA | Médio | Disclaimer médico repetido; tom educativo |
+| Foto de corpo enviada à IA | **Alto** | Envio só por ação explícita, duas fotos por vez, aviso antes do botão, nenhum job automático; prompt proíbe estimar peso/gordura por imagem e comentário estético; limite de 5 chamadas/h |
+| Estimativa de gordura lida como exame | Médio | Método sempre exibido junto do número; comparação entre métodos diferentes bloqueada em código (`sameMethod`); erro de 3-4 pontos declarado na tela |
 
 ## 7. Necessidade e proporcionalidade
 

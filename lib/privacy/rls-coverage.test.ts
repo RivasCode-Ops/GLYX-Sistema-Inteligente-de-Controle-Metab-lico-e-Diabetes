@@ -39,6 +39,9 @@ const CLINICAL_TABLES_WITH_USER_ID = [
   "muscle_pauses",
   "strength_logs",
   "blood_pressure_logs",
+  "body_measurements",
+  "body_goals",
+  "body_photos",
 ] as const;
 
 describe("cobertura RLS nas migrations", () => {

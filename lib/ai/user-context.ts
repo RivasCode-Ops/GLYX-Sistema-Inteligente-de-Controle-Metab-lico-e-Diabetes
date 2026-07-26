@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildBodyContextLines } from "@/lib/ai/body-context";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
@@ -280,6 +281,10 @@ export async function buildUserContext(
         .join("; ")}.`
     );
   }
+
+  // Composição corporal: sem isso o chat responde "estou ganhando músculo ou
+  // gordura?" no chute, enquanto o app já tem a resposta calculada.
+  linhas.push(...(await buildBodyContextLines(supabase, userId)));
 
   const SLEEP_SRC_PRIORITY = ["manual", "apple_health", "google_fit"];
   const sleepByDate = new Map<string, { hours: number; rank: number }>();

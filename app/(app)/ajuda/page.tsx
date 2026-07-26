@@ -182,6 +182,37 @@ export default function AjudaPage() {
         </ScreenPreview>
       </CollapsibleSection>
 
+      <CollapsibleSection
+        title="📏 Composição corporal"
+        description="Medidas, fotos, metas e leitura de músculo x gordura"
+      >
+        <p className="text-sm text-zinc-300">
+          A balança não separa músculo de gordura — 15 circunferências, dobras cutâneas (opcionais,
+          exigem adipômetro) e fotos de progresso separam. Em <strong>Medidas</strong> você registra
+          com fita métrica; em <strong>Metas</strong> define alvos por medida e o app projeta prazo
+          no ritmo observado; em <strong>Histórico</strong> vê a evolução de cada uma.
+        </p>
+        <p className="mt-2 text-sm text-zinc-300">
+          O resumo cruza tudo: peso × cintura diz se o ganho foi magro ou com gordura, o volume
+          semanal por grupo muscular diz se o treino comporta a meta, e a leitura da IA junta isso
+          com glicemia, sono e alimentação.
+        </p>
+        <ScreenPreview label="/composicao">
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <p className="text-sm font-medium text-emerald-200">Recomposição corporal</p>
+            <p className="text-xs text-zinc-400">
+              Peso +1,2 kg com cintura −2 cm: ganhar peso reduzindo cintura é o padrão de ganho de
+              músculo com perda de gordura.
+            </p>
+          </div>
+        </ScreenPreview>
+        <p className="mt-2 text-xs text-zinc-500">
+          Percentual de gordura por fita ou dobra é estimativa (erro de 3 a 4 pontos) e serve pra
+          acompanhar a sua tendência, não pra comparar com exame. Diferença de até 1 cm entre
+          medições é erro de fita — o app trata como estabilidade.
+        </p>
+      </CollapsibleSection>
+
       <CollapsibleSection title="📊 Análise" description="Resumo, correlações, linha do tempo, alertas">
         <p className="text-sm text-zinc-300">
           Consolida as visões retrospectivas em abas: mapa de risco (<strong>Resumo</strong>),

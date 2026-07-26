@@ -15,7 +15,7 @@ refeições, medicação, exercício, água, peso e exames, com sincronização 
 análise assistida por IA e alarmes push.
 
 **Não é dispositivo médico.** Não faz diagnóstico e não prescreve. Essa posição é reafirmada em
-código, não só em documento — ver §6.6.
+código, não só em documento — ver §6.7.
 
 Acesso é **invite-only** (`SIGNUP_INVITE_CODE` + allowlist de e-mail), com signup público do Supabase
 Auth desligado.
@@ -33,8 +33,8 @@ Auth desligado.
 | Páginas (`page.tsx`) | 42 |
 | Rotas de API | 37 |
 | Arquivos de teste | 30 (Vitest) + 3 specs E2E (Playwright) |
-| Migrations | 48 (`20260109000000_init` → `20260719000000_*`) |
-| Tabelas no Postgres | 25, **todas com RLS ativo** |
+| Migrations | 51 (`20260109000000_init` → `20260726010000_*`) |
+| Tabelas no Postgres | 28, **todas com RLS ativo** |
 | Funções SQL | 14 |
 | Cron jobs ativos | 7 |
 
@@ -190,7 +190,7 @@ mesmo tipo de informação.**
 
 ## 5. Modelo de dados
 
-25 tabelas, todas com RLS por `auth.uid() = user_id`. Tipos manuais em `types/database.ts` (não
+28 tabelas, todas com RLS por `auth.uid() = user_id`. Tipos manuais em `types/database.ts` (não
 gerados pelo CLI do Supabase — precisam ser atualizados à mão quando o schema muda).
 
 ### Núcleo clínico
@@ -199,7 +199,13 @@ gerados pelo CLI do Supabase — precisam ser atualizados à mão quando o schem
 
 ### Corpo e atividade
 `exercise_sessions` · `strength_logs` · `muscle_pauses` · `weight_logs` · `water_logs` ·
-`health_snapshots`
+`health_snapshots` · `body_measurements` · `body_goals` · `body_photos`
+
+`body_measurements` guarda 21 medidas opcionais (15 circunferências + 5 dobras + peso) com
+`unique (user_id, measured_on)`: uma medição por dia, a última do dia substitui. A composição
+estimada (% de gordura, massa magra, FFMI) **não é gravada** — é derivada em `lib/body/composition.ts`
+a cada leitura, porque a fórmula pode mudar e o dado bruto é a fonte da verdade. `body_goals` congela
+`start_value` na criação da meta para que o progresso não ande junto com o resultado.
 
 ### Derivados e análise
 `metabolic_audits` · `metabolic_alerts` · `insight_findings`
@@ -225,6 +231,7 @@ admin e guarda de colunas privilegiadas (`profiles_guard_privileged_columns`).
 |---|---|---|---|
 | `meal-photos` | não | 4 MB | jpeg, png, webp |
 | `medication-labels` | não | 4 MB | jpeg, png, webp |
+| `body-photos` | não | 8 MB | jpeg, png, webp |
 
 Caminho `${userId}/${uuid}.${ext}` — a pasta por usuário é o que a policy verifica. **Não há policy de
 `update`** em nenhum dos dois.
@@ -321,10 +328,47 @@ absoluto de 1200 kcal. Ritmo seguro: perda 0,75%/semana, ganho 0,25%/semana.
 **Ajuste adaptativo** (`:153-192`): exige ≥4 pesagens e ≥14 dias, usa 7700 kcal/kg, delta limitado a
 ±150 kcal e arredondado a múltiplos de 50.
 
+### 6.5 Composição corporal
+
+Tudo em `lib/body/` (+ `lib/exercicios/weekly-volume.ts`), determinístico e testado. A IA entra
+depois, com estes números prontos no prompt — não recalcula nada.
+
+**Estimativa de gordura** (`composition.ts`) — duas réguas, nunca misturadas:
+
+| Método | Equação | Exige |
+|---|---|---|
+| Dobras (preferido) | Jackson-Pollock 3 + Siri | 3 dobras do protocolo do sexo + idade |
+| Circunferências | US Navy / Hodgdon-Beckett | cintura + pescoço (+ quadril se mulher) |
+
+`sameMethod()` bloqueia comparar duas datas medidas por métodos diferentes: a troca de régua produz
+um "salto" de gordura que não aconteceu no corpo. Resultado fora de 3-70% é descartado como erro de
+entrada. Sem sexo/altura no perfil, só IMC e cintura/altura são calculados.
+
+**Piso de ruído** (`progress.ts`): 0,5 kg / 1,0 cm / 2,0 mm. Diferença menor é lida como
+**estabilidade**, nunca como evolução — a fita erra ~1 cm entre medições da mesma pessoa no mesmo
+dia. A classificação (`recomposicao`, `ganho_magro`, `ganho_com_gordura`, `perda_de_gordura`,
+`perda_com_massa_magra`, `estavel`) sai de peso × cintura × medidas de músculo, ou do split real em
+kg quando há % de gordura pelo mesmo método nas duas datas.
+
+**Metas** (`goals.ts`): progresso contra `start_value` congelado. Projeção de prazo só existe com
+≥21 dias entre a primeira e a última medição **e** mudança total acima do piso de ruído — ruído
+dividido pelo tempo produz um ritmo convincente e uma data inventada.
+
+**Volume de treino** (`weekly-volume.ts`): séries/semana por grupo contra faixa de referência
+(10-20 para grupos grandes; Schoenfeld). Progressão de carga por 1RM estimado (Epley), comparando a
+melhor carga da primeira metade da janela com a da segunda — um dia ruim no fim não apaga semanas.
+
+**Barras do painel** (`dashboard.ts`): cada uma tem definição fechada exibida junto do número, e vale
+`null` (com o que falta registrar) quando não há dado — nunca 0%, que o usuário lê como fracasso.
+
+**Fotos**: bucket privado, comparação lado a lado local; envio à IA só por ação explícita, com aviso
+antes do botão (ver DPIA §3 e §6). O prompt proíbe estimar peso/gordura por imagem e qualquer
+comentário estético.
+
 **Água**: `peso × 35 ml`, fallback 2000 ml. Só bebidas hidratantes contam (água, água c/ gás, chá —
 café e refrigerante diet não).
 
-### 6.5 Score metabólico (auditoria)
+### 6.6 Score metabólico (auditoria)
 
 `lib/audit/score.ts` — escala 0–100, **começa em 100 e subtrai**.
 
@@ -350,7 +394,7 @@ impacto — decisão registrada em comentário.
 inferência causal**: sono vs glicemia, carboidrato vs glicemia, exercício vs glicemia, todos com
 exigência de amostra mínima e delta mínimo.
 
-### 6.6 Onde o produto se recusa a agir
+### 6.7 Onde o produto se recusa a agir
 
 Guardrails no prompt de IA (regras negativas explícitas): não diagnosticar, não alterar dose, não
 recomendar medicamento, classificar valor de exame só quando a faixa de referência estiver no texto,

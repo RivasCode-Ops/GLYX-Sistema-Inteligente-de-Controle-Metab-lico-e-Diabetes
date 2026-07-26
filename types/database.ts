@@ -163,3 +163,37 @@ export type WeightLog = {
   logged_on: string;
   created_at: string;
 };
+
+/**
+ * Medidas corporais. As 21 colunas de medida vivem em `lib/body/fields.ts`
+ * (catálogo com rótulo, unidade e papel) — repeti-las aqui só criaria uma
+ * segunda lista para esquecer de atualizar.
+ */
+export type BodyMeasurementRow = {
+  id: string;
+  user_id: string;
+  measured_on: string;
+  notes: string | null;
+  created_at: string;
+} & Partial<Record<string, number | null>>;
+
+export type BodyGoalRowDb = {
+  id: string;
+  user_id: string;
+  metric: string;
+  target_value: number;
+  start_value: number | null;
+  start_on: string;
+  target_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BodyPhoto = {
+  id: string;
+  user_id: string;
+  taken_on: string;
+  pose: "frente" | "costas" | "perfil_esq" | "perfil_dir";
+  photo_path: string;
+  created_at: string;
+};

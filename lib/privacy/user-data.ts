@@ -17,6 +17,9 @@ export const USER_DATA_DELETE_ORDER = [
   "strength_logs",
   "muscle_pauses",
   "blood_pressure_logs",
+  "body_measurements",
+  "body_goals",
+  "body_photos",
   "metabolic_alerts",
   "exams",
   "health_snapshots",
@@ -44,6 +47,9 @@ export const USER_DATA_EXPORT_TABLES = [
   "strength_logs",
   "muscle_pauses",
   "blood_pressure_logs",
+  "body_measurements",
+  "body_goals",
+  "body_photos",
   "metabolic_alerts",
   "exams",
   "health_snapshots",
@@ -59,7 +65,7 @@ export const USER_DATA_EXPORT_TABLES = [
   "google_fit_connections",
 ] as const;
 
-export const PRIVATE_PHOTO_BUCKETS = ["meal-photos", "medication-labels"] as const;
+export const PRIVATE_PHOTO_BUCKETS = ["meal-photos", "medication-labels", "body-photos"] as const;
 
 /** Colunas sensíveis removidas do export (nunca saem no JSON do usuário). */
 export const EXPORT_REDACT_COLUMNS: Record<string, readonly string[]> = {

@@ -20,6 +20,7 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 | Qualidade: Vitest (RLS/LGPD/crypto) + E2E de portões | Vivo |
 | Admin: gasto de IA | Vivo |
 | Calculadora de bolus (educativa) | Vivo — ver ressalva abaixo |
+| Composição corporal: medidas, dobras, fotos, metas, volume de treino e leitura por IA | Vivo — ver ressalva abaixo |
 
 > **Calculadora de bolus.** Entrou em 18/07/2026, revertendo a decisão anterior de mantê-la fora de
 > escopo. É educativa: usa os parâmetros que o usuário configurou com o médico (`carb_ratio`,
@@ -27,6 +28,15 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 > dose em lugar nenhum**. Limitações conhecidas, sinalizadas na própria tela: **não considera
 > insulina ativa (IOB)** e **não tem teto de dose máxima** — esse teto depende de um valor
 > individual, que precisa vir do endocrinologista antes de virar código.
+
+> **Composição corporal.** Entrou em 26/07/2026 (`/composicao`). 21 medidas por data, fotos de
+> progresso em bucket privado, metas com projeção de prazo, volume semanal por grupo muscular e
+> progressão de carga. O percentual de gordura é **estimativa** por dobras (Jackson-Pollock 3) ou
+> fita (US Navy) — o método aparece sempre junto do número e comparar datas medidas por métodos
+> diferentes é bloqueado em código. Diferença abaixo do erro de medição (0,5 kg / 1 cm) é tratada
+> como estabilidade, não evolução. As fotos **não** vão para a IA por padrão: só na comparação
+> pedida explicitamente, com aviso na tela (ver [DPIA](docs/DPIA.md)). **Pendente:** aplicar as
+> migrations `20260726000000_body_composition` e `20260726010000_ai_usage_body_kinds` em produção.
 
 ## Próximos (ordem sugerida)
 

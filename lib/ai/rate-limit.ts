@@ -7,7 +7,9 @@ export type AiKind =
   | "exam"
   | "supplement"
   | "workout_suggestion"
-  | "medication_schedule";
+  | "medication_schedule"
+  | "body_composition"
+  | "body_photo";
 
 // Limites por usuário em janela deslizante de 1 hora.
 // Persistidos em ai_usage (RLS) para valer entre instâncias serverless.
@@ -19,6 +21,10 @@ const HOURLY_LIMITS: Record<AiKind, number> = {
   supplement: 10,
   workout_suggestion: 10,
   medication_schedule: 10,
+  body_composition: 10,
+  // Comparação de fotos manda duas imagens por chamada: mais cara que qualquer
+  // outra rota, e é análise mensal por natureza — 5/h é folgado pro uso real.
+  body_photo: 5,
 };
 
 export type RateLimitResult =
