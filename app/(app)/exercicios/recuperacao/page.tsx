@@ -1,4 +1,8 @@
-import { getLastTrainedByMuscleGroup, getActiveMusclePauses } from "@/lib/queries/muscle-recovery";
+import {
+  getLastTrainedByMuscleGroup,
+  getActiveMusclePauses,
+  getSessionCountByMuscleGroup,
+} from "@/lib/queries/muscle-recovery";
 import { getRecentStrengthLogs } from "@/lib/queries/strength";
 import { computeMuscleRecovery, suggestMuscleFocus } from "@/lib/exercicios/muscle-recovery";
 import { MuscleRecoveryPanel } from "@/components/exercicios/muscle-recovery-panel";
@@ -6,12 +10,13 @@ import { StrengthLogForm } from "@/components/exercicios/strength-log-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function RecuperacaoMuscularPage() {
-  const [lastTrained, pausedGroups, strengthLogs] = await Promise.all([
+  const [lastTrained, pausedGroups, strengthLogs, logCounts] = await Promise.all([
     getLastTrainedByMuscleGroup(),
     getActiveMusclePauses(),
     getRecentStrengthLogs(),
+    getSessionCountByMuscleGroup(),
   ]);
-  const statuses = computeMuscleRecovery(lastTrained, pausedGroups);
+  const statuses = computeMuscleRecovery(lastTrained, pausedGroups, new Date(), logCounts);
   const suggestion = suggestMuscleFocus(statuses);
 
   return (

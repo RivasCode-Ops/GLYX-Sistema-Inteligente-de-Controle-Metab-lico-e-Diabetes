@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 import { computeMuscleRecovery } from "./muscle-recovery";
 import { getTrainingDay, getWeekPlan, planSummaryLabel, suggestFromPlan } from "./training-plan";
-import type { MuscleGroupId } from "@/lib/data/muscle-groups";
+import { MUSCLE_GROUP_IDS, type MuscleGroupId } from "@/lib/data/muscle-groups";
 
 // 2026-07-13 Ã© uma segunda-feira.
 const SEGUNDA = new Date("2026-07-13T12:00:00");
@@ -55,20 +55,11 @@ describe("getWeekPlan", () => {
 /** Marca todos os grupos como treinados hÃ¡ `hours` horas, exceto os listados. */
 function trainedExcept(except: MuscleGroupId[], hours: number, now: Date) {
   const at = new Date(now.getTime() - hours * 3_600_000).toISOString();
-  const all: MuscleGroupId[] = [
-    "peito",
-    "costas",
-    "quadriceps",
-    "posterior",
-    "ombros",
-    "biceps",
-    "triceps",
-    "abdomen",
-    "panturrilhas",
-    "antebracos",
-  ];
+  // Derivado, não literal: a lista escrita à mão ficou defasada em silêncio
+  // quando trapézio e glúteos entraram, e "todos os grupos" passou a significar
+  // dez de doze — o mesmo modo de falha que a ponte corrigiu em MUSCLE_GROUPS.
   return Object.fromEntries(
-    all.filter((g) => !except.includes(g)).map((g) => [g, at])
+    MUSCLE_GROUP_IDS.filter((g) => !except.includes(g)).map((g) => [g, at])
   ) as Partial<Record<MuscleGroupId, string>>;
 }
 

@@ -1,4 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
+import { MUSCLE_GROUP_IDS, type MuscleGroupId } from "@/lib/data/muscle-groups";
 import {
   computeMuscleRecovery,
   limitAvailableByTime,
@@ -7,18 +8,14 @@ import {
 } from "./muscle-recovery";
 
 const NOW = new Date("2026-07-13T12:00:00.000Z");
-const ALL_IDS = [
-  "peito",
-  "costas",
-  "quadriceps",
-  "posterior",
-  "ombros",
-  "biceps",
-  "triceps",
-  "abdomen",
-  "panturrilhas",
-  "antebracos",
-];
+
+/**
+ * Derivado, não escrito à mão: a versão literal desta lista ficou defasada
+ * silenciosamente quando trapézio e glúteos entraram no modelo, e os testes
+ * passaram a afirmar "todos os grupos" sobre dez de doze. É o mesmo modo de
+ * falha que a ponte corrigiu em `MUSCLE_GROUPS`.
+ */
+const ALL_IDS: MuscleGroupId[] = [...MUSCLE_GROUP_IDS];
 
 describe("computeMuscleRecovery", () => {
   it("marca como nunca treinado quando nÃ£o hÃ¡ registro", () => {
@@ -136,7 +133,11 @@ describe("suggestMuscleSplit", () => {
     const suggestion = suggestMuscleSplit(statuses);
     expect(suggestion?.split.id).toBe("push");
     expect(suggestion?.available.map((s) => s.id)).toEqual(["peito"]);
-    expect(suggestion?.resting.map((s) => s.id).sort()).toEqual(["ombros", "triceps"]);
+    expect(suggestion?.resting.map((s) => s.id).sort()).toEqual([
+      "ombros",
+      "trapezio",
+      "triceps",
+    ]);
   });
 
   it("retorna null quando nenhum dia tem mÃºsculo disponÃ­vel", () => {

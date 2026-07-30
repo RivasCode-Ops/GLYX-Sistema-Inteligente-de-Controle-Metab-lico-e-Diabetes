@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { MUSCLE_GROUP_IDS } from "@/lib/data/muscle-groups";
 
 /**
  * O catálogo de exercícios vive no banco, semeado por migration — não há
@@ -102,17 +103,12 @@ describe("catálogo de exercícios", () => {
   });
 
   /**
-   * CatalogMuscleId e o CHECK são a mesma regra em duas linguagens. Divergindo,
-   * o código aceita um músculo que a gravação rejeita — erro que só apareceria
-   * quando a Fatia 2 começasse a escrever.
+   * `MuscleGroupId` é o vocabulário canônico e o CHECK é a mesma regra escrita em
+   * outra linguagem. Divergindo, o código aceita um músculo que a gravação
+   * rejeita — erro que só apareceria na primeira escrita real do catálogo.
    */
-  it("mantém CatalogMuscleId em sincronia com o CHECK", () => {
-    const ts = readFileSync(join(process.cwd(), "types", "database.ts"), "utf8");
-    const union = ts.match(/export type CatalogMuscleId =([\s\S]*?);/);
-    expect(union).not.toBeNull();
-
-    const declarados = [...union![1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
-    expect(declarados.sort()).toEqual(checkVocabulary().sort());
+  it("mantém MuscleGroupId em sincronia com o CHECK do catálogo", () => {
+    expect([...MUSCLE_GROUP_IDS].sort()).toEqual(checkVocabulary().sort());
   });
 
   /**

@@ -21,7 +21,7 @@ import {
 } from "@/lib/body/fields";
 import { NOISE_FLOOR_CM, type BodyProgress } from "@/lib/body/progress";
 import type { GoalProgress } from "@/lib/body/goals";
-import type { GroupVolume } from "@/lib/exercicios/weekly-volume";
+import { shouldSuppressVolumeDiagnosis, type GroupVolume } from "@/lib/exercicios/weekly-volume";
 import { bilateralAsymmetryPercent, waistToHeightBand, type BodyComposition } from "@/lib/body/composition";
 import type { MuscleGroupId } from "@/lib/data/muscle-groups";
 
@@ -157,6 +157,10 @@ export function buildBodyAlerts(input: AlertInput): BodyAlert[] {
   for (const muscle of goalMuscles) {
     const v = volumeById.get(muscle);
     if (!v || (v.status !== "insuficiente" && v.status !== "sem_registro")) continue;
+    // Grupo recém-adicionado ao modelo (trapézio, glúteos) tem histórico zero
+    // sem que o treino tenha mudado — o alerta seria sobre o app, não sobre quem
+    // treina. Ver MIN_LOGS_FOR_ESTABLISHED_HISTORY.
+    if (shouldSuppressVolumeDiagnosis(v, volume)) continue;
     alerts.push({
       id: `volume_goal_${muscle}`,
       title: `Volume de ${v.label.toLowerCase()} abaixo do necessário para sua meta`,
@@ -172,6 +176,7 @@ export function buildBodyAlerts(input: AlertInput): BodyAlert[] {
   // 3. Volume insuficiente sem meta associada: informativo, tom mais leve.
   for (const v of volume) {
     if (v.status !== "insuficiente" || goalMuscles.has(v.id)) continue;
+    if (shouldSuppressVolumeDiagnosis(v, volume)) continue;
     alerts.push({
       id: `volume_${v.id}`,
       title: `Volume semanal de ${v.label.toLowerCase()} baixo`,

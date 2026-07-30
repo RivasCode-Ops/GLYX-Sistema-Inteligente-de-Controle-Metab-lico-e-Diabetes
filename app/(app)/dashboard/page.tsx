@@ -4,7 +4,11 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
-import { getLastTrainedByMuscleGroup, getActiveMusclePauses } from "@/lib/queries/muscle-recovery";
+import {
+  getLastTrainedByMuscleGroup,
+  getActiveMusclePauses,
+  getSessionCountByMuscleGroup,
+} from "@/lib/queries/muscle-recovery";
 import { computeMuscleRecovery } from "@/lib/exercicios/muscle-recovery";
 import { planSummaryLabel, suggestFromPlan } from "@/lib/exercicios/training-plan";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -78,7 +82,8 @@ export default async function DashboardPage() {
         .maybeSingle();
       const startOfDayISO = startOfLocalDayISO(p?.timezone);
 
-      const [waterRes, mealsRes, weightRes, lastTrainedByGroup, pausedGroups] = await Promise.all([
+      const [waterRes, mealsRes, weightRes, lastTrainedByGroup, pausedGroups, logCounts] =
+        await Promise.all([
         supabase
           .from("water_logs")
           .select("amount_ml, kind")
@@ -98,13 +103,14 @@ export default async function DashboardPage() {
           .maybeSingle(),
         getLastTrainedByMuscleGroup(),
         getActiveMusclePauses(),
+        getSessionCountByMuscleGroup(),
       ]);
 
       // Mesma fonte de verdade que /exercicios/plano — antes o dashboard
       // sugeria um músculo solto e a tela de plano outro treino, sem nenhuma
       // relação entre os dois.
       muscleFocusLabel = planSummaryLabel(
-        suggestFromPlan(computeMuscleRecovery(lastTrainedByGroup, pausedGroups))
+        suggestFromPlan(computeMuscleRecovery(lastTrainedByGroup, pausedGroups, new Date(), logCounts))
       );
 
       if (p && !p.onboarding_done) redirect("/bem-vindo");

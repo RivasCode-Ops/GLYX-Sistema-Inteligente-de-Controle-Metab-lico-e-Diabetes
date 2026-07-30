@@ -12,7 +12,12 @@
  * mandar ninguém fazer 20 séries.
  */
 
-import { resolveMuscleGroupIds, MUSCLE_GROUPS, type MuscleGroupId } from "@/lib/data/muscle-groups";
+import {
+  resolveMuscleGroupIds,
+  MIN_LOGS_FOR_ESTABLISHED_HISTORY,
+  MUSCLE_GROUPS,
+  type MuscleGroupId,
+} from "@/lib/data/muscle-groups";
 
 export type StrengthLogRow = {
   exercise_name: string;
@@ -32,8 +37,10 @@ export type StrengthLogRow = {
 export const WEEKLY_SET_TARGET: Record<MuscleGroupId, { min: number; optimal: number }> = {
   peito: { min: 10, optimal: 16 },
   costas: { min: 10, optimal: 18 },
+  trapezio: { min: 6, optimal: 12 },
   quadriceps: { min: 10, optimal: 16 },
   posterior: { min: 8, optimal: 14 },
+  gluteos: { min: 10, optimal: 16 },
   ombros: { min: 8, optimal: 16 },
   biceps: { min: 6, optimal: 12 },
   triceps: { min: 6, optimal: 12 },
@@ -52,7 +59,35 @@ export type GroupVolume = {
   minTarget: number;
   optimalTarget: number;
   status: VolumeStatus;
+  /** Registros próprios do grupo na janela — base de `hasEstablishedHistory`. */
+  logCount: number;
 };
+
+/**
+ * Histórico próprio suficiente para o diagnóstico de volume afirmar alguma coisa.
+ * Abaixo disso, "volume insuficiente" diz mais sobre a idade do grupo no modelo
+ * do que sobre o treino de quem usa — ver `MIN_LOGS_FOR_ESTABLISHED_HISTORY`.
+ */
+export function hasEstablishedHistory(v: Pick<GroupVolume, "logCount">): boolean {
+  return v.logCount >= MIN_LOGS_FOR_ESTABLISHED_HISTORY;
+}
+
+/**
+ * Se o diagnóstico de volume deste grupo deve ficar calado.
+ *
+ * Só faz sentido silenciar um grupo sem histórico quando **outros** grupos têm —
+ * aí a ausência é sintoma de o grupo ser novo no modelo (trapézio, glúteos), não
+ * de a pessoa não treinar. Para quem ainda não registrou nada, zero séries é a
+ * verdade e o alerta é o próprio produto: suprimi-lo deixaria alguém com meta de
+ * peito e nenhum treino sem nenhum aviso.
+ */
+export function shouldSuppressVolumeDiagnosis(
+  group: Pick<GroupVolume, "logCount">,
+  all: Pick<GroupVolume, "logCount">[]
+): boolean {
+  if (hasEstablishedHistory(group)) return false;
+  return all.some(hasEstablishedHistory);
+}
 
 /** Acima de 1,5× o alvo ótimo, mais provável que atrapalhe a recuperação do que ajude. */
 const HIGH_VOLUME_FACTOR = 1.5;
@@ -79,12 +114,14 @@ export function computeWeeklyVolume(
 ): GroupVolume[] {
   const windowStart = now.getTime() - weeks * 7 * 86_400_000;
   const totals = new Map<MuscleGroupId, number>();
+  const counts = new Map<MuscleGroupId, number>();
 
   for (const log of logs) {
     if (new Date(log.logged_at).getTime() < windowStart) continue;
     const groups = log.muscle_group ? resolveMuscleGroupIds(log.muscle_group) : [];
     for (const id of groups) {
       totals.set(id, (totals.get(id) ?? 0) + log.sets);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
     }
   }
 
@@ -100,6 +137,7 @@ export function computeWeeklyVolume(
       minTarget: target.min,
       optimalTarget: target.optimal,
       status: statusFor(setsPerWeek, target),
+      logCount: counts.get(group.id) ?? 0,
     };
   });
 }

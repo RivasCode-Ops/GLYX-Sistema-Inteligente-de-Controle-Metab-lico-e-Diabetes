@@ -1,4 +1,8 @@
-import { MUSCLE_GROUPS, type MuscleGroupId } from "@/lib/data/muscle-groups";
+import {
+  MIN_LOGS_FOR_ESTABLISHED_HISTORY,
+  MUSCLE_GROUPS,
+  type MuscleGroupId,
+} from "@/lib/data/muscle-groups";
 
 export type MuscleRecoveryStatus = {
   id: MuscleGroupId;
@@ -11,6 +15,20 @@ export type MuscleRecoveryStatus = {
   hoursReady: number | null;
   /** Motivo da pausa manual (só quando status = "paused"). */
   pauseReason: string | null;
+  /** Registros próprios suficientes para o app afirmar algo sobre o grupo. */
+  establishedHistory: boolean;
+  /**
+   * Se este "nunca treinado" vale prioridade máxima.
+   *
+   * `status === "never"` sozinho não serve mais para priorizar: trapézio e
+   * glúteos entraram no modelo sem histórico, e sem esta distinção o app mandaria
+   * treiná-los na frente de tudo no dia seguinte à ponte — sendo que já são
+   * treinados, só que registrados sob outro grupo.
+   *
+   * A decisão depende do conjunto, por isso é resolvida aqui, onde o conjunto
+   * existe, e não em `byPriority`, que só enxerga dois elementos por vez.
+   */
+  prioritizeAsNever: boolean;
 };
 
 /**
@@ -22,17 +40,40 @@ export type MuscleRecoveryStatus = {
 export function computeMuscleRecovery(
   lastTrainedByGroup: Partial<Record<MuscleGroupId, string>>,
   pausedGroups: Partial<Record<MuscleGroupId, string | null>> = {},
-  now: Date = new Date()
+  now: Date = new Date(),
+  /**
+   * Quantas vezes cada grupo já foi registrado em nome próprio. Tem que vir da
+   * **mesma fonte** de `lastTrainedByGroup` — uma guarda alimentada por outra
+   * tabela fica inerte e ainda parece instalada.
+   */
+  historyCountByGroup: Partial<Record<MuscleGroupId, number>> = {}
 ): MuscleRecoveryStatus[] {
+  const established = (id: MuscleGroupId) =>
+    (historyCountByGroup[id] ?? 0) >= MIN_LOGS_FOR_ESTABLISHED_HISTORY;
+
+  /*
+   * Sem nenhum grupo com histórico próprio, quem usa o app é novo — e aí "nunca
+   * treinado" é a verdade, não ruído de modelo. Rebaixar todo mundo nesse caso
+   * deixaria a tela sem sugestão alguma logo no primeiro acesso, que é pior que o
+   * falso positivo que a guarda existe para evitar.
+   */
+  const anyEstablished = MUSCLE_GROUPS.some((g) => established(g.id));
+
   return MUSCLE_GROUPS.map((group) => {
     const last = lastTrainedByGroup[group.id] ?? null;
+    const establishedHistory = established(group.id);
+    const base = {
+      id: group.id,
+      label: group.label,
+      establishedHistory,
+      prioritizeAsNever: false,
+    };
 
     if (group.id in pausedGroups) {
       return {
-        id: group.id,
-        label: group.label,
+        ...base,
         lastTrainedAt: last,
-        status: "paused",
+        status: "paused" as const,
         hoursRemaining: null,
         hoursReady: null,
         pauseReason: pausedGroups[group.id] ?? null,
@@ -41,23 +82,22 @@ export function computeMuscleRecovery(
 
     if (!last) {
       return {
-        id: group.id,
-        label: group.label,
+        ...base,
         lastTrainedAt: null,
-        status: "never",
+        status: "never" as const,
         hoursRemaining: null,
         hoursReady: null,
         pauseReason: null,
+        prioritizeAsNever: establishedHistory || !anyEstablished,
       };
     }
 
     const hoursSince = (now.getTime() - new Date(last).getTime()) / 3_600_000;
     if (hoursSince < group.recoveryHours) {
       return {
-        id: group.id,
-        label: group.label,
+        ...base,
         lastTrainedAt: last,
-        status: "recovering",
+        status: "recovering" as const,
         hoursRemaining: Math.ceil(group.recoveryHours - hoursSince),
         hoursReady: null,
         pauseReason: null,
@@ -65,10 +105,9 @@ export function computeMuscleRecovery(
     }
 
     return {
-      id: group.id,
-      label: group.label,
+      ...base,
       lastTrainedAt: last,
-      status: "ready",
+      status: "ready" as const,
       hoursRemaining: null,
       hoursReady: Math.floor(hoursSince - group.recoveryHours),
       pauseReason: null,
@@ -78,7 +117,7 @@ export function computeMuscleRecovery(
 
 /** Sugestão de foco do dia: nunca treinado primeiro, senão o grupo pronto há mais tempo (pausados nunca entram). */
 export function suggestMuscleFocus(statuses: MuscleRecoveryStatus[]): MuscleRecoveryStatus | null {
-  const never = statuses.find((s) => s.status === "never");
+  const never = statuses.find((s) => s.prioritizeAsNever);
   if (never) return never;
 
   const ready = statuses.filter((s) => s.status === "ready");
@@ -98,8 +137,8 @@ export function isAvailable(s: MuscleRecoveryStatus): boolean {
  * que "pegar os N primeiros" (filtro de tempo) sempre priorize quem está
  * mais atrasado, não a ordem arbitrária de cadastro do grupo. */
 export function byPriority(a: MuscleRecoveryStatus, b: MuscleRecoveryStatus): number {
-  if (a.status === "never" && b.status !== "never") return -1;
-  if (b.status === "never" && a.status !== "never") return 1;
+  if (a.prioritizeAsNever && !b.prioritizeAsNever) return -1;
+  if (b.prioritizeAsNever && !a.prioritizeAsNever) return 1;
   return (b.hoursReady ?? 0) - (a.hoursReady ?? 0);
 }
 
@@ -107,11 +146,27 @@ export type MuscleSplitId = "push" | "pull" | "pernas";
 
 export type MuscleSplitDef = { id: MuscleSplitId; label: string; groups: MuscleGroupId[] };
 
-/** Divisão clássica de treino (push/pull/pernas) — agrupa músculos que fazem sentido no mesmo dia. */
+/**
+ * Divisão clássica de treino (push/pull/pernas) — agrupa músculos que fazem
+ * sentido no mesmo **dia**.
+ *
+ * Isto é nível de dia, não de série. A tabela de pares a evitar (peito↔tríceps,
+ * costas↔bíceps) é nível de **superset** e vive em outro lugar de propósito:
+ * push juntar peito, ombros e tríceps é correto, e o tríceps entrar já fatigado
+ * depois das pressões é intencional. Renderizar os dois no mesmo componente faz
+ * a tela se contradizer sozinha.
+ *
+ * Trapézio entra no push por ser o dia de ombros na ficha, não por afinidade
+ * anatômica com peito.
+ */
 export const MUSCLE_SPLITS: MuscleSplitDef[] = [
-  { id: "push", label: "Push (empurrar)", groups: ["peito", "ombros", "triceps"] },
+  { id: "push", label: "Push (empurrar)", groups: ["peito", "ombros", "triceps", "trapezio"] },
   { id: "pull", label: "Pull (puxar)", groups: ["costas", "biceps", "antebracos"] },
-  { id: "pernas", label: "Pernas", groups: ["quadriceps", "posterior", "panturrilhas", "abdomen"] },
+  {
+    id: "pernas",
+    label: "Pernas",
+    groups: ["quadriceps", "posterior", "gluteos", "panturrilhas", "abdomen"],
+  },
 ];
 
 export type MuscleSplitSuggestion = {
@@ -136,7 +191,7 @@ export function suggestMuscleSplit(statuses: MuscleRecoveryStatus[]): MuscleSpli
     const available = groupStatuses.filter(isAvailable).sort(byPriority);
     const resting = groupStatuses.filter((s) => !isAvailable(s));
     const score = available.reduce(
-      (sum, s) => sum + (s.status === "never" ? 1000 : (s.hoursReady ?? 0)) + 1,
+      (sum, s) => sum + (s.prioritizeAsNever ? 1000 : (s.hoursReady ?? 0)) + 1,
       0
     );
     return { split, available, resting, score };

@@ -51,17 +51,21 @@ const DESCANSO: TrainingDay = {
  */
 export const WEEKDAY_PLAN: Record<number, TrainingDay> = {
   0: DESCANSO,
+  // Glúteos entra na segunda e trapézio na terça porque é onde a ficha real os
+  // coloca (segunda = pernas completas, terça = ombros + trapézio + antebraços),
+  // não pelo agrupamento convencional — que poria trapézio junto de costas. Onde
+  // existe dado da ficha, convenção não decide.
   1: {
     id: "inferior-a",
     label: "Inferior A",
-    focus: "Quadríceps e panturrilha",
-    groups: ["quadriceps", "panturrilhas", "abdomen"],
+    focus: "Quadríceps, glúteos e panturrilha",
+    groups: ["quadriceps", "gluteos", "panturrilhas", "abdomen"],
   },
   2: {
     id: "superior-a",
     label: "Superior A",
-    focus: "Peito, ombro e tríceps",
-    groups: ["peito", "ombros", "triceps", "abdomen"],
+    focus: "Peito, ombro, trapézio e tríceps",
+    groups: ["peito", "ombros", "trapezio", "triceps", "abdomen"],
   },
   3: {
     id: "inferior-b",
@@ -123,7 +127,7 @@ export function planSummaryLabel(suggestion: PlanSuggestion): string {
 
 function availabilityScore(available: MuscleRecoveryStatus[]): number {
   return available.reduce(
-    (sum, s) => sum + (s.status === "never" ? 1000 : (s.hoursReady ?? 0)) + 1,
+    (sum, s) => sum + (s.prioritizeAsNever ? 1000 : (s.hoursReady ?? 0)) + 1,
     0
   );
 }

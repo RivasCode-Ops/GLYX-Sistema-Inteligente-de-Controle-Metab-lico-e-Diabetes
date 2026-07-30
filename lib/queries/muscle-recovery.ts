@@ -31,6 +31,49 @@ export async function getLastTrainedByMuscleGroup(): Promise<Partial<Record<Musc
   return result;
 }
 
+/**
+ * Quantas sessões registraram cada grupo **em nome próprio**, sem janela de tempo.
+ *
+ * Alimenta `MIN_LOGS_FOR_ESTABLISHED_HISTORY`: é o que separa "nunca treinou este
+ * grupo" de "este grupo acabou de existir no modelo". Sem janela de propósito — a
+ * pergunta é se o grupo já foi registrado como ele mesmo alguma vez, não se foi
+ * registrado recentemente.
+ *
+ * Lê `exercise_sessions`, a **mesma fonte** de `getLastTrainedByMuscleGroup`, e
+ * isso não é detalhe: a guarda tem que olhar para onde o sinal que ela protege
+ * nasce. A primeira versão contava `strength_logs` e ficava inerte — hoje não há
+ * um único `strength_log` com `muscle_group`, enquanto as sessões cobrem onze
+ * grupos. Guarda que lê a tabela errada não avisa nada e ainda parece instalada.
+ */
+export async function getSessionCountByMuscleGroup(): Promise<
+  Partial<Record<MuscleGroupId, number>>
+> {
+  const supabase = await createClient();
+  if (!supabase) return {};
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+
+  const { data } = await supabase
+    .from("exercise_sessions")
+    .select("muscle_groups")
+    .eq("user_id", user.id)
+    .not("muscle_groups", "is", null);
+
+  const result: Partial<Record<MuscleGroupId, number>> = {};
+  for (const row of (data ?? []) as { muscle_groups: string[] | null }[]) {
+    for (const g of row.muscle_groups ?? []) {
+      // Mesma expansão do legado "pernas" que o cálculo de última sessão usa.
+      for (const id of resolveMuscleGroupIds(g)) {
+        result[id] = (result[id] ?? 0) + 1;
+      }
+    }
+  }
+  return result;
+}
+
 /** Grupos com pausa manual ativa (id -> motivo, ou null se não informado). */
 export async function getActiveMusclePauses(): Promise<Partial<Record<MuscleGroupId, string | null>>> {
   const supabase = await createClient();

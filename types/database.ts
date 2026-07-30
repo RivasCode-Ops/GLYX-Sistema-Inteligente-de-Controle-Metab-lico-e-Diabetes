@@ -14,6 +14,7 @@
  * Regenerar depois de migration: `npm run types:gen`.
  */
 
+import type { MuscleGroupId } from "@/lib/data/muscle-groups";
 import type { Json, Tables } from "@/types/supabase.generated";
 
 /**
@@ -54,36 +55,22 @@ export type Medication = Narrow<Tables<"medications">, { kind: MedicationKind }>
 
 export type ExerciseSession = Tables<"exercise_sessions">;
 
-/**
- * Vocabulário muscular do **catálogo de exercícios** — 12 valores, propositalmente
- * mais rico que os 10 de `MuscleGroupId` (`lib/data/muscle-groups.ts`).
- *
- * São dois modelos distintos e ainda não conectados, de propósito. `MuscleGroupId`
- * é o modelo dos consumidores atuais (recuperação, volume, splits, plano) e não foi
- * tocado. Este é o do catálogo, que precisa de `trapezio` e `gluteos` para não
- * nascer torto: sem eles o encolhimento vira costas e infla o grupo, e a elevação
- * pélvica não tem onde ser classificada. A ponte entre os dois é fatia própria.
- */
-export type CatalogMuscleId =
-  | "peito"
-  | "costas"
-  | "trapezio"
-  | "ombros"
-  | "biceps"
-  | "triceps"
-  | "antebracos"
-  | "quadriceps"
-  | "posterior"
-  | "gluteos"
-  | "panturrilhas"
-  | "abdomen";
-
 /** Cardio não entra no motor de fadiga muscular nem no vetor de ativação. */
 export type ExerciseMechanic = "resistencia" | "cardio";
 
+/**
+ * O catálogo é restringido pelo vocabulário **canônico** (`MuscleGroupId`), não
+ * o contrário.
+ *
+ * Na Fatia 1 o catálogo teve vocabulário próprio, o que permitiu semeá-lo sem
+ * tocar em nenhum consumidor. A ponte encerrou essa duplicidade elegendo
+ * `MuscleGroupId` como fonte única — a union dá exaustividade em compilação, que
+ * se perderia se o vocabulário virasse dado puro. Um teste amarra esta union ao
+ * CHECK de `primary_muscle` no banco.
+ */
 export type Exercise = Narrow<
   Tables<"exercises">,
-  { mechanic: ExerciseMechanic; primary_muscle: CatalogMuscleId | null }
+  { mechanic: ExerciseMechanic; primary_muscle: MuscleGroupId | null }
 >;
 
 export type MetabolicAlert = Narrow<

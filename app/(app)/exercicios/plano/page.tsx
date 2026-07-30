@@ -12,7 +12,11 @@ import {
 } from "@/lib/exercicios/plan-prescription";
 import type { ExerciseProgression } from "@/lib/exercicios/weekly-volume";
 import { loadBodySnapshot } from "@/lib/queries/body-composition";
-import { getActiveMusclePauses, getLastTrainedByMuscleGroup } from "@/lib/queries/muscle-recovery";
+import {
+  getActiveMusclePauses,
+  getLastTrainedByMuscleGroup,
+  getSessionCountByMuscleGroup,
+} from "@/lib/queries/muscle-recovery";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import type { BodyGoal } from "@/lib/health/energy";
@@ -32,17 +36,18 @@ export default async function ExerciciosPlanoPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const [{ data }, lastTrained, pausedGroups, snapshot] = await Promise.all([
+        const [{ data }, lastTrained, pausedGroups, logCounts, snapshot] = await Promise.all([
           supabase.from("profiles").select("body_goal").eq("id", user.id).maybeSingle(),
           getLastTrainedByMuscleGroup(),
           getActiveMusclePauses(),
+          getSessionCountByMuscleGroup(),
           // Mesmo snapshot que o módulo de composição usa: se o plano montasse o
           // próprio cálculo de volume, as duas telas acabariam discordando sobre
           // quantas séries de costas o usuário fez na semana.
           loadBodySnapshot(supabase, user.id),
         ]);
         bodyGoal = (data?.body_goal as typeof bodyGoal) ?? null;
-        statuses = computeMuscleRecovery(lastTrained, pausedGroups);
+        statuses = computeMuscleRecovery(lastTrained, pausedGroups, new Date(), logCounts);
         progressions = snapshot.progressions;
         uncovered = uncoveredGoalMuscles(snapshot.volume, snapshot.goals);
 

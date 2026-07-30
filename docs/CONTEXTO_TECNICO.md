@@ -186,6 +186,88 @@ muro de texto"*.
 Consequência prática: **tela nova reaproveita `StatusPill`/`Card`; não se inventa layout novo para o
 mesmo tipo de informação.**
 
+### 4.9 Vocabulário nunca é lista escrita à mão — nem em código, nem em fixture
+
+**Regra:** todo lugar que precise de "todos os grupos musculares" usa `MUSCLE_GROUP_IDS`. Nenhuma
+lista literal de ids, em nenhum arquivo, incluindo testes.
+
+Isto não é preferência de estilo — é a correção de um modo de falha que apareceu em **três lugares
+diferentes** ao crescer `MuscleGroupId` de 10 para 12:
+
+1. `MUSCLE_GROUPS` era array literal: o grupo novo não virava erro, sumia de todas as telas (os
+   motores iteram sobre a lista). Corrigido com `Record<MuscleGroupId, _>` + lista derivada.
+2. Fixtures de teste tinham a lista literal: **onze testes passaram a afirmar "todos os grupos"
+   sobre dez de doze, e continuaram verdes.**
+3. `InsightModule` só não divergiu do CHECK porque havia teste amarrando os dois.
+
+O caso 2 é o pior dos três. O caso 1 produzia ausência — algo sumia da tela e alguém notaria. O caso
+2 produz **sinal verde ativo**: um teste que passa por não estar olhando é a única categoria de teste
+com valor negativo, porque entrega confiança que não corresponde a nada.
+
+Vale para qualquer vocabulário fechado do projeto (`AlertSeverity`, `InsightModule`,
+`BodyMeasurementKey`): a union é a fonte, a lista é derivada, e quando o vocabulário também existe no
+Postgres como CHECK, um teste amarra os dois.
+
+### 4.10 Quando a correção depende de *qual* tabela é a fonte, teste não decide
+
+Há uma família de defeitos em que o código está certo no que **faz** com o dado e errado em **de onde**
+o tira. Fixture não distingue os dois: ela alimenta a tabela que o código escolheu ler, então o teste
+confirma a premissa em vez de questioná-la. Teste e código compartilham o mesmo erro e concordam.
+
+Caso concreto: a supressão de alerta para grupo recém-criado nasceu contando `strength_logs`. Ficou
+**inerte** — não há um único `strength_log` com `muscle_group` preenchido, enquanto
+`exercise_sessions` cobre onze grupos. A guarda existia, tinha teste verde, e não protegia nada. Só
+apareceu ao conferir o banco.
+
+É o mesmo formato do `count(*)` por `service_role` (4.11): a verificação estava do lado de dentro da
+suposição que precisava checar.
+
+**Regra: quando a correção depender de qual tabela é a fonte de verdade, confirme no banco — contagem
+real, não fixture.** Vale especialmente enquanto duas fontes coexistem durante uma migração.
+
+O próximo caso já é previsível: `direct_sets` vai poder contar de `strength_logs.muscle_group` ou do
+catálogo via vetor de ativação, e as duas fontes vão conviver por um tempo. Escolher errado ali não
+produz erro nem número absurdo — produz um volume plausível e errado, que é a falha mais cara desta
+família.
+
+### 4.11 RLS só está verificada se a verificação simular o papel
+
+Ler a policy na migration não prova nada, e conferir pelo painel/MCP prova menos ainda: **essas
+conexões usam o `service_role`, que ignora RLS por definição**. Um `select count(*)` por ali retorna
+o número certo mesmo com a policy quebrada — e é assim que se ganha confiança falsa numa tabela que
+vai falhar no primeiro acesso real do app.
+
+O erro clássico é a policy copiada de outra tabela referenciando `auth.uid() = user_id` numa tabela
+que não tem `user_id`. A migration aplica sem reclamar; quebra só no primeiro `select` autenticado.
+
+Procedimento obrigatório para **toda tabela nova** — dentro de transação, com `rollback`, sem deixar
+resíduo:
+
+```sql
+-- 1. Estrutura: quais policies existem, para quais papéis, com qual expressão
+select pol.polname, pol.polcmd::text as cmd,
+       array_to_string(array(select rolname from pg_roles where oid = any(pol.polroles)), ',') as roles,
+       pg_get_expr(pol.polqual, pol.polrelid) as using_expr
+  from pg_policy pol where pol.polrelid = 'public.<tabela>'::regclass;
+
+-- 2. Leitura como authenticated (o que o app realmente faz)
+begin;
+  set local role authenticated;
+  set local request.jwt.claims to '{"sub":"<uuid>","role":"authenticated"}';
+  select count(*) from public.<tabela>;
+rollback;
+
+-- 3. Leitura como anon: deve ver 0 em tabela de usuário
+begin; set local role anon; select count(*) from public.<tabela>; rollback;
+
+-- 4. Escrita indevida deve ser barrada (catálogos e tabelas só-leitura)
+--    Envolver o insert em begin/exception when insufficient_privilege e falhar
+--    alto se ele passar.
+```
+
+Aplicado em `exercises`: `authenticated` vê 42, `anon` vê 0, escrita barrada. O schema de Treino traz
+mais tabelas — cada uma repete estes quatro passos.
+
 ---
 
 ## 5. Modelo de dados
@@ -208,11 +290,25 @@ erro de compilação.
 Treino. É referência global: não tem `user_id`, é lida por qualquer autenticado, não é escrita pelo
 app e por isso fica fora do export e do wipe de LGPD — não há dado pessoal nela.
 
-Ele tem **vocabulário muscular próprio, com 12 valores**, contra os 10 de `MuscleGroupId`
-(`lib/data/muscle-groups.ts`). São dois modelos ainda desconectados, de propósito. Os extras são
-`trapezio` e `gluteos`: sem eles o encolhimento entra como costas e infla o grupo, e a elevação
-pélvica não tem onde ser classificada. O catálogo nasce correto em vez de nascer torto para caber no
-modelo antigo; migrar os consumidores (recuperação, volume, splits, plano) é fatia própria.
+O vocabulário muscular é `MuscleGroupId` (`lib/data/muscle-groups.ts`), **canônico e único** — o CHECK
+de `primary_muscle` é a mesma regra escrita em SQL, e um teste amarra os dois. O catálogo nasceu com
+vocabulário próprio para poder ser semeado sem tocar em consumidor nenhum; a ponte encerrou a
+duplicidade elegendo a union como fonte, porque ela dá exaustividade em compilação que se perderia se
+o vocabulário virasse dado puro.
+
+`MuscleGroupId` foi de 10 para 12 com `trapezio` e `gluteos`: sem eles o encolhimento entra como
+costas e infla o grupo, e a elevação pélvica não tem onde ser classificada.
+
+A definição dos grupos é um `Record<MuscleGroupId, _>` **completo**, e a lista exibida é derivada
+dele. Isso não é estilo: enquanto era um array literal, crescer a union não quebrava nada — e como
+`computeMuscleRecovery` e `computeWeeklyVolume` iteram **sobre** a lista, o grupo faltante não virava
+erro nem zero, ele sumia de todas as telas sem deixar rastro. Dois testes cobrem o que o tipo não
+alcança: todo grupo aparece em ao menos um split e em ao menos um dia do plano — listas onde um
+músculo pode legitimamente estar em vários lugares, e por isso não são tipáveis por exaustividade.
+
+Trapézio entrou na terça (dia de ombros) e glúteos na segunda (pernas) porque é onde **a ficha real**
+os coloca, não pelo agrupamento convencional — que poria trapézio junto de costas. Onde existe dado
+da ficha, convenção não decide.
 
 `source_category` guarda a categoria do infográfico de origem mesmo quando ela diverge do primário —
 elevação pélvica vem em "Pernas" e é de glúteos. Guardar as duas deixa a correção auditável.
@@ -221,6 +317,17 @@ elevação pélvica vem em "Pernas" e é de glúteos. Guardar as duas deixa a co
 para id de catálogo é chute apresentado como dado, indistinguível do dado certo depois de gravado.
 Data de corte **2026-07-30**; a série tem descontinuidade aí. Quando os consumidores migrarem,
 `strength_logs.muscle_group` passa a ser derivável do exercício e tende a virar redundante.
+
+O custo dessa decisão é imediato e está tratado: trapézio e glúteos entram com histórico zero embora
+**sejam treinados** (encolhimento e elevação pélvica, gravados como costas e posterior). Sem guarda, o
+app anunciaria "trapézio nunca estimulado, prioridade máxima" e "glúteos negligenciados" no dia
+seguinte. `MIN_LOGS_FOR_ESTABLISHED_HISTORY` (3 registros próprios) silencia o grupo até ele existir
+por conta própria — contagem, não data de corte, porque data vira código morto que ninguém remove.
+
+A guarda tem duas pontas e errar qualquer uma é pior que não tê-la: silenciar de menos traz o falso
+positivo acima; silenciar demais tiraria de quem nunca registrou nada justamente o aviso que o produto
+existe para dar. Por isso a supressão só vale quando **outros** grupos têm histórico — aí a ausência é
+sintoma do modelo, não do treino. Para usuário novo, "nunca treinado" continua sendo verdade.
 
 `body_measurements` guarda 21 medidas opcionais (15 circunferências + 5 dobras + peso) com
 `unique (user_id, measured_on)`: uma medição por dia, a última do dia substitui. A composição
