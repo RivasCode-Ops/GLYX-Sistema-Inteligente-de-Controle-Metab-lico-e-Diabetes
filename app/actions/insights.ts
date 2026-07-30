@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { persistFindings, runCorrelationEngine } from "@/lib/insights/v2/engine";
+import {
+  GLUCOSE_INSIGHT_MODULE,
+  persistFindings,
+  runCorrelationEngine,
+} from "@/lib/insights/v2/engine";
 import { createClient } from "@/lib/supabase/server";
 
 export type InsightsActionResult = {
@@ -21,7 +25,7 @@ export async function refreshCorrelationInsights(windowDays: number = 14): Promi
   if (!user) return { error: "Sessão expirada." };
 
   const findings = await runCorrelationEngine(supabase, user.id, windowDays);
-  const saved = await persistFindings(supabase, user.id, findings);
+  const saved = await persistFindings(supabase, user.id, findings, GLUCOSE_INSIGHT_MODULE);
 
   if (saved.error) return { error: saved.error };
 

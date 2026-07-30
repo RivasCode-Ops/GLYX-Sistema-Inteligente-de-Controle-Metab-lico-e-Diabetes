@@ -8,7 +8,7 @@
  * daqui. Editar este arquivo à mão reintroduz exatamente a deriva que ele
  * existe para eliminar.
  *
- * Última geração: 2026-07-26 (projeto ajlbtahvmirdgiwycecb, schema public), a
+ * Última geração: 2026-07-30 (projeto ajlbtahvmirdgiwycecb, schema public), a
  * partir do schema real do banco. Esta versão traz só `Row` por tabela, que é o
  * que a aplicação consome; a saída do CLI do Supabase é um superconjunto (inclui
  * `Insert`/`Update` e os helpers `TablesInsert`/`TablesUpdate`) e sobrescreve
@@ -205,6 +205,7 @@ export type Database = {
           computed_at: string;
           id: string;
           metrics: Json | null;
+          module: string;
           severity: string;
           slug: string;
           title: string;

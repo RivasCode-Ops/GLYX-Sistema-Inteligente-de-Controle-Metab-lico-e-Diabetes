@@ -1,11 +1,14 @@
 import { isSupabaseConfigured } from "@/lib/env";
+import { GLUCOSE_INSIGHT_MODULE } from "@/lib/insights/v2/engine";
 import { listInsightFindings } from "@/lib/queries/insight-findings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshInsightsButton } from "@/components/insights/refresh-insights-button";
 import { demoInsights } from "@/lib/demo/data";
 
 export default async function AnaliseCorrelacoesPage() {
-  const findings = isSupabaseConfigured() ? await listInsightFindings() : demoInsights;
+  const findings = isSupabaseConfigured()
+    ? await listInsightFindings(GLUCOSE_INSIGHT_MODULE)
+    : demoInsights;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">

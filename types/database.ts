@@ -33,6 +33,13 @@ export type AuditLabelName = "Estável" | "Atenção" | "Alerta" | "Dados insufi
 export type MedicationKind = "med" | "supplement";
 export type BodyPhotoPose = "frente" | "costas" | "perfil_esq" | "perfil_dir";
 
+/**
+ * Módulo dono de um achado em `insight_findings`. A tabela é compartilhada: a
+ * unicidade no banco é `(user_id, module, slug)`, então dois módulos podem usar
+ * o mesmo slug sem um sobrescrever o outro no upsert.
+ */
+export type InsightModule = "glucose" | "body";
+
 export type GlucoseReading = Narrow<
   Tables<"glucose_readings">,
   { metadata: Record<string, unknown> | null }
@@ -53,7 +60,7 @@ export type MetabolicAlert = Narrow<
 
 export type InsightFinding = Narrow<
   Tables<"insight_findings">,
-  { severity: AlertSeverity; metrics: Record<string, unknown> | null }
+  { severity: AlertSeverity; metrics: Record<string, unknown> | null; module: InsightModule }
 >;
 
 export type MetabolicAudit = Narrow<

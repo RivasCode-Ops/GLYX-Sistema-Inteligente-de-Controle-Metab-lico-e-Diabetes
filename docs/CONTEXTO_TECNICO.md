@@ -213,6 +213,14 @@ a cada leitura, porque a fórmula pode mudar e o dado bruto é a fonte da verdad
 ### Derivados e análise
 `metabolic_audits` · `metabolic_alerts` · `insight_findings`
 
+`insight_findings` é **compartilhada entre módulos**: a coluna `module` (CHECK `glucose` | `body`)
+diz de quem é o achado, e a unicidade é `(user_id, module, slug)` — não `(user_id, slug)`. A
+distinção importa porque a escrita é `upsert`: com unicidade global, dois módulos que escolhessem o
+mesmo slug se sobrescreveriam **em silêncio**, sem erro nem log. Pelo mesmo motivo
+`listInsightFindings(module)` e `persistFindings(..., module)` exigem o módulo como parâmetro
+obrigatório — o default `'glucose'` da coluna existe para as linhas anteriores à migration, não para
+o código novo se apoiar nele. Adicionar um módulo é uma migration de uma linha (o CHECK).
+
 ### Infraestrutura
 `profiles` (23 colunas, 5 policies) · `cgm_connections` · `google_fit_connections` ·
 `push_subscriptions` · `push_dispatch_log` · `ai_threads` · `ai_messages` · `ai_usage`

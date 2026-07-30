@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { persistFindings, runCorrelationEngine } from "@/lib/insights/v2/engine";
+import {
+  GLUCOSE_INSIGHT_MODULE,
+  persistFindings,
+  runCorrelationEngine,
+} from "@/lib/insights/v2/engine";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   const findings = await runCorrelationEngine(supabase, user.id, windowDays);
-  const saved = await persistFindings(supabase, user.id, findings);
+  const saved = await persistFindings(supabase, user.id, findings, GLUCOSE_INSIGHT_MODULE);
 
   if (saved.error) {
     return NextResponse.json({ error: saved.error }, { status: 500 });

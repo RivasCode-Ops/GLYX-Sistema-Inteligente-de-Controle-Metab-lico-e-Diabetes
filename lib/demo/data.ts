@@ -226,6 +226,7 @@ export const demoInsights: InsightFinding[] = [
   {
     id: "insight-1",
     user_id: userId,
+    module: "glucose",
     slug: "carb-load-lunch-spike",
     title: "Almoço com maior carga glicêmica elevou a curva da tarde",
     body: "Nos dias com mais de 55 g de carboidratos no almoço, a média entre 13h e 16h subiu 18 mg/dL. A sugestão da demo é testar mais fibra e caminhada curta no pós-prandial.",
@@ -236,6 +237,7 @@ export const demoInsights: InsightFinding[] = [
   {
     id: "insight-2",
     user_id: userId,
+    module: "glucose",
     slug: "sleep-glucose-morning",
     title: "Sono acima de 7h melhorou a glicemia de jejum",
     body: "A amostra demo mostra jejum médio de 103 mg/dL após noites com sono suficiente, contra 117 mg/dL nos demais dias.",

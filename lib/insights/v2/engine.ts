@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadInsightDatasets } from "@/lib/insights/v2/datasets";
+import type { InsightModule } from "@/types/database";
+
+/** Módulo dos achados produzidos por `runCorrelationEngine`. */
+export const GLUCOSE_INSIGHT_MODULE: InsightModule = "glucose";
 
 export type CorrelationFinding = {
   slug: string;
@@ -131,15 +135,24 @@ export async function runCorrelationEngine(
   return findings;
 }
 
+/**
+ * `insight_findings` é compartilhada entre módulos, por isso `module` é
+ * obrigatório: sem ele o TypeScript deixaria um módulo novo gravar achados que
+ * o banco carimbaria como glicemia (o default da coluna) e que apareceriam na
+ * aba Correlações. O `onConflict` acompanha a unique real `(user_id, module,
+ * slug)` — dois módulos podem repetir o slug sem se sobrescrever.
+ */
 export async function persistFindings(
   supabase: SupabaseClient,
   userId: string,
-  findings: CorrelationFinding[]
+  findings: CorrelationFinding[],
+  module: InsightModule
 ): Promise<{ upserted: number; error?: string }> {
   if (findings.length === 0) return { upserted: 0 };
 
   const rows = findings.map((f) => ({
     user_id: userId,
+    module,
     slug: f.slug,
     title: f.title,
     body: f.body,
@@ -149,7 +162,7 @@ export async function persistFindings(
   }));
 
   const { error } = await supabase.from("insight_findings").upsert(rows, {
-    onConflict: "user_id,slug",
+    onConflict: "user_id,module,slug",
   });
 
   if (error) return { upserted: 0, error: error.message };

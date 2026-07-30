@@ -45,3 +45,6 @@ tsconfig.tsbuildinfo
 
 # metadado local de ferramenta (caminho da pasta varia por maquina)
 projeto.manifest.json
+
+# scratch do CLI do Supabase (criado por `npm run types:gen`)
+supabase/.temp/
