@@ -36,9 +36,10 @@ export type BodyPhotoPose = "frente" | "costas" | "perfil_esq" | "perfil_dir";
 /**
  * Módulo dono de um achado em `insight_findings`. A tabela é compartilhada: a
  * unicidade no banco é `(user_id, module, slug)`, então dois módulos podem usar
- * o mesmo slug sem um sobrescrever o outro no upsert.
+ * o mesmo slug sem um sobrescrever o outro no upsert. A coluna não tem default —
+ * gravar sem declarar o módulo falha no banco, não cai em glicemia por omissão.
  */
-export type InsightModule = "glucose" | "body";
+export type InsightModule = "glucose" | "training";
 
 export type GlucoseReading = Narrow<
   Tables<"glucose_readings">,

@@ -137,10 +137,11 @@ export async function runCorrelationEngine(
 
 /**
  * `insight_findings` é compartilhada entre módulos, por isso `module` é
- * obrigatório: sem ele o TypeScript deixaria um módulo novo gravar achados que
- * o banco carimbaria como glicemia (o default da coluna) e que apareceriam na
- * aba Correlações. O `onConflict` acompanha a unique real `(user_id, module,
- * slug)` — dois módulos podem repetir o slug sem se sobrescrever.
+ * obrigatório: sem ele um módulo novo gravaria achados que apareceriam na aba
+ * Correlações da glicemia. A coluna não tem default no banco, então o
+ * esquecimento falha nas duas camadas — erro de compilação aqui, violação de
+ * NOT NULL lá. O `onConflict` acompanha a unique real `(user_id, module, slug)`:
+ * dois módulos podem repetir o slug sem se sobrescrever.
  */
 export async function persistFindings(
   supabase: SupabaseClient,

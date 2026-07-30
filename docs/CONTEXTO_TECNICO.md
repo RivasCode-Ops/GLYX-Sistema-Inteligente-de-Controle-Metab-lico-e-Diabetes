@@ -213,13 +213,18 @@ a cada leitura, porque a fórmula pode mudar e o dado bruto é a fonte da verdad
 ### Derivados e análise
 `metabolic_audits` · `metabolic_alerts` · `insight_findings`
 
-`insight_findings` é **compartilhada entre módulos**: a coluna `module` (CHECK `glucose` | `body`)
+`insight_findings` é **compartilhada entre módulos**: a coluna `module` (CHECK `glucose` | `training`)
 diz de quem é o achado, e a unicidade é `(user_id, module, slug)` — não `(user_id, slug)`. A
 distinção importa porque a escrita é `upsert`: com unicidade global, dois módulos que escolhessem o
-mesmo slug se sobrescreveriam **em silêncio**, sem erro nem log. Pelo mesmo motivo
-`listInsightFindings(module)` e `persistFindings(..., module)` exigem o módulo como parâmetro
-obrigatório — o default `'glucose'` da coluna existe para as linhas anteriores à migration, não para
-o código novo se apoiar nele. Adicionar um módulo é uma migration de uma linha (o CHECK).
+mesmo slug se sobrescreveriam **em silêncio**, sem erro nem log.
+
+A coluna **não tem default**. O `'glucose'` inicial serviu só para backfillar as linhas anteriores à
+migration e foi derrubado em seguida, porque um default aqui é uma armadilha: o motor de treino que
+esquecesse a coluna não falharia — o achado seria carimbado como glicemia e apareceria na aba
+Correlações sem nenhum sinal. Sem default isso vira violação de NOT NULL na escrita, e
+`listInsightFindings(module)` / `persistFindings(..., module)` exigem o módulo como parâmetro
+obrigatório para que o mesmo esquecimento já não compile. Adicionar um módulo é uma migration de uma
+linha (o CHECK) mais um valor em `InsightModule` — um teste falha se os dois saírem de sincronia.
 
 ### Infraestrutura
 `profiles` (23 colunas, 5 policies) · `cgm_connections` · `google_fit_connections` ·
