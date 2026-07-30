@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { SpendGauge } from "@/components/admin/spend-gauge";
 import { estimateCostUsd } from "@/lib/ai/cost";
+import { sinceLabel } from "@/lib/admin/other-accounts";
 
 const DAILY_BUDGET_USD = Number(process.env.AI_DAILY_BUDGET_USD ?? "1");
 const MONTHLY_BUDGET_USD = Number(process.env.AI_MONTHLY_BUDGET_USD ?? "20");
@@ -22,7 +23,24 @@ type UserStat = {
   ai_calls_7d: number;
   ai_input_tokens: number;
   ai_output_tokens: number;
+  last_sign_in_at: string | null;
+  last_activity_at: string | null;
 };
+
+/**
+ * Contagem não distingue quem entrou uma vez e sumiu de quem está usando agora.
+ * Mostra o sinal mais recente entre entrar no app e gravar algo — e diz qual
+ * dos dois foi, porque significam coisas diferentes.
+ */
+function ultimoUso(u: UserStat): string {
+  const sign = u.last_sign_in_at;
+  const act = u.last_activity_at;
+  if (!sign && !act) return "nunca usou";
+  if (act && (!sign || Date.parse(act) >= Date.parse(sign))) {
+    return `registrou ${sinceLabel(act)}`;
+  }
+  return `entrou ${sinceLabel(sign)}`;
+}
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -109,6 +127,7 @@ export default async function AdminPage() {
               <tr className="border-b border-zinc-800 text-xs uppercase tracking-wide text-zinc-500">
                 <th className="py-2 pr-3">Usuário</th>
                 <th className="py-2 pr-3">Desde</th>
+                <th className="py-2 pr-3">Último uso</th>
                 <th className="py-2 pr-3">Dados</th>
                 <th className="py-2 pr-3">IA (7d)</th>
                 <th className="py-2 pr-3">Status</th>
@@ -127,6 +146,7 @@ export default async function AdminPage() {
                   <td className="py-2.5 pr-3 text-xs text-zinc-500">
                     {new Date(u.created_at).toLocaleDateString("pt-BR")}
                   </td>
+                  <td className="py-2.5 pr-3 text-xs text-zinc-400">{ultimoUso(u)}</td>
                   <td className="py-2.5 pr-3 font-mono text-xs text-zinc-500">
                     {u.glucose_count}g · {u.meals_count}r · {u.medications_count}m
                   </td>

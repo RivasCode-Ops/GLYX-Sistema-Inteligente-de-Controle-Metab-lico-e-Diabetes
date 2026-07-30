@@ -14,6 +14,12 @@ import { planSummaryLabel, suggestFromPlan } from "@/lib/exercicios/training-pla
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { DashboardAutoRefresh } from "@/components/dashboard/auto-refresh";
+import { OtherAccountsNotice } from "@/components/admin/other-accounts-notice";
+import {
+  summarizeOtherAccounts,
+  type AccountRow,
+  type OtherAccountsSummary,
+} from "@/lib/admin/other-accounts";
 import { SensorRadar } from "@/components/glicemia/sensor-radar";
 import { WaterCard, type BeverageSummary } from "@/components/dashboard/water-card";
 import { isHydrating, isBeverageKind } from "@/lib/health/beverages";
@@ -66,6 +72,7 @@ export default async function DashboardPage() {
   let macroTargets: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
     null;
   let muscleFocusLabel: string | null = null;
+  let otherAccounts: OtherAccountsSummary | null = null;
 
   const supabase = await createClient();
   if (supabase) {
@@ -76,7 +83,7 @@ export default async function DashboardPage() {
       const { data: p } = await supabase
         .from("profiles")
         .select(
-          "onboarding_done, primary_focus, sex, birth_year, height_cm, activity_level, body_goal, timezone"
+          "onboarding_done, primary_focus, sex, birth_year, height_cm, activity_level, body_goal, timezone, is_admin"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -115,6 +122,16 @@ export default async function DashboardPage() {
 
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
+
+      // Só para admin: a RPC recusa qualquer outro chamador, e o painel inicial
+      // é onde o aviso encontra a pessoa — /admin só é visto por quem já foi
+      // procurar. Falha aqui não pode derrubar o dashboard inteiro.
+      if (p?.is_admin) {
+        const { data: rows, error } = await supabase.rpc("admin_user_stats");
+        if (!error && rows) {
+          otherAccounts = summarizeOtherAccounts(rows as AccountRow[], user.id);
+        }
+      }
 
       // Só bebidas hidratantes contam pra meta; o resto vira o resumo de extras.
       const beverageRows = (waterRes.data ?? []) as { amount_ml: number | null; kind: string | null }[];
@@ -170,6 +187,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <DashboardAutoRefresh />
+      {otherAccounts ? <OtherAccountsNotice summary={otherAccounts} /> : null}
       <SensorRadar />
       {strip ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
