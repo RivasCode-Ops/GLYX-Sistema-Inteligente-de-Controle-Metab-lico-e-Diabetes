@@ -202,7 +202,25 @@ erro de compilação.
 
 ### Corpo e atividade
 `exercise_sessions` · `strength_logs` · `muscle_pauses` · `weight_logs` · `water_logs` ·
-`health_snapshots` · `body_measurements` · `body_goals` · `body_photos`
+`health_snapshots` · `body_measurements` · `body_goals` · `body_photos` · `exercises`
+
+`exercises` é o **catálogo** (40 de resistência + 2 de cardio) e a fonte de verdade do módulo
+Treino. É referência global: não tem `user_id`, é lida por qualquer autenticado, não é escrita pelo
+app e por isso fica fora do export e do wipe de LGPD — não há dado pessoal nela.
+
+Ele tem **vocabulário muscular próprio, com 12 valores**, contra os 10 de `MuscleGroupId`
+(`lib/data/muscle-groups.ts`). São dois modelos ainda desconectados, de propósito. Os extras são
+`trapezio` e `gluteos`: sem eles o encolhimento entra como costas e infla o grupo, e a elevação
+pélvica não tem onde ser classificada. O catálogo nasce correto em vez de nascer torto para caber no
+modelo antigo; migrar os consumidores (recuperação, volume, splits, plano) é fatia própria.
+
+`source_category` guarda a categoria do infográfico de origem mesmo quando ela diverge do primário —
+elevação pélvica vem em "Pernas" e é de glúteos. Guardar as duas deixa a correção auditável.
+
+**Sem backfill, por decisão.** Nada em `strength_logs` foi reetiquetado: reclassificar texto livre
+para id de catálogo é chute apresentado como dado, indistinguível do dado certo depois de gravado.
+Data de corte **2026-07-30**; a série tem descontinuidade aí. Quando os consumidores migrarem,
+`strength_logs.muscle_group` passa a ser derivável do exercício e tende a virar redundante.
 
 `body_measurements` guarda 21 medidas opcionais (15 circunferências + 5 dobras + peso) com
 `unique (user_id, measured_on)`: uma medição por dia, a última do dia substitui. A composição

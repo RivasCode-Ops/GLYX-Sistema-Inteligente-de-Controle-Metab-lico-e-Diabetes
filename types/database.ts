@@ -54,6 +54,38 @@ export type Medication = Narrow<Tables<"medications">, { kind: MedicationKind }>
 
 export type ExerciseSession = Tables<"exercise_sessions">;
 
+/**
+ * Vocabulário muscular do **catálogo de exercícios** — 12 valores, propositalmente
+ * mais rico que os 10 de `MuscleGroupId` (`lib/data/muscle-groups.ts`).
+ *
+ * São dois modelos distintos e ainda não conectados, de propósito. `MuscleGroupId`
+ * é o modelo dos consumidores atuais (recuperação, volume, splits, plano) e não foi
+ * tocado. Este é o do catálogo, que precisa de `trapezio` e `gluteos` para não
+ * nascer torto: sem eles o encolhimento vira costas e infla o grupo, e a elevação
+ * pélvica não tem onde ser classificada. A ponte entre os dois é fatia própria.
+ */
+export type CatalogMuscleId =
+  | "peito"
+  | "costas"
+  | "trapezio"
+  | "ombros"
+  | "biceps"
+  | "triceps"
+  | "antebracos"
+  | "quadriceps"
+  | "posterior"
+  | "gluteos"
+  | "panturrilhas"
+  | "abdomen";
+
+/** Cardio não entra no motor de fadiga muscular nem no vetor de ativação. */
+export type ExerciseMechanic = "resistencia" | "cardio";
+
+export type Exercise = Narrow<
+  Tables<"exercises">,
+  { mechanic: ExerciseMechanic; primary_muscle: CatalogMuscleId | null }
+>;
+
 export type MetabolicAlert = Narrow<
   Tables<"metabolic_alerts">,
   { severity: AlertSeverity; context: Record<string, unknown> | null }

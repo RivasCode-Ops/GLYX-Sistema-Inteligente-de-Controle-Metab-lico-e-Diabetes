@@ -158,6 +158,17 @@ export type Database = {
           user_id: string;
         };
       };
+      exercises: {
+        Row: {
+          created_at: string;
+          id: string;
+          mechanic: string;
+          name: string;
+          primary_muscle: string | null;
+          slug: string;
+          source_category: string;
+        };
+      };
       glucose_readings: {
         Row: {
           context: string | null;
