@@ -27,7 +27,9 @@ export function DataPrivacySection() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Meus dados (LGPD)</CardTitle>
-        <CardDescription>Exporte uma cópia ou apague todos os seus registros.</CardDescription>
+        <CardDescription>
+          Exporte uma cópia — legível ou bruta — ou apague todos os seus registros.
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {status ? (
@@ -37,6 +39,12 @@ export function DataPrivacySection() {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
+          <Button asChild variant="outline">
+            <a href="/relatorio-completo" target="_blank" rel="noopener">
+              📄 Diário completo (PDF)
+            </a>
+          </Button>
+
           <Button asChild variant="outline">
             <a href="/api/me/export" download>
               Exportar meus dados (JSON)
@@ -69,6 +77,12 @@ export function DataPrivacySection() {
             </Button>
           )}
         </div>
+
+        <p className="text-xs leading-5 text-zinc-500">
+          O <strong>diário completo</strong> abre uma página com tudo que você registrou, do primeiro
+          dia até hoje, pronta para imprimir ou salvar em PDF. O <strong>JSON</strong> é a mesma
+          informação em formato bruto, para levar a outro sistema.
+        </p>
 
         <p className="text-xs leading-5 text-zinc-500">
           A exclusão remove glicemia, refeições, água, peso, medicações, exercício, alertas, exames,

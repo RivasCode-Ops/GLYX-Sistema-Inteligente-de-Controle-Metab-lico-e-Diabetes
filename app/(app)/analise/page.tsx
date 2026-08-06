@@ -163,15 +163,26 @@ export default async function AnaliseResumoPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Dois documentos diferentes: o resumo é a janela curta da auditoria,
+              para o médico ler rápido, e só existe depois de gerar uma. O diário
+              é o histórico integral desde o primeiro registro e não depende de
+              auditoria nenhuma. */}
           {latest ? (
             <Link
               href="/relatorio-medico"
               target="_blank"
               className="rounded-lg border border-zinc-700 bg-zinc-900/60 px-3 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-800"
             >
-              📄 Exportar relatório
+              📄 Resumo p/ o médico
             </Link>
           ) : null}
+          <Link
+            href="/relatorio-completo"
+            target="_blank"
+            className="rounded-lg border border-zinc-700 bg-zinc-900/60 px-3 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-800"
+          >
+            📚 Diário completo
+          </Link>
           <GenerateAuditButton />
         </div>
       </div>
