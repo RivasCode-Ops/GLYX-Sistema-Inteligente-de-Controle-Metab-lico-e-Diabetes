@@ -1,8 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { localDateKey } from "@/lib/time/local-day";
-import { BODY_FIELD_KEYS, type BodyMeasurementKey } from "@/lib/body/fields";
+import { BODY_FIELD_KEYS, type BodyMeasurement, type BodyMeasurementKey } from "@/lib/body/fields";
 import { BEVERAGE_META, isBeverageKind, isHydrating } from "@/lib/health/beverages";
+import {
+  computeComposition,
+  sameMethod,
+  type BodyComposition,
+  type Sex,
+} from "@/lib/body/composition";
+import { computeProgress, type BodyProgress } from "@/lib/body/progress";
+import {
+  computeAllGoalProgress,
+  type BodyGoalRow as GoalDefinition,
+  type GoalProgress,
+} from "@/lib/body/goals";
 
 /**
  * Diário completo: tudo que o usuário registrou, do primeiro dia até hoje.
@@ -389,6 +401,69 @@ export function daysBetweenInclusive(startDay: string, endDay: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Corpo: composição, evolução e metas
+// ---------------------------------------------------------------------------
+
+export type MeasurementComposition = { measuredOn: string; composition: BodyComposition };
+
+/** Idade em anos no fim do período — a equação de dobras cutâneas depende dela. */
+export function ageAt(birthYear: number | null | undefined, referenceDay: string): number | null {
+  if (!birthYear) return null;
+  const age = Number(referenceDay.slice(0, 4)) - birthYear;
+  return age > 0 && age < 130 ? age : null;
+}
+
+/** Último peso registrado até o dia (inclusive) — só serve de reserva quando a
+ * própria medição não trouxe peso. */
+export function weightOnOrBefore(weights: WeightRow[], day: string): number | null {
+  let found: number | null = null;
+  for (const w of weights) {
+    if (w.logged_on <= day) found = Number(w.weight_kg);
+    else break;
+  }
+  return found != null && Number.isFinite(found) ? found : null;
+}
+
+/**
+ * Par de medições mais distante entre si cujas composições foram estimadas pelo
+ * MESMO método de gordura.
+ *
+ * Existe porque a divisão músculo/gordura em kg só é honesta dentro de um mesmo
+ * método (ver `sameMethod` em lib/body/composition.ts), e a primeira medição de
+ * uma série costuma ser a incompleta — falta pescoço, falta a terceira dobra. Se
+ * o relatório comparasse só a primeira com a última, quem passou a medir direito
+ * depois perderia justamente a leitura que já é possível fazer.
+ */
+export function widestComparablePair(
+  comps: MeasurementComposition[]
+): [number, number] | null {
+  for (let span = comps.length - 1; span >= 1; span -= 1) {
+    for (let i = 0; i + span < comps.length; i += 1) {
+      const j = i + span;
+      if (sameMethod(comps[i].composition, comps[j].composition)) return [i, j];
+    }
+  }
+  return null;
+}
+
+export type BodySection = {
+  /** Composição estimada em cada data medida, da mais antiga para a mais recente. */
+  compositions: MeasurementComposition[];
+  /** Evolução da primeira à última medição — o quadro geral do período. */
+  progress: BodyProgress | null;
+  /** Evolução no maior intervalo com divisão músculo/gordura confiável. `null`
+   * quando é o mesmo par de `progress` ou quando nenhum par é comparável. */
+  comparableProgress: BodyProgress | null;
+  goalProgress: GoalProgress[];
+  weightFirst: { day: string; kg: number } | null;
+  weightLast: { day: string; kg: number } | null;
+  weightDeltaKg: number | null;
+  /** Perfil e metas guardam peso-alvo em lugares diferentes; divergência vira
+   * aviso em vez de dois números soltos se contradizendo na mesma página. */
+  weightTargetConflict: { profileKg: number; goalKg: number } | null;
+};
+
+// ---------------------------------------------------------------------------
 // Leitura do banco
 // ---------------------------------------------------------------------------
 
@@ -468,6 +543,9 @@ export type FullHistoryReport = {
   weights: WeightRow[];
   measurements: MeasurementRow[];
   bodyGoals: BodyGoalRow[];
+  /** Leitura derivada das medidas: quanto do peso é músculo, quanto é gordura,
+   * para onde foi no período e o quanto falta para cada meta. */
+  body: BodySection;
   pressure: PressureRow[];
   exams: ExamRow[];
   alerts: AlertRow[];
@@ -635,6 +713,61 @@ export async function buildFullHistoryReport(
     snapshots[0]?.snapshot_date,
   ]);
 
+  const rawSex = (profileRow?.sex as string | null) ?? null;
+  const sex: Sex | null = rawSex === "m" || rawSex === "f" ? rawSex : null;
+  const heightCm = (profileRow?.height_cm as number | null) ?? null;
+  const ageYears = ageAt(profileRow?.birth_year as number | null, lastDay);
+
+  const compositions: MeasurementComposition[] = measurements.map((m) => ({
+    measuredOn: m.measured_on,
+    composition: computeComposition({
+      measurement: m as BodyMeasurement,
+      sex,
+      ageYears,
+      heightCm,
+      fallbackWeightKg: weightOnOrBefore(weights, m.measured_on),
+    }),
+  }));
+
+  const progressBetween = (i: number, j: number): BodyProgress =>
+    computeProgress(
+      { measurement: measurements[i] as BodyMeasurement, composition: compositions[i].composition },
+      { measurement: measurements[j] as BodyMeasurement, composition: compositions[j].composition }
+    );
+
+  const lastIndex = compositions.length - 1;
+  const progress = compositions.length >= 2 ? progressBetween(0, lastIndex) : null;
+
+  const pair = widestComparablePair(compositions);
+  const comparableProgress =
+    pair && !(pair[0] === 0 && pair[1] === lastIndex) ? progressBetween(pair[0], pair[1]) : null;
+
+  const goalDefinitions: GoalDefinition[] = bodyGoals
+    .filter(
+      (goal): goal is BodyGoalRow & { target_value: number; start_on: string } =>
+        goal.target_value != null && goal.start_on != null
+    )
+    .map((goal) => ({
+      metric: goal.metric,
+      target_value: goal.target_value,
+      start_value: goal.start_value,
+      start_on: goal.start_on,
+      target_date: goal.target_date,
+    }));
+
+  const weightFirst = weights[0]
+    ? { day: weights[0].logged_on, kg: Number(weights[0].weight_kg) }
+    : null;
+  const weightLast = weights.length
+    ? {
+        day: weights[weights.length - 1].logged_on,
+        kg: Number(weights[weights.length - 1].weight_kg),
+      }
+    : null;
+
+  const profileTargetKg = (profileRow?.target_weight_kg as number | null) ?? null;
+  const goalTargetKg = goalDefinitions.find((goal) => goal.metric === "weight_kg")?.target_value ?? null;
+
   return {
     profile: {
       fullName: (profileRow?.full_name as string | null) ?? null,
@@ -678,6 +811,22 @@ export async function buildFullHistoryReport(
     weights,
     measurements,
     bodyGoals,
+    body: {
+      compositions,
+      progress,
+      comparableProgress,
+      goalProgress: computeAllGoalProgress(goalDefinitions, measurements as BodyMeasurement[]),
+      weightFirst,
+      weightLast,
+      weightDeltaKg:
+        weightFirst && weightLast && weightFirst.day !== weightLast.day
+          ? Math.round((weightLast.kg - weightFirst.kg) * 10) / 10
+          : null,
+      weightTargetConflict:
+        profileTargetKg != null && goalTargetKg != null && Number(profileTargetKg) !== goalTargetKg
+          ? { profileKg: Number(profileTargetKg), goalKg: goalTargetKg }
+          : null,
+    },
     pressure,
     exams,
     alerts,

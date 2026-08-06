@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ageAt,
   aggregateGlucoseByDay,
   aggregateWaterByDay,
   daysBetweenInclusive,
@@ -8,7 +9,11 @@ import {
   groupMedicationLogsByDay,
   isRealGlucoseSource,
   summarizeGlucose,
+  weightOnOrBefore,
+  widestComparablePair,
+  type MeasurementComposition,
 } from "./full-history";
+import type { BodyComposition, BodyFatMethod } from "@/lib/body/composition";
 
 const TZ = "America/Sao_Paulo";
 
@@ -187,6 +192,73 @@ describe("earliestDay", () => {
 
   it("devolve null quando não há data nenhuma", () => {
     expect(earliestDay([null, undefined])).toBeNull();
+  });
+});
+
+describe("ageAt", () => {
+  it("calcula a idade no ano de referência", () => {
+    expect(ageAt(1969, "2026-08-06")).toBe(57);
+  });
+
+  it("devolve null sem ano de nascimento ou com valor absurdo", () => {
+    expect(ageAt(null, "2026-08-06")).toBeNull();
+    expect(ageAt(undefined, "2026-08-06")).toBeNull();
+    expect(ageAt(2030, "2026-08-06")).toBeNull(); // idade negativa
+  });
+});
+
+describe("weightOnOrBefore", () => {
+  const weights = [
+    { logged_on: "2026-07-12", weight_kg: 75 },
+    { logged_on: "2026-07-18", weight_kg: 77 },
+    { logged_on: "2026-07-26", weight_kg: 78 },
+  ];
+
+  it("pega o último peso até a data, nunca um posterior", () => {
+    expect(weightOnOrBefore(weights, "2026-07-20")).toBe(77);
+    expect(weightOnOrBefore(weights, "2026-07-26")).toBe(78);
+    expect(weightOnOrBefore(weights, "2026-08-30")).toBe(78);
+  });
+
+  it("devolve null antes do primeiro registro", () => {
+    expect(weightOnOrBefore(weights, "2026-07-01")).toBeNull();
+    expect(weightOnOrBefore([], "2026-07-20")).toBeNull();
+  });
+});
+
+describe("widestComparablePair", () => {
+  function comp(method: BodyFatMethod | null): MeasurementComposition {
+    return {
+      measuredOn: "2026-07-26",
+      composition: { bodyFatMethod: method } as BodyComposition,
+    };
+  }
+
+  it("ignora a medição incompleta do início e compara o resto", () => {
+    // Primeira medição sem pescoço: sem método, logo incomparável.
+    expect(widestComparablePair([comp(null), comp("circunferencias"), comp("circunferencias")])).toEqual(
+      [1, 2]
+    );
+  });
+
+  it("prefere o intervalo mais largo possível", () => {
+    expect(
+      widestComparablePair([
+        comp("circunferencias"),
+        comp("dobras"),
+        comp("circunferencias"),
+      ])
+    ).toEqual([0, 2]);
+  });
+
+  it("não casa métodos diferentes — o salto de gordura seria artificial", () => {
+    expect(widestComparablePair([comp("dobras"), comp("circunferencias")])).toBeNull();
+  });
+
+  it("devolve null com menos de duas medições comparáveis", () => {
+    expect(widestComparablePair([])).toBeNull();
+    expect(widestComparablePair([comp("dobras")])).toBeNull();
+    expect(widestComparablePair([comp(null), comp(null)])).toBeNull();
   });
 });
 

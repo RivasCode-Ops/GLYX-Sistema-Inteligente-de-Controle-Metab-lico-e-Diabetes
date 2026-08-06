@@ -5,6 +5,9 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { buildFullHistoryReport, type FullHistoryReport } from "@/lib/reports/full-history";
 import { SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { BODY_FIELDS, BODY_FIELD_BY_KEY, isBodyMeasurementKey } from "@/lib/body/fields";
+import { METHOD_LABEL, waistToHeightBand } from "@/lib/body/composition";
+import { progressSummary, type ProgressTone } from "@/lib/body/progress";
+import { projectionMessage } from "@/lib/body/goals";
 import { MUSCLE_GROUP_BY_ID, resolveMuscleGroupIds } from "@/lib/data/muscle-groups";
 import { INTENSITY_LEVELS, activityTypeLabel } from "@/lib/data/activity-types";
 import { ACTIVITY_LABEL, GOAL_LABEL, type ActivityLevel, type BodyGoal } from "@/lib/health/energy";
@@ -201,6 +204,40 @@ function MeasurementsTable({ report }: { report: FullHistoryReport }) {
   );
 }
 
+/** Impresso em preto e branco a cor some, então o veredito também carrega
+ * palavra e borda — nunca só o tom. */
+const TONE_BOX: Record<ProgressTone, string> = {
+  otimo: "border-emerald-700 bg-emerald-50",
+  bom: "border-emerald-600 bg-emerald-50/60",
+  atencao: "border-amber-600 bg-amber-50",
+  neutro: "border-zinc-400 bg-zinc-50",
+};
+
+function ProgressBlock({
+  progress,
+  caption,
+}: {
+  progress: NonNullable<FullHistoryReport["body"]["progress"]>;
+  caption: string;
+}) {
+  return (
+    <div className={`mt-2 break-inside-avoid rounded-lg border-2 p-3 ${TONE_BOX[progress.verdict.tone]}`}>
+      <div className="text-[10.5px] uppercase tracking-wide text-zinc-600">{caption}</div>
+      <div className="mt-0.5 text-[15px] font-bold">{progress.verdict.headline}</div>
+      <p className="mt-1 text-[12.5px] leading-5">{progress.verdict.detail}</p>
+      <p className="mt-1.5 text-[12px] font-medium">{progressSummary(progress)}</p>
+      {!progress.splitIsEstimated ? (
+        <p className="mt-1.5 text-[11.5px] text-zinc-700">
+          A divisão em quilos de músculo e de gordura não pôde ser calculada neste intervalo: ela exige
+          percentual de gordura estimado pelo <strong>mesmo método</strong> nas duas datas. Faltou a
+          medida necessária (pescoço, para o método de circunferências; as três dobras do protocolo,
+          para o de dobras) em pelo menos uma delas.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function ExamSummaryText({ parsed }: { parsed: unknown }) {
   if (!parsed || typeof parsed !== "object") return <>—</>;
   const summary = (parsed as { summary?: unknown }).summary;
@@ -222,8 +259,11 @@ export default async function RelatorioCompletoPage() {
   if (!user) notFound();
 
   const report = await buildFullHistoryReport(supabase, user.id);
-  const { profile: p, glucose: g } = report;
+  const { profile: p, glucose: g, body: b } = report;
   const tz = p.timezone;
+
+  const latestComposition = b.compositions[b.compositions.length - 1]?.composition ?? null;
+  const waistBand = waistToHeightBand(latestComposition?.waistToHeight ?? null);
 
   const totalRecords =
     (g.overall?.count ?? 0) +
@@ -575,6 +615,146 @@ export default async function RelatorioCompletoPage() {
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
+        <Section title="Peso e composição corporal">
+          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-3">
+            <Stat
+              value={b.weightFirst ? `${b.weightFirst.kg} kg` : "—"}
+              label={b.weightFirst ? `Peso em ${fmtDayShort(b.weightFirst.day)}` : "Peso inicial"}
+            />
+            <Stat
+              value={b.weightLast ? `${b.weightLast.kg} kg` : "—"}
+              label={b.weightLast ? `Peso em ${fmtDayShort(b.weightLast.day)}` : "Peso atual"}
+            />
+            <Stat
+              value={
+                b.weightDeltaKg == null
+                  ? "—"
+                  : `${b.weightDeltaKg > 0 ? "+" : ""}${b.weightDeltaKg} kg`
+              }
+              label="Variação no período"
+            />
+            <Stat value={num(latestComposition?.bmi)} label="IMC atual" />
+            <Stat
+              value={
+                latestComposition?.bodyFatPercent != null
+                  ? `${latestComposition.bodyFatPercent}%`
+                  : "—"
+              }
+              label="Gordura estimada"
+            />
+            <Stat value={num(latestComposition?.leanMassKg, " kg")} label="Massa magra" />
+            <Stat value={num(latestComposition?.fatMassKg, " kg")} label="Massa gorda" />
+          </div>
+
+          {waistBand ? (
+            <p className="mt-2 text-[12px]">
+              <span className="text-zinc-600">Cintura ÷ altura:</span>{" "}
+              <strong>{latestComposition?.waistToHeight}</strong> — {waistBand.label}. Referência:
+              manter a cintura abaixo de metade da altura.
+            </p>
+          ) : null}
+
+          {b.weightTargetConflict ? (
+            <div className="mt-2 rounded-lg border-2 border-amber-500 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+              <strong>Metas de peso em conflito.</strong> O perfil traz{" "}
+              {b.weightTargetConflict.profileKg} kg como peso-alvo, e a meta corporal cadastrada pede{" "}
+              {b.weightTargetConflict.goalKg} kg. São dois números incompatíveis apontando direções
+              opostas — vale corrigir um dos dois no app para que o progresso pare de ser medido contra
+              alvos que se contradizem.
+            </div>
+          ) : null}
+
+          {b.progress ? (
+            <ProgressBlock
+              progress={b.progress}
+              caption={`Da primeira à última medição · ${fmtDay(b.progress.fromDate)} a ${fmtDay(b.progress.toDate)} (${b.progress.days} dias)`}
+            />
+          ) : (
+            <Empty>
+              É necessária mais de uma medição corporal para calcular evolução. Registre uma nova em
+              Composição › Medidas.
+            </Empty>
+          )}
+
+          {b.comparableProgress ? (
+            <ProgressBlock
+              progress={b.comparableProgress}
+              caption={`Maior intervalo com divisão músculo/gordura confiável · ${fmtDay(b.comparableProgress.fromDate)} a ${fmtDay(b.comparableProgress.toDate)} (${b.comparableProgress.days} dias)`}
+            />
+          ) : null}
+
+          {b.compositions.length > 0 ? (
+            <>
+              <h3 className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-zinc-700">
+                Composição estimada em cada medição
+              </h3>
+              <Table
+                head={["Data", "Peso", "IMC", "Cint./alt.", "% gordura", "Método", "Gorda", "Magra", "FFMI"]}
+              >
+                {b.compositions.map((c, i) => (
+                  <tr key={i}>
+                    <Td className="whitespace-nowrap">{fmtDay(c.measuredOn)}</Td>
+                    <Td>{num(c.composition.weightKg, " kg")}</Td>
+                    <Td>{num(c.composition.bmi)}</Td>
+                    <Td>{num(c.composition.waistToHeight)}</Td>
+                    <Td className="font-medium">
+                      {c.composition.bodyFatPercent != null ? `${c.composition.bodyFatPercent}%` : "—"}
+                    </Td>
+                    <Td className="text-[11px]">
+                      {c.composition.bodyFatMethod ? METHOD_LABEL[c.composition.bodyFatMethod] : "—"}
+                    </Td>
+                    <Td>{num(c.composition.fatMassKg, " kg")}</Td>
+                    <Td>{num(c.composition.leanMassKg, " kg")}</Td>
+                    <Td>{num(c.composition.ffmi)}</Td>
+                  </tr>
+                ))}
+              </Table>
+              <p className="mt-1.5 text-[11.5px] text-zinc-600">
+                Nenhuma fórmula de fita ou dobra <em>mede</em> gordura — todas inferem por equação de
+                regressão, com erro de ~3-4 pontos percentuais. O uso correto é acompanhar a tendência
+                da mesma pessoa medida do mesmo jeito, não comparar o número absoluto com exame
+                (DEXA/bioimpedância) nem com outra pessoa. Linhas com método diferente não são
+                comparáveis entre si.
+              </p>
+            </>
+          ) : null}
+
+          {b.progress && b.progress.deltas.length > 0 ? (
+            <>
+              <h3 className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-zinc-700">
+                Variação de cada medida no período
+              </h3>
+              <Table head={["Medida", "De", "Para", "Variação", "Leitura"]}>
+                {b.progress.deltas.map((d, i) => (
+                  <tr key={i}>
+                    <Td className="font-medium">
+                      {d.label} <span className="text-zinc-500">({d.unit})</span>
+                    </Td>
+                    <Td>{d.from}</Td>
+                    <Td>{d.to}</Td>
+                    <Td className="font-medium">
+                      {d.delta > 0 ? "+" : ""}
+                      {d.delta}
+                    </Td>
+                    <Td className="text-[11.5px]">
+                      {d.withinNoise
+                        ? "dentro da margem de erro"
+                        : d.direction === "up"
+                          ? "aumentou"
+                          : "reduziu"}
+                    </Td>
+                  </tr>
+                ))}
+              </Table>
+              <p className="mt-1.5 text-[11.5px] text-zinc-600">
+                Fita métrica erra ~1 cm entre medições da mesma pessoa no mesmo dia; o peso oscila 1-2
+                kg por água, sal e intestino. Variação abaixo desse piso é lida como estável, não como
+                evolução.
+              </p>
+            </>
+          ) : null}
+        </Section>
+
         <Section title="Peso registrado" count={report.weights.length}>
           {report.weights.length === 0 ? (
             <Empty>Nenhum peso registrado.</Empty>
@@ -598,27 +778,61 @@ export default async function RelatorioCompletoPage() {
           )}
         </Section>
 
-        <Section title="Metas corporais" count={report.bodyGoals.length}>
-          {report.bodyGoals.length === 0 ? (
-            <Empty>Nenhuma meta corporal definida.</Empty>
+        <Section title="Metas corporais e progresso" count={report.bodyGoals.length}>
+          {b.goalProgress.length === 0 ? (
+            report.bodyGoals.length === 0 ? (
+              <Empty>Nenhuma meta corporal definida.</Empty>
+            ) : (
+              <Table head={["Medida", "Partida", "Meta", "Prazo"]}>
+                {report.bodyGoals.map((goal, i) => (
+                  <tr key={i}>
+                    <Td className="font-medium">
+                      {isBodyMeasurementKey(goal.metric)
+                        ? BODY_FIELD_BY_KEY[goal.metric].label
+                        : goal.metric}
+                    </Td>
+                    <Td>{num(goal.start_value)}</Td>
+                    <Td>{num(goal.target_value)}</Td>
+                    <Td className="whitespace-nowrap">
+                      {goal.target_date ? fmtDay(goal.target_date) : "—"}
+                    </Td>
+                  </tr>
+                ))}
+              </Table>
+            )
           ) : (
-            <Table head={["Medida", "Partida", "Meta", "Início", "Prazo"]}>
-              {report.bodyGoals.map((goal) => (
-                <tr key={goal.metric}>
-                  <Td className="font-medium">
-                    {isBodyMeasurementKey(goal.metric)
-                      ? BODY_FIELD_BY_KEY[goal.metric].label
-                      : goal.metric}
-                  </Td>
-                  <Td>{num(goal.start_value)}</Td>
-                  <Td>{num(goal.target_value)}</Td>
-                  <Td className="whitespace-nowrap">{goal.start_on ? fmtDay(goal.start_on) : "—"}</Td>
-                  <Td className="whitespace-nowrap">
-                    {goal.target_date ? fmtDay(goal.target_date) : "—"}
-                  </Td>
-                </tr>
-              ))}
-            </Table>
+            <>
+              <Table head={["Medida", "Partida", "Atual", "Meta", "Falta", "Andado", "Ritmo"]}>
+                {b.goalProgress.map((goal, i) => (
+                  <tr key={i}>
+                    <Td className="font-medium">{goal.label}</Td>
+                    <Td>{num(goal.start, ` ${goal.unit}`)}</Td>
+                    <Td className="font-medium">{num(goal.current, ` ${goal.unit}`)}</Td>
+                    <Td>
+                      {goal.target} {goal.unit}
+                    </Td>
+                    <Td>
+                      {goal.achieved ? (
+                        <span className="font-medium text-[#0a6b2f]">atingida</span>
+                      ) : (
+                        num(goal.remaining, ` ${goal.unit}`)
+                      )}
+                    </Td>
+                    <Td>{goal.progressPercent != null ? `${goal.progressPercent}%` : "—"}</Td>
+                    <Td>
+                      {goal.ratePerWeek != null ? `${goal.ratePerWeek} ${goal.unit}/sem` : "—"}
+                    </Td>
+                  </tr>
+                ))}
+              </Table>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[11.5px] leading-5">
+                {b.goalProgress.map((goal, i) => (
+                  <li key={i}>
+                    <strong>{goal.label}:</strong> {projectionMessage(goal)}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Section>
 
