@@ -8,6 +8,7 @@ function exercise(over: Partial<CatalogExercise> = {}): CatalogExercise {
     name: "Supino reto com barra",
     mechanic: "resistencia",
     primaryMuscle: "peito",
+    secondaryMuscles: [],
     sourceCategory: "Peito",
     ...over,
   };

@@ -22,6 +22,12 @@ export type CatalogExercise = {
    * dado.
    */
   primaryMuscle: MuscleGroupId | null;
+  /**
+   * Músculos recrutados de forma secundária. Vazio em isolador — e o vazio é
+   * informação, não classificação pendente: rosca direta não tem secundário
+   * relevante.
+   */
+  secondaryMuscles: MuscleGroupId[];
   sourceCategory: string;
 };
 

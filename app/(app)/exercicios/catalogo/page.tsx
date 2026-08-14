@@ -48,7 +48,17 @@ export default async function CatalogoPage() {
                   key={exercise.id}
                   className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/70 bg-zinc-950/40 px-3 py-2"
                 >
-                  <span className="text-sm text-zinc-200">{exercise.name}</span>
+                  <span className="text-sm text-zinc-200">
+                    {exercise.name}
+                    {exercise.secondaryMuscles.length ? (
+                      <span className="mt-0.5 block text-[11px] text-zinc-500">
+                        também recruta{" "}
+                        {exercise.secondaryMuscles
+                          .map((m) => MUSCLE_GROUP_BY_ID[m].label.toLowerCase())
+                          .join(" e ")}
+                      </span>
+                    ) : null}
+                  </span>
                   {exercise.primaryMuscle ? (
                     <span className="shrink-0 rounded-md bg-zinc-800/80 px-2 py-0.5 text-[11px] text-zinc-300">
                       {MUSCLE_GROUP_BY_ID[exercise.primaryMuscle].label}
@@ -80,6 +90,12 @@ export default async function CatalogoPage() {
         A categoria é a do material de origem e nem sempre bate com o músculo principal — elevação
         pélvica vem em &quot;Pernas&quot; e é de glúteos. As duas informações aparecem juntas de
         propósito: a categoria é onde você procura, o músculo é o que o app conta.
+      </p>
+      <p className="text-[11px] leading-snug text-zinc-500">
+        &quot;Também recruta&quot; é trabalho secundário: supino treina tríceps e ombro nas mesmas
+        séries em que treina peito. Isso <strong>não</strong> entra na conta comparada com a sua
+        meta de volume — as faixas de referência já contam com o trabalho indireto dos compostos, e
+        somar duas vezes daria um número alto e errado. Aparece como informação à parte.
       </p>
     </div>
   );

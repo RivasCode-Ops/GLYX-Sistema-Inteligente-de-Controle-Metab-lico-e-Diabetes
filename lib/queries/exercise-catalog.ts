@@ -12,7 +12,8 @@ import type { CatalogExercise } from "@/lib/exercicios/catalog";
  * pelo formulário, que é componente cliente.
  */
 
-const COLUMNS = "id, slug, name, mechanic, primary_muscle, source_category";
+const COLUMNS =
+  "id, slug, name, mechanic, primary_muscle, secondary_muscles, source_category";
 
 type Row = {
   id: string;
@@ -20,6 +21,7 @@ type Row = {
   name: string;
   mechanic: string;
   primary_muscle: string | null;
+  secondary_muscles: string[] | null;
   source_category: string;
 };
 
@@ -30,6 +32,7 @@ function toCatalogExercise(row: Row): CatalogExercise {
     name: row.name,
     mechanic: row.mechanic as CatalogExercise["mechanic"],
     primaryMuscle: (row.primary_muscle as MuscleGroupId | null) ?? null,
+    secondaryMuscles: (row.secondary_muscles ?? []) as MuscleGroupId[],
     sourceCategory: row.source_category,
   };
 }

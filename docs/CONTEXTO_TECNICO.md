@@ -242,6 +242,17 @@ catálogo via vetor de ativação, e as duas fontes vão conviver por um tempo. 
 produz erro nem número absurdo — produz um volume plausível e errado, que é a falha mais cara desta
 família.
 
+**Desfecho (14/08/2026, Fatia 5).** A previsão se confirmou e a saída foi não escolher: a série
+secundária vive em `lib/exercicios/indirect-volume.ts`, numa contagem **separada e rotulada**, e
+`setsPerWeek` continua sendo só o primário. O motivo é que `WEEKLY_SET_TARGET` já embute trabalho
+indireto — a própria definição diz que grupos pequenos recebem alvo menor "porque também são
+recrutados indiretamente nos compostos". Somar as duas compararia número inflado contra alvo
+calibrado para trabalho direto. Nenhum número existente mudou de valor com a fatia.
+
+Uma série indireta vale **uma série**, não meia: ponderar exigiria um fator por par
+exercício-músculo que ninguém mediu, e um número com casa decimal parece mais preciso que o palpite
+que seria.
+
 ### 4.11 RLS só está verificada se a verificação simular o papel
 
 Ler a policy na migration não prova nada, e conferir pelo painel/MCP prova menos ainda: **essas

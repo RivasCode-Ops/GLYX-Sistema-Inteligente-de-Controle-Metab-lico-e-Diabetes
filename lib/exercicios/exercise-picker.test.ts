@@ -9,6 +9,7 @@ function ex(id: string, name: string, muscle: CatalogExercise["primaryMuscle"]):
     name,
     mechanic: "resistencia",
     primaryMuscle: muscle,
+    secondaryMuscles: [],
     sourceCategory: "Peito",
   };
 }

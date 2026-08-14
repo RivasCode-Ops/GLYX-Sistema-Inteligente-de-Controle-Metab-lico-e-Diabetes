@@ -60,8 +60,12 @@ Construído em fatias, cada uma aditiva e verificável sozinha.
 | 1b. Vocabulário canônico ganha trapézio e glúteos | Entregue 30/07/2026 |
 | 2. A ponte: `strength_logs.exercise_id`, nome e músculo derivados no servidor | Entregue 14/08/2026 |
 | 3. Registro de carga conta como treino na recuperação e no volume | Entregue 14/08/2026 |
-| 4. Plano prescrever exercícios do catálogo, não só grupos musculares | Aberto |
-| 5. Vetor de ativação: músculos secundários, para `direct_sets` deixar de ser só o primário | Aberto |
+| 4. Plano prescreve exercícios do catálogo, priorizando o que já tem histórico | Entregue 14/08/2026 |
+| 5. Vetor de ativação: músculo secundário em contagem separada | Entregue 14/08/2026 |
+
+**Módulo completo.** A série secundária é deliberadamente **separada** do volume comparado com a
+meta: `WEEKLY_SET_TARGET` já embute trabalho indireto, e somar as duas contagens daria um número
+plausível e errado — a armadilha que o §4.10 do CONTEXTO_TECNICO previu por escrito para esta fatia.
 
 **Sem backfill, por decisão.** Nada em `strength_logs` foi reetiquetado — reclassificar texto livre
 para id de catálogo é chute apresentado como dado. Data de corte 30/07/2026 para o catálogo e
@@ -82,7 +86,7 @@ escolhendo o exercício da lista.
 
 ### P2 — produto
 
-5. **Fatias 4 e 5 do módulo Treino** (ver seção acima) — o catálogo já é fonte de verdade na escrita; falta ele guiar a prescrição e cobrir músculo secundário.
+5. ~~Fatias 4 e 5 do módulo Treino.~~ — entregues em 14/08/2026; módulo completo.
 6. Decisão estratégica: **só paciente** vs **compartilhamento com cuidador** (consentimento granular, escopos). Sem isso, não começar multi-tenant clínico.
 7. ~~Métricas educativas: TIR / resumo semanal exportável (não AGP clínico).~~ — entregue em 26/07/2026 em `/analise/semana`: 7 dias contra os 7 anteriores, destaques determinísticos e export em texto puro. Comparação só aparece quando as DUAS semanas passam do piso de dados.
 8. Modelo de negócio (freemium IA / convite pago) — hoje só controle de custo.
