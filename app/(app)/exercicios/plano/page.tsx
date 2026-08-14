@@ -11,6 +11,13 @@ import {
   type GroupPrescription,
 } from "@/lib/exercicios/plan-prescription";
 import type { ExerciseProgression } from "@/lib/exercicios/weekly-volume";
+import {
+  lastLoggedByExercise,
+  pickExercisesForGroup,
+  type ExercisePick,
+} from "@/lib/exercicios/exercise-picker";
+import { listCatalogExercises } from "@/lib/queries/exercise-catalog";
+import { getRecentStrengthLogs } from "@/lib/queries/strength";
 import { loadBodySnapshot } from "@/lib/queries/body-composition";
 import {
   getActiveMusclePauses,
@@ -28,6 +35,7 @@ export default async function ExerciciosPlanoPage() {
   let prescriptions: GroupPrescription[] = [];
   let progressions: ExerciseProgression[] = [];
   let uncovered: ReturnType<typeof uncoveredGoalMuscles> = [];
+  let picksByGroup: Record<string, ExercisePick[]> = {};
 
   if (!demoMode) {
     const supabase = await createClient();
@@ -36,16 +44,19 @@ export default async function ExerciciosPlanoPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const [{ data }, lastTrained, pausedGroups, logCounts, snapshot] = await Promise.all([
-          supabase.from("profiles").select("body_goal").eq("id", user.id).maybeSingle(),
-          getLastTrainedByMuscleGroup(),
-          getActiveMusclePauses(),
-          getSessionCountByMuscleGroup(),
-          // Mesmo snapshot que o módulo de composição usa: se o plano montasse o
-          // próprio cálculo de volume, as duas telas acabariam discordando sobre
-          // quantas séries de costas o usuário fez na semana.
-          loadBodySnapshot(supabase, user.id),
-        ]);
+        const [{ data }, lastTrained, pausedGroups, logCounts, snapshot, catalog, strengthLogs] =
+          await Promise.all([
+            supabase.from("profiles").select("body_goal").eq("id", user.id).maybeSingle(),
+            getLastTrainedByMuscleGroup(),
+            getActiveMusclePauses(),
+            getSessionCountByMuscleGroup(),
+            // Mesmo snapshot que o módulo de composição usa: se o plano montasse o
+            // próprio cálculo de volume, as duas telas acabariam discordando sobre
+            // quantas séries de costas o usuário fez na semana.
+            loadBodySnapshot(supabase, user.id),
+            listCatalogExercises(),
+            getRecentStrengthLogs(),
+          ]);
         bodyGoal = (data?.body_goal as typeof bodyGoal) ?? null;
         statuses = computeMuscleRecovery(lastTrained, pausedGroups, new Date(), logCounts);
         progressions = snapshot.progressions;
@@ -58,6 +69,17 @@ export default async function ExerciciosPlanoPage() {
           suggestion.included.map((s) => ({ id: s.id, label: s.label })),
           snapshot.volume,
           snapshot.goals
+        );
+
+        // Traduz as séries prescritas em exercícios concretos. O histórico entra
+        // para o sugerido repetir o que já foi feito quando existe: trocar de
+        // exercício zera a comparação de carga com a última vez.
+        const historico = lastLoggedByExercise(strengthLogs);
+        picksByGroup = Object.fromEntries(
+          prescriptions.map((p) => [
+            p.id,
+            pickExercisesForGroup(catalog, p.id, p.setsToday, historico),
+          ])
         );
       }
     }
@@ -83,6 +105,7 @@ export default async function ExerciciosPlanoPage() {
           prescriptions={prescriptions}
           progressions={progressions}
           uncovered={uncovered}
+          picksByGroup={picksByGroup}
         />
       ) : null}
       <GoalTrainingCard goal={demoMode ? "maintain" : bodyGoal} />

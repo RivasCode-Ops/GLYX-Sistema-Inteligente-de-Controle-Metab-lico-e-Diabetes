@@ -8,6 +8,7 @@ import {
   type PrescriptionEmphasis,
 } from "@/lib/exercicios/plan-prescription";
 import type { ExerciseProgression } from "@/lib/exercicios/weekly-volume";
+import type { ExercisePick } from "@/lib/exercicios/exercise-picker";
 
 const EMPHASIS_PILL: Record<PrescriptionEmphasis, { tone: "emerald" | "amber" | "zinc"; label: string }> = {
   meta: { tone: "emerald", label: "meta" },
@@ -27,10 +28,13 @@ export function SessionPrescriptionCard({
   prescriptions,
   progressions,
   uncovered,
+  picksByGroup,
 }: {
   prescriptions: GroupPrescription[];
   progressions: ExerciseProgression[];
   uncovered: { id: string; label: string; goalLabel: string; setsPerWeek: number; minTarget: number }[];
+  /** Exercícios sugeridos por grupo. Vazio quando o catálogo não cobre o músculo. */
+  picksByGroup?: Record<string, ExercisePick[]>;
 }) {
   if (!prescriptions.length && !uncovered.length) return null;
 
@@ -66,6 +70,29 @@ export function SessionPrescriptionCard({
                     </p>
                   </div>
                   <p className="mt-1 text-[11px] leading-snug text-zinc-500">{p.reason}</p>
+
+                  {picksByGroup?.[p.id]?.length ? (
+                    <ul className="mt-2 space-y-1 border-t border-zinc-800/70 pt-2">
+                      {picksByGroup[p.id].map((pick) => (
+                        <li
+                          key={pick.exercise.id}
+                          className="flex items-baseline justify-between gap-2 text-xs"
+                        >
+                          <span className="text-zinc-300">{pick.exercise.name}</span>
+                          <span className="flex shrink-0 items-baseline gap-2">
+                            {/* "Já fez" marca o exercício com histórico: é nele que
+                                a comparação de carga com a última vez existe. */}
+                            {pick.lastLoggedAt ? (
+                              <span className="text-[10px] uppercase tracking-wide text-emerald-400/70">
+                                já fez
+                              </span>
+                            ) : null}
+                            <span className="font-mono text-zinc-400">{pick.sets}×</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               ))}
             </div>
