@@ -103,7 +103,7 @@ escolhendo o exercício da lista.
 
 - [ ] `npm run check:prod` verde nas obrigatórias (+ avisos tratados)
 - [ ] Migrations e secrets de produção aplicados ([docs/PRODUCAO.md](docs/PRODUCAO.md))
-- [ ] Signup Auth fechado + convite operacional
+- [x] Signup Auth fechado + convite operacional — **verificado em 14/08/2026**: `/auth/v1/settings` responde `disable_signup: true`, e o cadastro só existe por `/api/auth/register` (Admin API + `SIGNUP_INVITE_CODE`). Nenhum `signUp()` anônimo no código. Google OAuth segue ativo **para quem já tem conta** — com signup fechado ele não cria usuário novo.
 - [ ] Wipe/export LGPD exercitado em conta real
 - [ ] Sentry recebendo erros de cron CGM/push
 - [x] Pelo menos um sensor (Libre ou Dexcom) sync estável por 7 dias em usuário piloto — **atendido**: Libre com 15 dias seguidos (30/07 a 13/08/2026), ~190 leituras/dia. Houve um vão de 5 dias antes disso (24 a 28/07), compatível com troca de sensor.
