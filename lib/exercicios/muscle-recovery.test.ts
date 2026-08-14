@@ -174,6 +174,8 @@ describe("limitAvailableByTime", () => {
     hoursRemaining: null,
     hoursReady: 0,
     pauseReason: null,
+    establishedHistory: true,
+    prioritizeAsNever: false,
   }));
 
   it("30 min: sÃ³ o primeiro (mais prioritÃ¡rio) entra", () => {
