@@ -52,11 +52,40 @@ Sem a #2, upsert Dexcom / PK composta falha.
 
 ## 3. `pg_cron` ↔ domínio e segredo
 
-As functions SQL chamam o domínio Vercel com `x-cron-secret`.
+As functions SQL chamam o domínio Vercel com `x-cron-secret`. **Nenhum valor fica em literal no
+SQL**: desde 18/07/2026 as `dispatch_*` leem `vault.decrypted_secrets` (segredo `cgm_cron_secret`) e
+o domínio do segredo `app_base_url`. Instrução antiga mandava editar as functions — não faça isso,
+recolocar o valor em literal é como o segredo vazou da primeira vez.
 
-1. Confirme que a URL nas migrations/`dispatch_*` aponta para o domínio **atual**.
-2. O valor do secret nas functions **deve** ser o mesmo de `CRON_SECRET` na Vercel.
-3. Se um secret antigo já apareceu em commit público: **rote** (novo valor na Vercel + update nas functions SQL). Não reutilize secrets do histórico do git.
+1. Confirme o domínio: `select decrypted_secret from vault.decrypted_secrets where name = 'app_base_url';`
+2. O segredo `cgm_cron_secret` no Vault **deve** ser igual a `CRON_SECRET` na Vercel. Quem confere é
+   `secretsMatch` (`lib/auth/constant-time.ts`) nas rotas de cron.
+
+### Rotação do `CRON_SECRET`
+
+Necessária porque dois valores antigos estão no histórico do git (ver §10.2 do CONTEXTO_TECNICO).
+Os dois lados têm que virar juntos — enquanto discordam, as rotas devolvem 401.
+
+```sql
+-- 1. valor novo (rode e guarde a saída)
+select encode(gen_random_bytes(32), 'hex');
+
+-- 3. depois de trocar na Vercel, atualize o Vault
+select vault.update_secret(
+  (select id from vault.secrets where name = 'cgm_cron_secret'),
+  '<valor-novo>'
+);
+```
+
+2. Entre o passo 1 e o 3: Vercel → Settings → Environment Variables → `CRON_SECRET` = valor novo →
+   **Redeploy** (variável só passa a valer no próximo deploy).
+4. Confira que voltou a passar:
+   `select status_code, count(*) from net._http_response where created > now() - interval '30 minutes' group by 1;`
+
+**A janela de falha é aceitável e não some:** entre o redeploy e o update do Vault, as chamadas de
+cron tomam 401. Os jobs rodam a cada 5–15 min e `push_dispatch_log` deduplica por dia, então o pior
+caso é uma rodada perdida — não há alarme duplicado nem dose contada duas vezes. Faça os dois passos
+seguidos e confira no fim.
 
 ## 4. Supabase Auth
 
