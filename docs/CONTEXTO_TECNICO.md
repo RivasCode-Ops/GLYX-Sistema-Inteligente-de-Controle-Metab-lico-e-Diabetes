@@ -804,7 +804,7 @@ em 15 min. Toda dose passou a exibir que o cálculo **não desconta insulina ati
   chat, que continua sem calcular; a calculadora é uma superfície separada, com parâmetros que o
   usuário configurou com o médico.
 
-### 10.2 🔴 Segredo de cron versionado no git
+### 10.2 ✅ Segredo de cron versionado no git — resolvido em 14/08/2026
 
 O `CRON_SECRET` esteve **hardcoded em literal** dentro de funções SQL de migração, em dois valores
 (v1 e v2). A própria migração `20260718010000` documenta o erro:
@@ -824,9 +824,19 @@ função, e este parágrafo é que estava desatualizado.
 (`lib/auth/constant-time.ts`), que compara em tempo constante e faz hash antes para não vazar tamanho
 nem lançar com entradas de tamanhos diferentes. `inviteCodesMatch` passou a reusar o mesmo helper.
 
-**Continua aberto — e depende de ação fora do código:** os dois valores do segredo permanecem no
-histórico do git. Remover do arquivo não basta; o valor precisa ser **rotacionado** no Vault e na
-env da Vercel.
+**Rotacionado em 14/08/2026.** Os dois valores antigos continuam no histórico do git — e agora não
+valem nada, que é o único desfecho possível: reescrever histórico não desvaza segredo, girar o valor
+sim. `vault.secrets.updated_at` de `cgm_cron_secret` marca 14/08 15:57 UTC, e a env da Vercel foi
+trocada com redeploy.
+
+Verificação, na ordem que importa. Primeiro que o novo funciona: 14 respostas 200 e **zero 401** nas
+3 h seguintes. Depois — e isto é o que a primeira checagem não prova — que a fechadura existe:
+chamada com segredo errado e chamada sem segredo devolvem ambas 401. Bater 200 depois de trocar a
+chave mostra que a chave nova abre; só a tentativa negada mostra que havia porta.
+
+A janela de 401 prevista não chegou a ocorrer: o redeploy entrou entre duas rodadas de cron e o
+Vault virou antes da seguinte. Foi sorte de tempo, não garantia — o procedimento em
+[docs/PRODUCAO.md](PRODUCAO.md) continua avisando que a janela existe.
 
 > **Falso positivo do advisor.** O linter do Supabase reporta que `anon` pode executar
 > `record_system_ai_usage` (`0028_anon_security_definer_function_executable`). É **intencional**:
