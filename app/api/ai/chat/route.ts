@@ -126,6 +126,7 @@ export async function POST(req: Request) {
     async start(controller) {
       let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
       let reply = "";
+      let finishReason: string | null = null;
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content;
@@ -133,10 +134,22 @@ export async function POST(req: Request) {
             reply += delta;
             controller.enqueue(encoder.encode(delta));
           }
+          if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
           if (chunk.usage) usage = chunk.usage;
         }
       } catch {
         // conexão com o provedor caiu no meio — encerra com o que já foi enviado
+      }
+
+      // Truncagem por limite é a falha que o sistema DAVA como sucesso: 200,
+      // texto gravado, nada quebrado — e a resposta terminando no meio da
+      // palavra. O provedor sempre disse `finish_reason: "length"`; ninguém
+      // olhava. Num app de saúde o pedaço que falta costuma ser a ressalva do
+      // fim, então quem lê precisa saber que faltou.
+      if (finishReason === "length" && reply) {
+        const aviso = "\n\n_(resposta interrompida por limite de tamanho — peça para continuar)_";
+        reply += aviso;
+        controller.enqueue(encoder.encode(aviso));
       }
       await recordAiTokens(supabase, rate.usageId, usage, aiModel());
 
