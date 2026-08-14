@@ -1,23 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+/** Saudação de abertura. Não é conteúdo de conversa e por isso não é gravada —
+ * histórico cheio de "olá" repetido a cada reabertura não é histórico. */
+const SAUDACAO: Msg = {
+  role: "assistant",
+  content:
+    "Olá. Sou o copiloto metabólico GLYX. Posso ajudar a interpretar padrões dos seus dados e sugerir perguntas para seu médico — não substituo a consulta. O que deseja revisar?",
+};
+
 export function IaChat() {
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "assistant",
-      content:
-        "Olá. Sou o copiloto metabólico GLYX. Posso ajudar a interpretar padrões dos seus dados e sugerir perguntas para seu médico — não substituo a consulta. O que deseja revisar?",
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([SAUDACAO]);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [restaurando, setRestaurando] = useState(true);
+
+  // Retoma a conversa mais recente ao abrir. Falha aqui é silenciosa de
+  // propósito: começar do zero é um chat pior, não um chat quebrado.
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/ai/chat/historico");
+        if (!res.ok) return;
+        const data = (await res.json()) as { threadId?: string; messages?: Msg[] };
+        if (!ativo || !data.threadId || !data.messages?.length) return;
+        setThreadId(data.threadId);
+        setMessages([SAUDACAO, ...data.messages]);
+      } catch {
+        /* segue com conversa nova */
+      } finally {
+        if (ativo) setRestaurando(false);
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  function novaConversa() {
+    setThreadId(null);
+    setMessages([SAUDACAO]);
+    setError(null);
+  }
 
   const SUGGESTIONS = [
     {
@@ -56,8 +89,12 @@ export function IaChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
+          ...(threadId ? { threadId } : {}),
         }),
       });
+
+      const novaThread = res.headers.get("X-Thread-Id");
+      if (novaThread) setThreadId(novaThread);
 
       const contentType = res.headers.get("content-type") ?? "";
 
@@ -100,10 +137,27 @@ export function IaChat() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Conversa</CardTitle>
-        <CardDescription>
-          Requer sessão e, para respostas do modelo, <code className="font-mono text-xs">KIMI_API_KEY</code>.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Conversa</CardTitle>
+            <CardDescription>
+              {restaurando
+                ? "Buscando a conversa anterior…"
+                : threadId
+                  ? "Retomando de onde você parou. O histórico fica na sua conta e entra no export e no apagamento da LGPD."
+                  : "Requer sessão e, para respostas do modelo, KIMI_API_KEY."}
+            </CardDescription>
+          </div>
+          {threadId ? (
+            <button
+              type="button"
+              onClick={novaConversa}
+              className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 transition hover:bg-zinc-800"
+            >
+              Nova conversa
+            </button>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 text-sm">

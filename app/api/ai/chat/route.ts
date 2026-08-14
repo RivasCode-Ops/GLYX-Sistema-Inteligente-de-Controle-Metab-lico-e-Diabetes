@@ -4,6 +4,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { buildUserContext } from "@/lib/ai/user-context";
 import { featureIndexForPrompt } from "@/lib/feature-index";
+import { appendMessages, ensureThread } from "@/lib/queries/ai-threads";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -37,7 +38,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const body = (await req.json()) as { messages?: { role: string; content: string }[] };
+  const body = (await req.json()) as {
+    messages?: { role: string; content: string }[];
+    threadId?: string;
+  };
   const messages = body.messages ?? [];
   if (!messages.length) {
     return NextResponse.json({ error: "Mensagens vazias." }, { status: 400 });
@@ -78,6 +82,16 @@ export async function POST(req: Request) {
     /* segue sem contexto */
   }
 
+  // Só a última mensagem do usuário é nova; o resto do array é histórico que o
+  // cliente reenvia a cada turno e que já está gravado.
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  let threadId: string | null = null;
+  try {
+    threadId = await ensureThread(supabase, user.id, body.threadId ?? null, lastUserMessage);
+  } catch {
+    /* sem thread o chat segue funcionando, só não guarda */
+  }
+
   const openai = createAiClient();
   let stream;
   try {
@@ -107,21 +121,46 @@ export async function POST(req: Request) {
   const readable = new ReadableStream({
     async start(controller) {
       let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      let reply = "";
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content;
-          if (delta) controller.enqueue(encoder.encode(delta));
+          if (delta) {
+            reply += delta;
+            controller.enqueue(encoder.encode(delta));
+          }
           if (chunk.usage) usage = chunk.usage;
         }
       } catch {
         // conexão com o provedor caiu no meio — encerra com o que já foi enviado
       }
       await recordAiTokens(supabase, rate.usageId, usage, aiModel());
+
+      // Grava pergunta e resposta juntas, depois do stream. A pergunta sozinha,
+      // gravada antes, viraria conversa pela metade toda vez que o provedor
+      // falhasse no meio — e uma pergunta sem resposta no histórico parece
+      // mensagem ignorada, não falha de rede.
+      if (threadId && lastUserMessage) {
+        try {
+          await appendMessages(supabase, user.id, threadId, [
+            { role: "user", content: lastUserMessage },
+            ...(reply ? [{ role: "assistant" as const, content: reply }] : []),
+          ]);
+        } catch {
+          /* histórico é conveniência: não derruba a resposta que já foi entregue */
+        }
+      }
       controller.close();
     },
   });
 
   return new Response(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      // O cliente guarda este id e o devolve na próxima mensagem, para a
+      // conversa inteira cair numa thread só em vez de uma por pergunta.
+      ...(threadId ? { "X-Thread-Id": threadId } : {}),
+    },
   });
 }
