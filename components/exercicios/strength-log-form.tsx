@@ -8,10 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import type { StrengthLog } from "@/lib/queries/strength";
+import { groupByCategory, type CatalogExercise } from "@/lib/exercicios/catalog";
+import { MUSCLE_GROUP_BY_ID } from "@/lib/data/muscle-groups";
 
-export function StrengthLogForm({ logs }: { logs: StrengthLog[] }) {
+/** Valor da opção que revela o campo de texto — o catálogo tem 42 exercícios e
+ * a academia tem mais, então a lista nunca pode ser a única saída. */
+const FREE_TEXT = "__livre__";
+
+export function StrengthLogForm({
+  logs,
+  catalog,
+}: {
+  logs: StrengthLog[];
+  catalog: CatalogExercise[];
+}) {
   const router = useRouter();
   const toast = useToast();
+  const [selectedId, setSelectedId] = useState("");
   const [exerciseName, setExerciseName] = useState("");
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
@@ -19,28 +32,49 @@ export function StrengthLogForm({ logs }: { logs: StrengthLog[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const groups = useMemo(() => groupByCategory(catalog), [catalog]);
+  const selected = useMemo(
+    () => catalog.find((e) => e.id === selectedId) ?? null,
+    [catalog, selectedId]
+  );
+  const isFreeText = selectedId === FREE_TEXT;
+
   const exerciseNames = useMemo(
     () => [...new Set(logs.map((l) => l.exercise_name))].sort(),
     [logs]
   );
 
+  /** "Última vez" casa por id quando ele existe e cai no nome só no texto
+   * livre — é a primeira coisa que a ponte melhora: casar texto errava com
+   * maiúscula e acento diferentes. */
   const lastForExercise = useMemo(() => {
+    if (selected) {
+      return (
+        logs.find((l) => l.exercise_id === selected.id) ??
+        logs.find((l) => l.exercise_name.toLowerCase() === selected.name.toLowerCase()) ??
+        null
+      );
+    }
     const q = exerciseName.trim().toLowerCase();
     if (!q) return null;
     return logs.find((l) => l.exercise_name.toLowerCase() === q) ?? null;
-  }, [exerciseName, logs]);
+  }, [exerciseName, logs, selected]);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!exerciseName.trim() || !reps) {
-      setError("Preencha o exercício e as repetições.");
+    const named = selected ? selected.name : exerciseName.trim();
+    if (!named || !reps) {
+      setError("Escolha um exercício da lista ou digite o nome, e preencha as repetições.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
       const fd = new FormData();
-      fd.set("exercise_name", exerciseName.trim());
+      // Manda um OU outro: com id, o servidor ignora qualquer nome e deriva
+      // tudo do catálogo; sem id, o texto é o que há.
+      if (selected) fd.set("exercise_id", selected.id);
+      else fd.set("exercise_name", named);
       if (weight) fd.set("weight_kg", weight);
       fd.set("reps", reps);
       fd.set("sets", sets || "1");
@@ -74,15 +108,54 @@ export function StrengthLogForm({ logs }: { logs: StrengthLog[] }) {
           ))}
         </datalist>
         <div className="grid gap-1">
-          <Label htmlFor="exercise_name">Exercício</Label>
-          <Input
-            id="exercise_name"
-            list="strength-exercise-names"
-            value={exerciseName}
-            onChange={(e) => setExerciseName(e.target.value)}
-            placeholder="ex.: Supino reto"
-          />
+          <Label htmlFor="exercise_pick">Exercício</Label>
+          <select
+            id="exercise_pick"
+            value={selectedId}
+            onChange={(e) => {
+              setSelectedId(e.target.value);
+              if (e.target.value !== FREE_TEXT) setExerciseName("");
+            }}
+            className="h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100"
+          >
+            <option value="">Escolha…</option>
+            {groups.map((group) => (
+              <optgroup key={group.category} label={group.category}>
+                {group.exercises.map((exercise) => (
+                  <option key={exercise.id} value={exercise.id}>
+                    {exercise.name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+            <option value={FREE_TEXT}>Outro — digitar o nome</option>
+          </select>
         </div>
+
+        {isFreeText ? (
+          <div className="grid gap-1">
+            <Label htmlFor="exercise_name">Nome do exercício</Label>
+            <Input
+              id="exercise_name"
+              list="strength-exercise-names"
+              value={exerciseName}
+              onChange={(e) => setExerciseName(e.target.value)}
+              placeholder="ex.: Supino reto"
+            />
+            <p className="text-[11px] text-zinc-500">
+              Fora do catálogo o app não sabe qual músculo foi treinado, então este registro
+              não entra na recuperação muscular — só no histórico de carga.
+            </p>
+          </div>
+        ) : null}
+
+        {selected ? (
+          <p className="text-[11px] text-zinc-500">
+            {selected.primaryMuscle
+              ? `Conta como ${MUSCLE_GROUP_BY_ID[selected.primaryMuscle].label} na recuperação muscular.`
+              : "Cardio: não entra na recuperação muscular."}
+          </p>
+        ) : null}
         {lastForExercise ? (
           <p className="text-[11px] text-zinc-500">
             Última vez: {lastForExercise.weight_kg != null ? `${lastForExercise.weight_kg} kg × ` : ""}

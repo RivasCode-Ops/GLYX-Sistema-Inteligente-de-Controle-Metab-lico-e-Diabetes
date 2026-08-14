@@ -379,6 +379,7 @@ export type Database = {
       strength_logs: {
         Row: {
           created_at: string;
+          exercise_id: string | null;
           exercise_name: string;
           id: string;
           logged_at: string;

@@ -5,16 +5,18 @@ import {
 } from "@/lib/queries/muscle-recovery";
 import { getRecentStrengthLogs } from "@/lib/queries/strength";
 import { computeMuscleRecovery, suggestMuscleFocus } from "@/lib/exercicios/muscle-recovery";
+import { listCatalogExercises } from "@/lib/queries/exercise-catalog";
 import { MuscleRecoveryPanel } from "@/components/exercicios/muscle-recovery-panel";
 import { StrengthLogForm } from "@/components/exercicios/strength-log-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function RecuperacaoMuscularPage() {
-  const [lastTrained, pausedGroups, strengthLogs, logCounts] = await Promise.all([
+  const [lastTrained, pausedGroups, strengthLogs, logCounts, catalog] = await Promise.all([
     getLastTrainedByMuscleGroup(),
     getActiveMusclePauses(),
     getRecentStrengthLogs(),
     getSessionCountByMuscleGroup(),
+    listCatalogExercises(),
   ]);
   const statuses = computeMuscleRecovery(lastTrained, pausedGroups, new Date(), logCounts);
   const suggestion = suggestMuscleFocus(statuses);
@@ -35,7 +37,7 @@ export default async function RecuperacaoMuscularPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <StrengthLogForm logs={strengthLogs} />
+          <StrengthLogForm logs={strengthLogs} catalog={catalog} />
         </CardContent>
       </Card>
     </div>

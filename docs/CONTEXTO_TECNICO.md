@@ -45,19 +45,24 @@ observável de correções em cima de correções recentes, e a deriva de docume
 
 | Tabela | Linhas |
 |---|---|
-| `glucose_readings` | 1.341 |
-| `ai_usage` | 82 |
-| `water_logs` | 44 |
-| `medication_logs` | 34 |
-| `meals` | 32 |
-| `medications` | 13 |
+| `glucose_readings` | 4.592 |
+| `ai_usage` | 245 |
+| `medication_logs` | 181 |
+| `water_logs` | 80 |
+| `meals` | 58 |
+| `exercise_sessions` | 21 |
+| `medications` | 14 |
+| `weight_logs` | 7 |
 | `metabolic_audits` | 5 |
-| `exercise_sessions` | 4 |
-| `weight_logs` / `insulin_logs` / `push_subscriptions` / `profiles` | 3 / 2 / 2 / 2 |
-| `exams` / `strength_logs` | 0 |
+| `body_measurements` / `strength_logs` | 4 / 4 |
+| `profiles` / `insulin_logs` / `push_subscriptions` | 2 / 2 / 2 |
+| `exams` | 0 |
+
+Contagem de **2026-08-14**. As 96 leituras `source='mock'` que constavam aqui foram removidas nessa
+data; `glucose_readings` é só sensor real agora.
 
 **Dois perfis reais.** O sistema está em beta fechado de fato, não só de intenção. O volume de
-glicemia (1.341) vem do CGM; o resto é registro manual esparso. Consequência prática: **as regras
+glicemia (4.592) vem do CGM; o resto é registro manual esparso. Consequência prática: **as regras
 que dependem de histórico ainda não foram exercitadas com dados densos** — auditoria, correlações de
 insights e adesão medicamentosa rodam hoje perto do piso de dados mínimos.
 
@@ -315,8 +320,25 @@ elevação pélvica vem em "Pernas" e é de glúteos. Guardar as duas deixa a co
 
 **Sem backfill, por decisão.** Nada em `strength_logs` foi reetiquetado: reclassificar texto livre
 para id de catálogo é chute apresentado como dado, indistinguível do dado certo depois de gravado.
-Data de corte **2026-07-30**; a série tem descontinuidade aí. Quando os consumidores migrarem,
-`strength_logs.muscle_group` passa a ser derivável do exercício e tende a virar redundante.
+Data de corte **2026-07-30**; a série tem descontinuidade aí.
+
+**A ponte (Fatia 2, 2026-08-14).** `strength_logs.exercise_id` referencia `public.exercises`, e
+`lib/exercicios/catalog.ts` é o primeiro leitor do catálogo. Quando o id existe, `exercise_name` e
+`muscle_group` são derivados da linha do catálogo **no servidor** — o formulário manda o id, não o
+nome. Isso é o que impede "Supino Reto" e "supino reto" de voltarem a divergir: se o cliente pudesse
+sobrescrever, o catálogo deixaria de ser fonte única no exato ponto em que importa, a escrita.
+
+A coluna é anulável por duas razões. O histórico não é reetiquetado (mesma decisão acima), e o texto
+livre continua válido — o catálogo tem 42 exercícios e a academia tem mais; obrigar a escolher da
+lista transformaria "registrei o que fiz" em "não deu para registrar". Registro por texto livre entra
+sem músculo, e a tela diz isso antes de salvar: ele conta no histórico de carga e não na recuperação
+muscular. Cardio idem — esteira não fadiga um grupo, e inventar um faria o motor mandar descansar
+algo que não foi treinado.
+
+Antes da ponte o formulário sequer enviava `muscle_group`: as 4 linhas existentes têm todas nulo, ou
+seja, registro de carga não contribuía com nada para nenhuma agregação por músculo. Com o id
+preenchido, `strength_logs.muscle_group` passa a ser derivável do exercício e tende a virar
+redundante.
 
 O custo dessa decisão é imediato e está tratado: trapézio e glúteos entram com histórico zero embora
 **sejam treinados** (encolhimento e elevação pélvica, gravados como costas e posterior). Sem guarda, o
