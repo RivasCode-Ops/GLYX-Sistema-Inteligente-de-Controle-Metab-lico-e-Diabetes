@@ -137,9 +137,9 @@ export const FEATURES: Feature[] = [
   },
   {
     title: "Catálogo de exercícios",
-    href: "/exercicios/recuperacao",
-    where: ["Exercícios", "Recuperação", "Progressão de carga"],
-    what: "Os 42 exercícios que o app conhece, agrupados por categoria. Aparecem na lista ao registrar carga — escolher da lista é o que faz o app saber qual músculo foi treinado.",
+    href: "/exercicios/catalogo",
+    where: ["Exercícios", "Catálogo"],
+    what: "Os 42 exercícios que o app conhece, por categoria e com o músculo de cada um. Os mesmos aparecem na lista ao registrar carga — escolher da lista é o que faz o app saber qual músculo foi treinado.",
     terms: [
       "lista de exercícios",
       "quais exercícios",

@@ -99,6 +99,7 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Visão geral", href: "/exercicios" },
     { title: "Plano", href: "/exercicios/plano" },
     { title: "Recuperação", href: "/exercicios/recuperacao" },
+    { title: "Catálogo", href: "/exercicios/catalogo" },
   ],
   "/composicao": [
     { title: "Resumo", href: "/composicao" },

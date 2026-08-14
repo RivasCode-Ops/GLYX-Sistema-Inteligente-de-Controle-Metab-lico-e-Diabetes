@@ -66,8 +66,16 @@ describe("integridade do índice", () => {
   });
 
   it("formata o caminho com separador legível", () => {
+    const progressao = FEATURES.find((f) => f.title === "Progressão de carga")!;
+    expect(formatWhere(progressao)).toBe("Exercícios › Recuperação › Progressão de carga");
+  });
+
+  it("aponta o catálogo para a tela dele, não para dentro do formulário", () => {
+    // Enquanto o catálogo era só um <select>, a lupa levava à tela que o
+    // continha. Ter tela própria muda a resposta certa, e o índice tem que
+    // acompanhar — senão a busca continua mandando o usuário para o lugar antigo.
     const catalogo = FEATURES.find((f) => f.title === "Catálogo de exercícios")!;
-    expect(formatWhere(catalogo)).toBe("Exercícios › Recuperação › Progressão de carga");
+    expect(catalogo.href).toBe("/exercicios/catalogo");
   });
 });
 
