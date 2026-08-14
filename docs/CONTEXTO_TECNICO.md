@@ -220,9 +220,16 @@ o tira. Fixture não distingue os dois: ela alimenta a tabela que o código esco
 confirma a premissa em vez de questioná-la. Teste e código compartilham o mesmo erro e concordam.
 
 Caso concreto: a supressão de alerta para grupo recém-criado nasceu contando `strength_logs`. Ficou
-**inerte** — não há um único `strength_log` com `muscle_group` preenchido, enquanto
-`exercise_sessions` cobre onze grupos. A guarda existia, tinha teste verde, e não protegia nada. Só
+**inerte** — não havia um único `strength_log` com `muscle_group` preenchido, enquanto
+`exercise_sessions` cobria onze grupos. A guarda existia, tinha teste verde, e não protegia nada. Só
 apareceu ao conferir o banco.
+
+Desde a Fatia 3 (2026-08-14) as duas leem **as mesmas duas fontes**, via
+`lib/exercicios/muscle-history.ts`: sessão e registro de carga com músculo. Somar carga só no sinal e
+não na guarda recriaria o mesmo defeito pelo outro lado, e é por isso que as duas funções puras vivem
+no mesmo módulo. Conferência no banco no dia da mudança: 18 sessões com grupos, **0** registros de
+carga com músculo — ou seja, a fatia não mexe em número nenhum hoje, ela liga o caminho para o
+primeiro registro vindo do catálogo.
 
 É o mesmo formato do `count(*)` por `service_role` (4.11): a verificação estava do lado de dentro da
 suposição que precisava checar.
