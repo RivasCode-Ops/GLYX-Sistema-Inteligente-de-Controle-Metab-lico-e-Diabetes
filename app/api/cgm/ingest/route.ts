@@ -13,7 +13,13 @@ const bodySchema = z.discriminatedUnion("mode", [
       z.object({
         valueMgDl: z.number(),
         recordedAt: z.string(),
-        source: z.enum(["dexcom", "libre", "mock", "manual"]),
+        // Sem "mock": a rota grava na série real do usuário, e leitura de
+        // demonstração ali dentro é indistinguível de leitura de sensor para as
+        // 24 consultas que leem esta tabela — só o diário completo filtra por
+        // `isRealGlucoseSource`. Foi assim que 96 leituras falsas entraram na
+        // conta e passaram um mês inflando média, TIR e contexto da IA.
+        // O valor continua existindo em `CgmVendorId` para a conta de demo.
+        source: z.enum(["dexcom", "libre", "manual"]),
         externalId: z.string().nullable().optional(),
         trend: z.string().nullable().optional(),
         metadata: z.record(z.any()).nullable().optional(),
