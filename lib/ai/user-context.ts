@@ -309,9 +309,22 @@ export async function buildUserContext(
 
   if (!linhas.length) return "";
 
+  // A data de hoje vem dita, não deduzida. Sem ela o modelo inferia "hoje" da
+  // leitura mais recente — e com o sensor parado desde ontem ele anunciou
+  // "seus dados de hoje (13/08)" num dia 14/08. Num app de glicemia, analisar
+  // o dia errado com convicção é pior que não saber a data.
+  const hoje = new Date().toLocaleDateString("pt-BR", {
+    timeZone: tz,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
   return (
-    "DADOS RECENTES DO USUÁRIO (somente leitura, use para contextualizar as respostas; " +
-    "horários no fuso do usuário):\n- " +
+    `DADOS RECENTES DO USUÁRIO (somente leitura, use para contextualizar as respostas; ` +
+    `horários no fuso do usuário). HOJE é ${hoje} — use esta data, nunca deduza o dia atual ` +
+    `a partir do registro mais recente: se o último dado for de dias atrás, isso significa que ` +
+    `não há registro recente, e vale dizer isso ao usuário.\n- ` +
     linhas.join("\n- ")
   );
 }

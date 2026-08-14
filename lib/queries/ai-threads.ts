@@ -130,12 +130,15 @@ export async function getLatestThread(): Promise<ThreadHistory | null> {
 
   if (!thread) return null;
 
+  // Ordena por `seq`, não por `created_at`: pergunta e resposta são gravadas na
+  // mesma transação e compartilham o mesmo `now()`, então o timestamp empata e
+  // não desempata — era isso que fazia a resposta aparecer antes da pergunta.
   const { data: messages } = await supabase
     .from("ai_messages")
-    .select("role, content, created_at")
+    .select("role, content, seq")
     .eq("thread_id", thread.id)
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
+    .order("seq", { ascending: false })
     .limit(HISTORY_LIMIT);
 
   return {

@@ -109,7 +109,11 @@ export async function POST(req: Request) {
           content: m.content,
         })),
       ],
-      max_tokens: 800,
+      // 800 cortava a resposta no meio da palavra — uma explicação sobre risco
+      // glicêmico terminou literalmente em "**Cair ab". Resposta clínica
+      // truncada é pior que resposta curta: o usuário não sabe que faltou
+      // pedaço, e o pedaço que falta costuma ser a ressalva do fim.
+      max_tokens: 2000,
       stream: true,
       stream_options: { include_usage: true },
     });

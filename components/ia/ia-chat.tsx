@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AssistantMarkdown } from "@/components/ia/assistant-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -170,7 +171,7 @@ export function IaChat() {
                   : "mr-8 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-zinc-300"
               }
             >
-              {m.content}
+              {m.role === "assistant" ? <AssistantMarkdown content={m.content} /> : m.content}
             </div>
           ))}
           {loading ? <p className="text-xs text-zinc-500">Gerando…</p> : null}
