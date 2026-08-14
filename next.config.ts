@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["recharts"],
+  experimental: {
+    // O padrão do Next é 1 MB por Server Action, e o formulário de fotos de
+    // progresso manda quatro poses numa submissão só. Mesmo já comprimidas no
+    // navegador, quatro fotos passavam de 1 MB e a submissão era recusada antes
+    // de chegar na action — erro sem mensagem. 4 MB cabe folgado e continua
+    // abaixo do teto de corpo de requisição da hospedagem (4,5 MB).
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   async headers() {
     return [
       {

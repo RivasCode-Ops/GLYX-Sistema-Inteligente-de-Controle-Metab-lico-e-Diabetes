@@ -19,7 +19,16 @@ async function formAction(
   _prev: ActionResult | undefined,
   formData: FormData
 ): Promise<ActionResult> {
-  return saveBodyPhotos(formData);
+  try {
+    return await saveBodyPhotos(formData);
+  } catch {
+    // Falha de transporte (envio recusado por tamanho, rede caindo) rejeita a
+    // promessa antes de a action rodar. Sem este catch o formulário só quebrava,
+    // sem dizer nada — que era exatamente o sintoma relatado.
+    return {
+      error: "Não consegui enviar as fotos. Envie menos poses de uma vez ou tente de novo.",
+    };
+  }
 }
 
 function SubmitButton() {
