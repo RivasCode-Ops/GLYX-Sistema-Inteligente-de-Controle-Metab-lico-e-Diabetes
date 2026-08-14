@@ -6,6 +6,7 @@ import { mainNav } from "@/lib/navigation";
 import { ModuleSubnav } from "@/components/shell/module-subnav";
 import { MobileMoreMenu } from "@/components/shell/mobile-more-menu";
 import { SignOutButton } from "@/components/shell/sign-out-button";
+import { FeatureSearch } from "@/components/shell/feature-search";
 
 function titleForPath(pathname: string): { title: string; crumbs: string[] } {
   if (pathname === "/dashboard")
@@ -47,10 +48,15 @@ export function AppHeader() {
               </span>
             ))}
           </div>
-          {/* No desktop o "Sair" fica na sidebar; no mobile ela não existe. */}
-          <div className="flex items-center gap-2 md:hidden">
-            <MobileMoreMenu />
-            <SignOutButton compact />
+          <div className="flex items-center gap-2">
+            {/* A lupa fica nas duas larguras: "onde acho isso" é pergunta de
+                quem não conhece o app, e não muda de natureza no desktop. */}
+            <FeatureSearch />
+            {/* No desktop o "Sair" fica na sidebar; no mobile ela não existe. */}
+            <span className="flex items-center gap-2 md:hidden">
+              <MobileMoreMenu />
+              <SignOutButton compact />
+            </span>
           </div>
         </div>
         <div className="flex flex-wrap items-end justify-between gap-3">
