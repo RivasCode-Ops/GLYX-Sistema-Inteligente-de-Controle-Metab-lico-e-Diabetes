@@ -1,14 +1,23 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { GLUCOSE_INSIGHT_MODULE } from "@/lib/insights/v2/engine";
-import { listInsightFindings } from "@/lib/queries/insight-findings";
+import { computeInsightsIfEmpty, listInsightFindings } from "@/lib/queries/insight-findings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshInsightsButton } from "@/components/insights/refresh-insights-button";
 import { demoInsights } from "@/lib/demo/data";
 
 export default async function AnaliseCorrelacoesPage() {
-  const findings = isSupabaseConfigured()
+  let findings = isSupabaseConfigured()
     ? await listInsightFindings(GLUCOSE_INSIGHT_MODULE)
     : demoInsights;
+
+  // Primeira visita calcula sozinha. O motor só rodava pelo botão "Recalcular",
+  // e o resultado foi previsível: a tabela de achados ficou zerada desde sempre,
+  // não porque o motor falhe, mas porque ninguém adivinha que precisa apertar
+  // algo para a análise existir. Tela de análise que chega vazia parece função
+  // sem resultado, não função não executada.
+  if (isSupabaseConfigured() && findings.length === 0) {
+    findings = await computeInsightsIfEmpty();
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -27,8 +36,10 @@ export default async function AnaliseCorrelacoesPage() {
         <h2 className="mb-3 text-lg font-semibold text-zinc-100">Correlações (v2)</h2>
         {findings.length === 0 ? (
           <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 p-8 text-sm text-zinc-500">
-            Sem resultados ainda. Registe glicemia, refeições, sono ou exercício e clique em
-            recalcular — são necessários vários dias com dados sobrepostos.
+            Nada encontrado ainda — o cálculo já rodou. Correlação precisa de vários dias com dados{" "}
+            <strong className="text-zinc-400">sobrepostos</strong>: glicemia sozinha não basta, ela
+            tem que coincidir com dias de sono, refeição ou exercício registrados. Continue
+            registrando e volte aqui.
           </p>
         ) : (
           <ul className="space-y-3">
