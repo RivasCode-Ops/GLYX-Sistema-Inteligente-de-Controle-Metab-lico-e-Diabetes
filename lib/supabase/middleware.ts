@@ -20,15 +20,21 @@ const PUBLIC_PREFIXES = [
   "/sw.js",
 ];
 
-export async function updateSession(request: NextRequest) {
+/**
+ * `cabecalhos` sao os cabecalhos de requisicao que devem seguir para o render
+ * do Next - e por eles que o nonce do CSP chega la. Opcional de proposito: os
+ * testes chamam esta funcao sem middleware por cima.
+ */
+export async function updateSession(request: NextRequest, cabecalhos?: Headers) {
+  const headers = cabecalhos ?? request.headers;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers } });
   }
 
-  let supabaseResponse = NextResponse.next({ request });
+  let supabaseResponse = NextResponse.next({ request: { headers } });
 
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -43,7 +49,7 @@ export async function updateSession(request: NextRequest) {
         }[]
       ) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        supabaseResponse = NextResponse.next({ request });
+        supabaseResponse = NextResponse.next({ request: { headers } });
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
         );

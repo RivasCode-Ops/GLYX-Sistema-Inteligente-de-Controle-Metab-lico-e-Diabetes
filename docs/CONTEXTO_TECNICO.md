@@ -745,6 +745,10 @@ automaticamente** — o usuário confirma.
   [DPIA](DPIA.md). Teste estático (`lib/privacy/rls-coverage.test.ts`) exige que toda tabela clínica
   nova tenha RLS + policy com `auth.uid()`
 - **Logs**: apenas os 8 primeiros chars do `user_id` vão para o Sentry
+- **Cabeçalhos de segurança**: os quatro fixos (`X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy`, `Permissions-Policy`) em `next.config.ts`; o HSTS vem da Vercel; e o
+  **Content-Security-Policy** em `lib/security/csp.ts`, montado por requisição no middleware porque
+  carrega nonce. Ver §10.10
 
 ### Alerta operacional documentado no próprio repo
 
@@ -949,6 +953,41 @@ Mesma classe, também corrigida: o formulário de peso em `/perfil/corpo` chamav
   num lugar só, para que coluna nova não quebre fixture nenhuma
 - ~~`README.md` aponta uma raiz de repositório diferente da atual~~ — corrigido em 26/07/2026
   no `README.md` e no `AGENTS.md`, que carregava a mesma raiz velha
+
+### 10.10 ✅ Sem Content-Security-Policy — resolvido em 03/09/2026
+
+**Estado original:** dos seis cabeçalhos que o securityheaders.com avalia, cinco existiam — quatro
+fixos no `next.config.ts` e o HSTS pela Vercel. Faltava o CSP, que é o único que **impede execução**
+em vez de descrever intenção. Sem ele, um `<script>` que chegasse ao HTML por qualquer caminho
+rodava: resposta de IA, OCR de rótulo, nome de refeição — as mesmas entradas que a §10.3 já tratou no
+prompt e que `components/ia/assistant-markdown.tsx` já trata no render. O CSP é a terceira camada,
+a que vale mesmo quando as outras duas falham.
+
+**Correção:** `lib/security/csp.ts` monta a política e o `middleware.ts` a emite com **nonce sorteado
+por requisição**. Origens externas listadas são só as que o *navegador* alcança — Supabase (REST,
+realtime e Storage) e Sentry; Kimi, Dexcom, Libre e Google Fit ficam de fora porque quem fala com
+eles é o servidor, e há teste que reprova se algum deles aparecer.
+
+**A decisão que custou o resto do trabalho:** nonce só existe se a página for renderizada na
+requisição. Havia **12 rotas pré-renderizadas**, e eram justamente as públicas — `/login`,
+`/register`, `/reset-password`, `/privacidade`, `/instalar`, `/risco`. Página pré-renderizada sai com
+os `<script>` sem nonce; o navegador recusa os inline e a página **não hidrata**: o formulário de
+login desenha na tela e o botão não faz nada, com resposta 200 e nenhum erro de servidor. Medido em
+navegador real antes do conserto: 7 a 8 violações por página, `hidratou=false` nas cinco.
+
+`export const dynamic = "force-dynamic"` no `app/layout.tsx` resolve para a árvore inteira. O preço
+é render por requisição onde antes havia arquivo pronto — irrelevante num app de um usuário, ao
+contrário da página de login morta. Sobra `/manifest.webmanifest` estática, que não tem script.
+
+**A alternativa recusada:** `script-src 'unsafe-inline'` faria as 12 rotas continuarem estáticas e
+daria a **mesma nota** no securityheaders.com — sem impedir injeção nenhuma. É o conserto tentador de
+qualquer quebra futura, e `lib/security/csp.test.ts` existe para reprová-lo.
+
+**Verificação:** `node scripts/verifica-csp.mjs <base> [rotas]` abre cada rota em Chromium e afirma
+duas coisas — zero violações **e** `hidratou=true`. A segunda é a que importa: sem ela, "zero
+violação" também descreveria uma página morta. 18 rotas conferidas (8 públicas + 10 internas, estas
+com o servidor sem Supabase, que é como as telas internas abrem sem sessão), todas com todos os
+scripts carimbados.
 
 ---
 

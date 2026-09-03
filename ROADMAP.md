@@ -1,6 +1,6 @@
 # ROADMAP — GLYX
 
-Última atualização: 2026-08-14  
+Última atualização: 2026-09-03  
 Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.  
 **Não é dispositivo médico.** Papel clínico/cuidador ainda não está no escopo implementado.
 
@@ -27,8 +27,16 @@ Produto: autocuidado metabólico / diabetes (pt-BR), PWA Next.js + Supabase.
 | Resiliência Libre: quebra do provedor separada de problema individual | Vivo — depende de `OPS_ALERT_WEBHOOK_URL` |
 | Diário completo: tudo que foi registrado desde o primeiro dia | Vivo (06/08/2026) |
 | Módulo Treino: catálogo de exercícios ligado ao registro de carga | Vivo — ver seção abaixo |
+| Cabeçalhos de segurança completos, com CSP por nonce | Vivo (03/09/2026) — ver ressalva abaixo |
 
 > **Provedor de IA.** Desde 19/07/2026 é Kimi K2.6 (`api.moonshot.ai`), não OpenAI.
+
+> **Cabeçalhos de segurança.** O CSP entrou em 03/09/2026 e fechou o último dos seis que o
+> securityheaders.com avalia. Ele usa **nonce por requisição**, e isso teve um preço declarado: o app
+> deixou de ter páginas pré-renderizadas (`force-dynamic` no layout raiz), porque página gerada no
+> build sai sem nonce e **não hidrata** — a de login desenhava e o botão não respondia. Verificar com
+> `node scripts/verifica-csp.mjs <base>` depois de mexer em script, iframe, fonte ou origem externa;
+> o roteiro completo está no §10.10 do [CONTEXTO_TECNICO](docs/CONTEXTO_TECNICO.md).
 
 > **Calculadora de bolus.** Entrou em 18/07/2026, revertendo a decisão anterior de mantê-la fora de
 > escopo. É educativa: usa os parâmetros que o usuário configurou com o médico (`carb_ratio`,

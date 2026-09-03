@@ -13,6 +13,26 @@ const jetbrains = JetBrains_Mono({
   variable: "--font-mono",
 });
 
+/**
+ * Toda página renderiza por requisição, e o motivo é o CSP.
+ *
+ * O `script-src` carrega um nonce sorteado no middleware, e é o render que
+ * carimba esse nonce nos `<script>` do Next. Página pré-renderizada no build
+ * não passa por render nenhum na requisição: ela sai com os scripts sem nonce,
+ * o navegador recusa os inline e a página **não hidrata** — o formulário de
+ * login aparece na tela e o botão não faz nada.
+ *
+ * Medido em 03/09/2026, antes desta linha existir: /login, /register,
+ * /privacidade, /instalar e /risco eram estáticas e davam 7 a 8 violações de
+ * CSP cada uma, com `hidratou=false` em navegador real
+ * (`node scripts/verifica-csp.mjs`). Eram justamente as páginas públicas — as
+ * únicas que um atacante alcança sem sessão.
+ *
+ * O preço é render por requisição em 12 rotas que antes vinham prontas. Num app
+ * de um usuário, isso não se mede; a página de login morta, sim.
+ */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "GLYX — Controle metabólico",
   description:
