@@ -32,8 +32,19 @@ export function aiProvider(): AiProvider {
   if (forced === "anthropic" || forced === "kimi" || forced === "openai") {
     return forced;
   }
-  if (process.env.ANTHROPIC_API_KEY?.trim()) return "anthropic";
+
+  // KIMI CONTINUA SENDO O PADRÃO, e a ordem aqui é a decisão.
+  //
+  // Antes, a mera presença de `ANTHROPIC_API_KEY` no ambiente trocava o
+  // provedor sozinha — alguém adicionar a chave para testar mudaria o modelo
+  // que analisa dado clínico, sem ninguém pedir e sem nada na tela avisando.
+  // Trocar de provedor passa a exigir `AI_PROVIDER=anthropic`, escrito de
+  // propósito.
+  //
+  // A Anthropic só entra por presença de chave quando não há Kimi nenhum para
+  // usar — aí não é troca, é o único provedor disponível.
   if (process.env.KIMI_API_KEY?.trim()) return "kimi";
+  if (process.env.ANTHROPIC_API_KEY?.trim()) return "anthropic";
   return "openai";
 }
 

@@ -637,10 +637,16 @@ carga glicêmica 34/67, 7700 kcal/kg.
 
 ### 7.1 IA
 
-Provedor padrão: **Anthropic `claude-sonnet-5`** via `https://api.anthropic.com/v1/`, usando o SDK
-`openai` (camada de compatibilidade). A seleção é explícita por `AI_PROVIDER`
-(`anthropic` | `kimi` | `openai`); sem ela, vence a primeira chave presente nessa ordem
-(`lib/env.ts`). Kimi K2.6 e OpenAI `gpt-4o-mini` seguem disponíveis sem mudança de código —
+Provedor padrão: **Kimi K2.6** via `https://api.moonshot.ai/v1`, usando o SDK `openai`.
+
+A seleção é explícita por `AI_PROVIDER` (`anthropic` | `kimi` | `openai`). **Sem essa variável,
+Kimi vence sempre que sua chave existe** — a presença de `ANTHROPIC_API_KEY` no ambiente NÃO
+troca o provedor sozinha. A ordem em `aiProvider()` é decisão, não acaso: alguém adicionar uma
+chave para testar mudaria o modelo que analisa dado clínico, sem ninguém pedir e sem nada na
+tela avisando. Anthropic só entra por presença de chave quando não há Kimi nenhum para usar —
+aí não é troca, é o único provedor disponível.
+
+Anthropic `claude-sonnet-5` e OpenAI `gpt-4o-mini` seguem disponíveis sem mudança de código:
 nenhuma das 13 rotas conhece o provedor, todas usam `createAiClient()` + `aiModel()`.
 
 ⚠️ **`aiProviderOptions()` injeta `{ thinking: { type: "disabled" } }` apenas quando a base URL é a

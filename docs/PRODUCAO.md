@@ -15,11 +15,11 @@ Defina **todas** as variáveis obrigatórias (ver `.env.example`):
 | `SIGNUP_INVITE_CODE` | sim | Sem isto o register retorna 503 |
 | `CRON_SECRET` | sim | Igual ao header nas funções SQL `pg_cron` |
 | `CGM_CREDENTIALS_SECRET` | sim (forte) | **Diferente** do `CRON_SECRET` |
-| `ANTHROPIC_API_KEY` | sim (se IA) | Chave da Anthropic; somente servidor. Provedor padrão |
-| `AI_PROVIDER` | opcional | `anthropic` \| `kimi` \| `openai`. Sem ela, vence a primeira chave presente, nesta ordem |
-| `AI_MODEL` | opcional | Padrão por provedor (`claude-sonnet-5` na Anthropic). Nas rotas de classificação simples, `claude-haiku-4-5` sai mais barato |
+| `KIMI_API_KEY` | sim (se IA) | Chave da API oficial Moonshot; somente servidor. **Provedor padrão** |
+| `AI_PROVIDER` | opcional | `anthropic` \| `kimi` \| `openai`. **Trocar de provedor exige esta variável**: adicionar `ANTHROPIC_API_KEY` ao ambiente NÃO troca o modelo sozinho |
+| `AI_MODEL` | opcional | Padrão por provedor (`kimi-k2.6` no Kimi) |
 | `AI_BASE_URL` | opcional | Só para proxy (ex.: OpenRouter). `OPENAI_BASE_URL` segue aceito como nome legado |
-| `KIMI_API_KEY` / `OPENAI_API_KEY` | opcional | Provedores alternativos, selecionáveis por `AI_PROVIDER` |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | opcional | Provedores alternativos, só ativos por `AI_PROVIDER` |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | sim (push) | `npx web-push generate-vapid-keys` |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | recomendado | Mesmo valor |
 | `NEXT_PUBLIC_SITE_URL` | recomendado | Domínio público (Dexcom redirect) |
