@@ -3,14 +3,8 @@ import { buildBodyContextLines } from "@/lib/ai/body-context";
 import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
 import { renderVerdictBlock } from "@/lib/safety/present";
-import {
-  buildContextReceipt,
-  divergenciaAlimentacao,
-  divergenciaExercicio,
-  divergenciaInsulina,
-  divergenciaMedicacao,
-  renderContextReceipt,
-} from "@/lib/ai/context-receipt";
+import { renderContextReceipt } from "@/lib/ai/context-receipt";
+import { getContextReceipt } from "@/lib/queries/context-receipt";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
@@ -366,85 +360,11 @@ export async function buildUserContext(
   // "0 refeições" e "nenhuma refeição registrada" chegam iguais, e a segunda
   // vira conclusão de jejum.
   //
-  // Duas contagens extras para as divergências: dose órfã (medication_id nulo,
-  // consequência do `on delete set null`) e insulina sem tipo (que some do
-  // checador de interação).
-  const [orfasRes, insulinaOutraRes] = await Promise.all([
-    supabase
-      .from("medication_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .is("medication_id", null)
-      .gte("taken_at", sevenDaysAgo),
-    supabase
-      .from("insulin_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("insulin_kind", "outra")
-      .gte("applied_at", sevenDaysAgo),
-  ]);
-
-  const agora = new Date().toISOString();
-  const janela = (from: string) => ({ from, to: agora });
-  const minutosDeExercicio = ex.reduce((s, e) => s + (e.duration_min ?? 0), 0);
-
-  // NOTA sobre `zero_confirmado`: nenhum campo o usa hoje, e não é esquecimento.
-  // O schema não tem registro EXPLÍCITO de ausência em fonte nenhuma — não
-  // existe "declaro que não comi". Marcar zero_confirmado sem esse registro
-  // seria transformar lacuna em fato, que é o defeito que este recibo existe
-  // para impedir. O estado fica disponível para quando o schema o suportar.
-  const receipt = buildContextReceipt(userId, {
-    glicemia: {
-      count: gl.length,
-      summary: gl.length ? `última ${gl[0].value_mg_dl} mg/dL` : null,
-      window: janela(new Date(Date.now() - 14 * 86_400_000).toISOString()),
-    },
-    alimentacao: {
-      count: meals.length,
-      summary: meals.length ? `${meals.length} refeição(ões) hoje` : null,
-      window: janela(startOfDay),
-      divergence: divergenciaAlimentacao({
-        spikeMeals: spikes.length,
-        glucoseReadingsAfterSpike: history.length,
-      }),
-    },
-    exercicio: {
-      count: ex.length,
-      summary: ex.length ? `${ex.length} sessão(ões), ${minutosDeExercicio} min` : null,
-      window: janela(twoDaysAgo),
-      divergence: divergenciaExercicio({
-        sessions: ex.length,
-        totalMinutes: minutosDeExercicio,
-      }),
-    },
-    medicacao: {
-      count: meds.length + suplementos.length,
-      summary: `${meds.length} med, ${suplementos.length} suplemento(s)`,
-      window: janela(sevenDaysAgo),
-      divergence: divergenciaMedicacao({ orphanLogs: orfasRes.count ?? 0 }),
-    },
-    insulina: {
-      count: ins.length,
-      summary: ins.length ? `${ins.length} registro(s) em 48h` : null,
-      window: janela(twoDaysAgo),
-      divergence: divergenciaInsulina({ kindOther: insulinaOutraRes.count ?? 0 }),
-    },
-    sono: {
-      count: sleepByDate.size,
-      summary: sleepByDate.size ? `${sleepByDate.size} noite(s) com registro` : null,
-      window: janela(new Date(`${fiveDaysAgoDate}T00:00:00Z`).toISOString()),
-    },
-    alertas_48h: {
-      count: alerts.length,
-      summary: alerts.length ? `${alerts.length} alerta(s)` : null,
-      window: janela(twoDaysAgo),
-    },
-    mapa_risco: {
-      count: audit ? 1 : 0,
-      summary: audit ? `score ${audit.score}/100` : null,
-      window: janela(sevenDaysAgo),
-    },
-  });
+  // A montagem vive em , e o bloco do painel lê
+  // da MESMA função: duas montagens seriam duas verdades sobre o que o app
+  // sabe, e a tela poderia dizer "sem registro" enquanto o modelo recebe um
+  // número — a divergência que este recibo existe para detectar.
+  const receipt = await getContextReceipt(supabase, userId, profile?.timezone);
 
   const comRecibo = `${renderContextReceipt(receipt)}\n\n${resumo}`;
 

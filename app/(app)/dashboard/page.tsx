@@ -15,6 +15,9 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { DashboardAutoRefresh } from "@/components/dashboard/auto-refresh";
 import { SensorRadar } from "@/components/glicemia/sensor-radar";
+import { CardAgoraView } from "@/components/painel/card-agora";
+import { ReciboContexto } from "@/components/painel/recibo-contexto";
+import { getCardAgora, type CardAgoraResult } from "@/lib/queries/card-agora";
 
 const FOCUS_STRIP: Record<
   "diabetes" | "lose" | "gain",
@@ -54,6 +57,12 @@ export default async function DashboardPage() {
   type Focus = "diabetes" | "lose" | "gain";
   let focus: Focus | null = null;
   let muscleFocusLabel: string | null = null;
+  let userId: string | null = null;
+  let perfil: {
+    timezone?: string | null;
+    target_glucose_min?: number | null;
+    target_glucose_max?: number | null;
+  } | null = null;
 
   // Água e macros saíram do painel e foram para o módulo Alimentação, junto do
   // formulário que os preenche. O que fica aqui é só o que o card de glicemia
@@ -69,7 +78,9 @@ export default async function DashboardPage() {
     if (user) {
       const { data: p } = await supabase
         .from("profiles")
-        .select("onboarding_done, primary_focus")
+        .select(
+          "onboarding_done, primary_focus, timezone, target_glucose_min, target_glucose_max"
+        )
         .eq("id", user.id)
         .maybeSingle();
 
@@ -88,12 +99,32 @@ export default async function DashboardPage() {
 
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
+      perfil = p;
+      userId = user.id;
     }
   }
 
   const summary = await getDashboardSummary();
   if (!summary) {
     return <DashboardDemo />;
+  }
+
+  // Card de ação e recibo: o motor decide qual card, e a montagem do contexto
+  // fica em `lib/queries/card-agora.ts`. Falha aqui não derruba o painel — o
+  // resto da tela continua servindo, e o card simplesmente não aparece.
+  let agora: CardAgoraResult | null = null;
+  if (supabase && userId) {
+    try {
+      agora = await getCardAgora(supabase, userId, {
+        lastGlucose: summary.latestGlucose,
+        lastGlucoseAt: summary.latestGlucoseAt,
+        glucoseTrend: summary.glucoseTrend,
+        plannedWorkoutLabel: muscleFocusLabel,
+        profile: perfil,
+      });
+    } catch {
+      /* painel segue sem o card */
+    }
   }
 
   const strip = focus ? FOCUS_STRIP[focus] : null;
@@ -105,6 +136,11 @@ export default async function DashboardPage() {
           administrativo: não responde "o que eu faço agora", e ocupava a melhor
           posição da tela com um evento de um mês atrás. */}
       <SensorRadar />
+      {/* Card de ação: primeiro elemento depois da faixa de sensor. É o que
+          responde "o que faço agora" — e é o único lugar do painel onde uma
+          sugestão de treino pode nascer, porque só ele passa pela guarda
+          `exerciseSuppressed`. */}
+      {agora ? <CardAgoraView card={agora.card} /> : null}
       {strip ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <p className="text-sm font-medium text-emerald-200">{strip.label}</p>
@@ -146,6 +182,10 @@ export default async function DashboardPage() {
 
           O painel é vista breve do que fazer agora. Detalhe e registro moram no
           módulo, alcançáveis pelo menu e pela própria lista MÓDULOS. */}
+
+      {/* Recibo por último e fechado: é conferência do que o app sabe, não
+          decisão. Aberto, mostra a mesma leitura que vai para o copiloto. */}
+      {agora ? <ReciboContexto receipt={agora.receipt} /> : null}
     </div>
   );
 }

@@ -4,12 +4,11 @@ import {
   UtensilsCrossed,
   Dumbbell,
   Pill,
-  BellRing,
   Plug,
   LineChart,
   FileText,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { GlucoseHeroCard } from "@/components/dashboard/glucose-hero-card";
 import { NextStepCard } from "@/components/dashboard/next-step-card";
 import { ModuleRow } from "@/components/dashboard/module-row";
@@ -28,6 +27,7 @@ type Props = {
   riskLabel: string;
   /** Faixa alvo por extenso, ex. "70–140" — a régua sem a qual `riskLabel` é adjetivo. */
   targetRangeLabel?: string | null;
+  /** Contagem alimenta o card de acao; a lista mora em /analise/alertas. */
   alerts: MetabolicAlert[];
   stepsToday?: number | null;
   sleepHoursToday?: number | null;
@@ -46,7 +46,6 @@ export function DashboardShell({
   waterGoalMl,
   riskLabel,
   targetRangeLabel = null,
-  alerts,
   stepsToday = null,
   sleepHoursToday = null,
   muscleFocusLabel = null,
