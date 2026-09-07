@@ -1,0 +1,117 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot do recibo contra dataset fixo > o objeto inteiro 1`] = `
+{
+  "builtAt": "2026-09-07T17:32:11.000Z",
+  "fields": [
+    {
+      "count": 12,
+      "divergence": null,
+      "key": "glicemia",
+      "state": "registrado",
+      "summary": "ultima 125 mg/dL as 14:05",
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 0,
+      "divergence": null,
+      "key": "alimentacao",
+      "state": "nao_registrado",
+      "summary": null,
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 1,
+      "divergence": "1 sessão(ões) registrada(s) com 0 min de duração",
+      "key": "exercicio",
+      "state": "registrado",
+      "summary": "1 sessao",
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 4,
+      "divergence": null,
+      "key": "medicacao",
+      "state": "registrado",
+      "summary": "2 med, 2 supplement",
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 3,
+      "divergence": null,
+      "key": "insulina",
+      "state": "registrado",
+      "summary": "3 registros ultimos 7d",
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 0,
+      "divergence": null,
+      "key": "sono",
+      "state": "nao_registrado",
+      "summary": null,
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 0,
+      "divergence": null,
+      "key": "alertas_48h",
+      "state": "zero_confirmado",
+      "summary": "0 alertas",
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+    {
+      "count": 1,
+      "divergence": null,
+      "key": "mapa_risco",
+      "state": "registrado",
+      "summary": "score de 06/09",
+      "window": {
+        "from": "2026-09-07T03:00:00.000Z",
+        "to": "2026-09-08T02:59:59.999Z",
+      },
+    },
+  ],
+  "hasDivergence": true,
+  "missing": [
+    "alimentacao",
+    "sono",
+  ],
+  "userId": "usuario-de-teste",
+}
+`;
+
+exports[`snapshot do recibo contra dataset fixo > o texto que vai para o prompt 1`] = `
+"RECIBO DE CONTEXTO (montado em 2026-09-07T17:32:11.000Z)
+glicemia    | registrado      |  12 linha(s) | ultima 125 mg/dL as 14:05
+alimentacao | nao_registrado  |   0 linha(s)
+exercicio   | registrado      |   1 linha(s) | 1 sessao | DIVERGENCIA: 1 sessão(ões) registrada(s) com 0 min de duração
+medicacao   | registrado      |   4 linha(s) | 2 med, 2 supplement
+insulina    | registrado      |   3 linha(s) | 3 registros ultimos 7d
+sono        | nao_registrado  |   0 linha(s)
+alertas_48h | zero_confirmado |   0 linha(s) | 0 alertas
+mapa_risco  | registrado      |   1 linha(s) | score de 06/09
+
+CAMPOS SEM REGISTRO: alimentacao, sono"
+`;
