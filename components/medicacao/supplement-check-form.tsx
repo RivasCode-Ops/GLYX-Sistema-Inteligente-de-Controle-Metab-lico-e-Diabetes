@@ -4,22 +4,34 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
+import { InteractionAlert } from "@/components/medicacao/interaction-alert";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
+import type { SafetyPayload } from "@/lib/safety/present";
+
+/**
+ * O alerta desta tela vem de `result.safety`, que o servidor monta a partir do
+ * motor determinístico — nunca do texto do modelo. Por isso não existe estado
+ * verde aqui: o melhor caso possível é "sem alerta na base", com a legenda
+ * dizendo que isso não é atestado de segurança. Um card verde escrito "Seguro"
+ * foi exatamente o que o app mostrou no incidente da berberina.
+ */
 
 type Result = {
   productName: string;
-  verdict: "seguro" | "atencao" | "evitar";
+  safety: SafetyPayload;
   summary: string;
   concerningIngredients: { name: string; why: string }[];
   crossCheck: string[];
   doctorNote: string;
   limitations: string;
+  llmSkipped: boolean;
 };
 
-const VERDICT_STYLE: Record<Result["verdict"], { box: string; label: string }> = {
-  seguro: { box: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300", label: "✅ Seguro" },
-  atencao: { box: "border-amber-500/40 bg-amber-500/10 text-amber-300", label: "⚠️ Atenção" },
-  evitar: { box: "border-red-500/40 bg-red-500/10 text-red-300", label: "🚫 Evitar" },
+const TONE_STYLE: Record<SafetyPayload["tone"], string> = {
+  evitar: "border-red-500/40 bg-red-500/10",
+  atencao: "border-amber-500/40 bg-amber-500/10",
+  // Neutro, deliberadamente. Não é verde e não diz "seguro".
+  sem_alerta: "border-zinc-700 bg-zinc-900/60",
 };
 
 export function SupplementCheckForm() {
@@ -63,44 +75,48 @@ export function SupplementCheckForm() {
   return (
     <div className="space-y-4">
       <div>
-          <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
-            <PhotoCaptureButtons
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              onFile={(f) => void onFileChange(f)}
-            />
-            {previews.length ? (
-              <div className={previews.length > 1 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : ""}>
-                {previews.map((p) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={p}
-                    src={p}
-                    alt="Rótulo do suplemento"
-                    className="max-h-64 w-full rounded-xl border border-zinc-800 object-contain"
-                  />
-                ))}
-              </div>
-            ) : null}
-            <Button type="submit" disabled={loading}>
-              {loading ? "Analisando…" : "Analisar rótulo"}
-            </Button>
-            {status ? <p className="text-xs text-amber-300">{status}</p> : null}
-            <p className="text-[11px] leading-4 text-zinc-600">
-              Análise educativa de segurança — não prescreve dose nem substitui
-              nutricionista/nefrologista/endocrinologista.
-            </p>
-          </form>
+        <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
+          <PhotoCaptureButtons
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onFile={(f) => void onFileChange(f)}
+          />
+          {previews.length ? (
+            <div className={previews.length > 1 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : ""}>
+              {previews.map((p) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={p}
+                  src={p}
+                  alt="Rótulo do suplemento"
+                  className="max-h-64 w-full rounded-xl border border-zinc-800 object-contain"
+                />
+              ))}
+            </div>
+          ) : null}
+          <Button type="submit" disabled={loading}>
+            {loading ? "Analisando…" : "Analisar rótulo"}
+          </Button>
+          {status ? <p className="text-xs text-amber-300">{status}</p> : null}
+          <p className="text-[11px] leading-4 text-zinc-600">
+            Checagem de interação com o que você tem registrado — não prescreve dose nem substitui
+            nutricionista/nefrologista/endocrinologista.
+          </p>
+        </form>
       </div>
 
       {result ? (
-        <Card className={VERDICT_STYLE[result.verdict].box}>
+        <Card className={TONE_STYLE[result.safety.tone]}>
           <CardContent className="space-y-4 pt-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide">
-                {VERDICT_STYLE[result.verdict].label} — {result.productName}
+            {result.productName ? (
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
+                {result.productName}
               </p>
-              <p className="mt-1 text-sm text-zinc-200">{result.summary}</p>
-            </div>
+            ) : null}
+
+            {/* O alerta vem antes da prosa e não depende dela. */}
+            <InteractionAlert safety={result.safety} />
+
+            <p className="whitespace-pre-line text-sm text-zinc-200">{result.summary}</p>
 
             {result.concerningIngredients.length ? (
               <div>
@@ -117,9 +133,7 @@ export function SupplementCheckForm() {
 
             {result.crossCheck.length ? (
               <div>
-                <p className="mb-1 text-xs font-medium text-zinc-300">
-                  Cruzamento com seus dados
-                </p>
+                <p className="mb-1 text-xs font-medium text-zinc-300">Cruzamento com seus dados</p>
                 <ul className="space-y-1 text-xs text-zinc-400">
                   {result.crossCheck.map((c) => (
                     <li key={c}>🔎 {c}</li>
@@ -135,7 +149,9 @@ export function SupplementCheckForm() {
               <p className="text-sm text-zinc-200">{result.doctorNote}</p>
             </div>
 
-            <p className="text-[11px] leading-4 text-zinc-600">{result.limitations}</p>
+            {result.limitations ? (
+              <p className="text-[11px] leading-4 text-zinc-600">{result.limitations}</p>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildBodyContextLines } from "@/lib/ai/body-context";
 import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
+import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
+import { renderVerdictBlock } from "@/lib/safety/present";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
@@ -49,6 +51,7 @@ export async function buildUserContext(
     sleepRes,
     auditRes,
     alertsRes,
+    supplementsRes,
   ] = await Promise.all([
       supabase
         .from("glucose_readings")
@@ -129,6 +132,15 @@ export async function buildUserContext(
         .gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
         .order("created_at", { ascending: false })
         .limit(5),
+      // Suplementos ativos: são os candidatos da checagem de interação. Ficam
+      // fora de `medsRes` (que filtra kind='med') justamente porque o papel
+      // deles aqui é outro — não é adesão, é o que pode interagir.
+      supabase
+        .from("medications")
+        .select("name")
+        .eq("user_id", userId)
+        .eq("active", true)
+        .eq("kind", "supplement"),
     ]);
 
   const meds = medsRes.data ?? [];
@@ -320,11 +332,34 @@ export async function buildUserContext(
     year: "numeric",
   });
 
-  return (
+  const resumo =
     `DADOS RECENTES DO USUÁRIO (somente leitura, use para contextualizar as respostas; ` +
     `horários no fuso do usuário). HOJE é ${hoje} — use esta data, nunca deduza o dia atual ` +
     `a partir do registro mais recente: se o último dado for de dias atrás, isso significa que ` +
     `não há registro recente, e vale dizer isso ao usuário.\n- ` +
-    linhas.join("\n- ")
-  );
+    linhas.join("\n- ");
+
+  // Checagem de interação dos suplementos que o usuário já tem cadastrados
+  // contra a medicação/insulina em uso. Entra no contexto — não no SYSTEM —
+  // porque é dado do usuário, calculado a cada conversa. O SYSTEM é que diz ao
+  // modelo como tratá-lo: veredito já decidido, não reavaliável.
+  //
+  // Vem DEPOIS do resumo por ser conteúdo derivado dele; e a regra
+  // anti-injeção do SYSTEM continua valendo sobre os dois, já que os nomes aqui
+  // também passam por sanitizeForPrompt.
+  const suplementos = (supplementsRes.data ?? [])
+    .map((s) => (s.name as string | null) ?? "")
+    .filter((n) => n.trim().length > 0);
+
+  if (!suplementos.length) return resumo;
+
+  try {
+    const verdict = await checkSubstanceSafety(supabase, userId, suplementos);
+    return `${resumo}\n\n${renderVerdictBlock(verdict)}`;
+  } catch {
+    // Falha na checagem não pode derrubar o contexto inteiro. Mas também não
+    // pode virar silêncio: sem o bloco, o SYSTEM manda o modelo dizer que a
+    // checagem não foi executada, em vez de opinar sobre risco.
+    return resumo;
+  }
 }

@@ -8,6 +8,7 @@ import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
 import { GOAL_LABEL, bmr, dailyTargets, safeWeeklyRateKg, tdee } from "@/lib/health/energy";
 import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
 import { createClient } from "@/lib/supabase/server";
+import { parseModelJson } from "@/lib/ai/parse-json";
 
 const resultSchema = z.object({
   verdict: z.enum(["realista", "agressiva", "arriscada"]),
@@ -141,7 +142,10 @@ REGRAS:
 
   let json: unknown;
   try {
-    json = JSON.parse(completion.choices[0]?.message?.content ?? "");
+    json = parseModelJson(completion.choices[0]?.message?.content);
+    // response_format é ignorado pela camada de compatibilidade da Anthropic:
+    // sem o parse tolerante, JSON embrulhado em markdown viraria 502.
+    if (json === null) throw new Error("json");
   } catch {
     return NextResponse.json({ error: "Resposta inválida do modelo. Tente novamente." }, { status: 502 });
   }

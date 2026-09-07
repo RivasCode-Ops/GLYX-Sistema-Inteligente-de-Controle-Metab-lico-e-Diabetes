@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ReminderTimesField } from "@/components/medicacao/reminder-times-field";
+import { InteractionAlert } from "@/components/medicacao/interaction-alert";
 import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
+import type { SafetyPayload } from "@/lib/safety/present";
 
 // Cadastro por foto do rótulo: a IA lê nome/tipo/dose/estoque e pré-preenche;
 // o usuário revisa, ajusta horários e salva — a própria foto fica anexada
@@ -37,6 +39,7 @@ export function AddMedicationByPhoto() {
   const preview = previews[0] ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [limitations, setLimitations] = useState<string | null>(null);
+  const [safety, setSafety] = useState<SafetyPayload | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [similar, setSimilar] = useState<SimilarMedication[]>([]);
@@ -64,6 +67,7 @@ export function AddMedicationByPhoto() {
           stock_units: number | null;
           limitations: string;
         };
+        safety?: SafetyPayload | null;
         error?: string;
       };
       if (!res.ok || !data.result) {
@@ -82,6 +86,7 @@ export function AddMedicationByPhoto() {
         reminder_times: "",
       });
       setLimitations(r.limitations || null);
+      setSafety(data.safety ?? null);
       setSimilar(await findSimilarActiveMedications(r.name));
     } catch {
       setStatus("Erro de rede.");
@@ -117,6 +122,7 @@ export function AddMedicationByPhoto() {
       setSaved(true);
       setDraft(null);
       setLimitations(null);
+      setSafety(null);
       setSimilar([]);
       clear();
       router.refresh();
@@ -133,6 +139,9 @@ export function AddMedicationByPhoto() {
             onFile={(f) => {
               setDraft(null);
               setSaved(false);
+              // O alerta é do rótulo anterior: trocar a foto sem limpá-lo
+              // deixaria um veredito de outra substância na tela.
+              setSafety(null);
               setSimilar([]);
               void selectSingle(f);
             }}
@@ -233,6 +242,11 @@ export function AddMedicationByPhoto() {
                 A IA não conseguiu ler: {limitations}
               </p>
             ) : null}
+            {/* Checagem determinística de interação, quando o rótulo lido é de
+                suplemento. Aparece ANTES do botão de salvar, porque o momento
+                útil do alerta é antes de o item entrar na lista — foi assim que
+                a berberina entrou ao lado da insulina sem ninguém ver. */}
+            {safety ? <InteractionAlert safety={safety} className="sm:col-span-2" /> : null}
             {similar.length ? (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200 sm:col-span-2">
                 <p className="font-medium">Você já tem algo parecido cadastrado:</p>

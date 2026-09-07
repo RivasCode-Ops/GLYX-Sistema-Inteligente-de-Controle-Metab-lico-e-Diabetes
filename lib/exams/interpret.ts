@@ -1,6 +1,7 @@
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
-import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { aiKeyEnvName, aiModel, isOpenAIConfigured } from "@/lib/env";
 import { parsedExamSummarySchema, type ParsedExamSummary } from "@/lib/exams/types";
+import { parseModelJson } from "@/lib/ai/parse-json";
 
 const SYSTEM = `És um assistente clínico-educativo para leigos (Português do Brasil).
 
@@ -47,7 +48,7 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
     return {
       ok: false,
       error:
-        "Configure KIMI_API_KEY no servidor para interpretação assistida. O texto continua disponível para revisão manual.",
+        `Configure ${aiKeyEnvName()} no servidor para interpretação assistida. O texto continua disponível para revisão manual.`,
       demo: true,
     };
   }
@@ -79,7 +80,10 @@ export async function interpretExamText(rawText: string): Promise<InterpretResul
 
   let json: unknown;
   try {
-    json = JSON.parse(raw);
+    json = parseModelJson(raw);
+    // response_format é ignorado pela camada de compatibilidade da Anthropic:
+    // sem o parse tolerante, JSON embrulhado em markdown viraria 502.
+    if (json === null) throw new Error("json");
   } catch {
     return { ok: false, error: "Resposta do modelo não era JSON válido." };
   }

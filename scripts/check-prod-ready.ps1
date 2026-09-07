@@ -77,10 +77,13 @@ foreach ($k in $required) {
     $fail++
   }
 }
-if ((Has-Value $envMap "KIMI_API_KEY") -or (Has-Value $envMap "OPENAI_API_KEY")) {
-  Write-Host "  OK  KIMI_API_KEY" -ForegroundColor Green
+# Qualquer uma das tres chaves serve: o provedor ativo e escolhido por AI_PROVIDER
+# (com fallback por presenca de chave). Exigir so KIMI_API_KEY reprovaria um
+# ambiente correto depois da troca de provedor.
+if ((Has-Value $envMap "ANTHROPIC_API_KEY") -or (Has-Value $envMap "KIMI_API_KEY") -or (Has-Value $envMap "OPENAI_API_KEY")) {
+  Write-Host "  OK  chave de IA (ANTHROPIC_API_KEY / KIMI_API_KEY / OPENAI_API_KEY)" -ForegroundColor Green
 } else {
-  Write-Host "  MISSING  KIMI_API_KEY" -ForegroundColor Red
+  Write-Host "  MISSING  chave de IA (ANTHROPIC_API_KEY / KIMI_API_KEY / OPENAI_API_KEY)" -ForegroundColor Red
   $fail++
 }
 

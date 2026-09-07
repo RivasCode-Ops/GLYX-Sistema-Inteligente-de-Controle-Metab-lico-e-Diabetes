@@ -6,6 +6,7 @@ import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/a
 import { defaultTitleFor, visionPromptFor } from "@/lib/exams/prompts";
 import { examPhotoResultSchema, parseExamType } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
+import { parseModelJson } from "@/lib/ai/parse-json";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_PAGES = 3;
@@ -97,7 +98,10 @@ export async function POST(req: Request) {
   const raw = completion.choices[0]?.message?.content ?? "";
   let json: unknown;
   try {
-    json = JSON.parse(raw);
+    json = parseModelJson(raw);
+    // response_format é ignorado pela camada de compatibilidade da Anthropic:
+    // sem o parse tolerante, JSON embrulhado em markdown viraria 502.
+    if (json === null) throw new Error("json");
   } catch {
     return NextResponse.json(
       { error: "A resposta do modelo não era JSON válido. Tente novamente." },

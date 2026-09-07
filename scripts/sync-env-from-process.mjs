@@ -12,8 +12,11 @@ const keys = [
   "SIGNUP_INVITE_CODE",
   "CRON_SECRET",
   "CGM_CREDENTIALS_SECRET",
+  "ANTHROPIC_API_KEY",
   "KIMI_API_KEY",
   "OPENAI_API_KEY",
+  "AI_PROVIDER",
+  "AI_BASE_URL",
   "OPENAI_BASE_URL",
   "AI_MODEL",
   "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
@@ -98,7 +101,9 @@ for (const k of required) {
   console.log(`  ${ok ? "OK" : "MISSING"} ${k}`);
 }
 const aiConfigured = Boolean(
-  existing.get("KIMI_API_KEY")?.trim() || existing.get("OPENAI_API_KEY")?.trim()
+  existing.get("ANTHROPIC_API_KEY")?.trim() ||
+    existing.get("KIMI_API_KEY")?.trim() ||
+    existing.get("OPENAI_API_KEY")?.trim()
 );
-console.log(`  ${aiConfigured ? "OK" : "MISSING"} KIMI_API_KEY`);
+console.log(`  ${aiConfigured ? "OK" : "MISSING"} chave de IA (ANTHROPIC_API_KEY / KIMI_API_KEY / OPENAI_API_KEY)`);
 process.exit(required.every((k) => existing.get(k)?.trim()) && aiConfigured ? 0 : 1);

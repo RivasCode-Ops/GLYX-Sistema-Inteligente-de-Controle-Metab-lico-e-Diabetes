@@ -637,13 +637,28 @@ carga glicêmica 34/67, 7700 kcal/kg.
 
 ### 7.1 IA
 
-Provedor único: **Kimi K2.6** via `https://api.moonshot.ai/v1`, usando o SDK `openai`. Fallback
-legado para OpenAI `gpt-4o-mini` quando só `OPENAI_API_KEY` existe.
+Provedor padrão: **Anthropic `claude-sonnet-5`** via `https://api.anthropic.com/v1/`, usando o SDK
+`openai` (camada de compatibilidade). A seleção é explícita por `AI_PROVIDER`
+(`anthropic` | `kimi` | `openai`); sem ela, vence a primeira chave presente nessa ordem
+(`lib/env.ts`). Kimi K2.6 e OpenAI `gpt-4o-mini` seguem disponíveis sem mudança de código —
+nenhuma das 13 rotas conhece o provedor, todas usam `createAiClient()` + `aiModel()`.
 
-⚠️ **`aiProviderOptions()` injeta `{ thinking: { type: "disabled" } }` apenas para o Kimi**
-(`lib/ai/client.ts:11-15`). Sem esse parâmetro o modelo gasta todo o `max_tokens` em raciocínio e
-devolve conteúdo **vazio** — comportamento verificado empiricamente em 21/07. Qualquer chamada nova
-ao Kimi precisa espalhar `...aiProviderOptions()`.
+⚠️ **`aiProviderOptions()` injeta `{ thinking: { type: "disabled" } }` apenas quando a base URL é a
+do Kimi** (`lib/ai/client.ts:11-15`). Sem esse parâmetro o Kimi gasta todo o `max_tokens` em
+raciocínio e devolve conteúdo **vazio** — verificado empiricamente em 21/07. Qualquer chamada nova
+precisa espalhar `...aiProviderOptions()`.
+
+⚠️ **`response_format: { type: "json_object" }` é ACEITO e IGNORADO pela camada de compatibilidade
+da Anthropic.** As rotas que leem JSON usam `parseModelJson()` (`lib/ai/parse-json.ts`), que descasca
+cerca de markdown e prosa em volta do objeto. Sem ele, a troca de provedor transformaria essas rotas
+em 502 intermitente, com a mensagem apontando para "formato inesperado" em vez da causa.
+
+⚠️ **`usage.prompt_tokens_details` / `completion_tokens_details` vêm sempre vazios** na camada de
+compatibilidade. `prompt_tokens` e `completion_tokens` seguem funcionando — são os únicos que
+`recordAiTokens()` lê.
+
+Os três blocos `system` do copiloto (SYSTEM → mapa de telas → contexto do usuário) viram um só,
+concatenados por `\n`, na ordem enviada. A ordem atual continua correta.
 
 12 chamadas de IA: `chat` (streaming, 800 tk), `meal-photo` (700), `meal-text` (800), `exam-photo`
 (1600, JSON), `med-label` (500), `supplement-check` (1400, JSON), `plate-builder` (1200, JSON),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
-import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
 import { isUnusableCompletion, parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   if (!isOpenAIConfigured()) {
     return NextResponse.json(
       {
-        error: "KIMI_API_KEY não configurada no servidor.",
+        error: `${aiKeyEnvName()} não configurada no servidor.`,
         demo: true,
       },
       { status: 503 }

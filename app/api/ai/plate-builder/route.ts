@@ -5,6 +5,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { parseModelJson } from "@/lib/ai/parse-json";
 
 const MAX_PHOTOS = 4;
 const MAX_TOTAL_BYTES = 3.5 * 1024 * 1024; // corpo da request na Vercel ~4.5MB
@@ -148,7 +149,10 @@ REGRAS OBRIGATÓRIAS:
 
   let json: unknown;
   try {
-    json = JSON.parse(completion.choices[0]?.message?.content ?? "");
+    json = parseModelJson(completion.choices[0]?.message?.content);
+    // response_format é ignorado pela camada de compatibilidade da Anthropic:
+    // sem o parse tolerante, JSON embrulhado em markdown viraria 502.
+    if (json === null) throw new Error("json");
   } catch {
     return NextResponse.json(
       { error: "A resposta do modelo não era JSON válido. Tente novamente." },

@@ -5,6 +5,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { parseModelJson } from "@/lib/ai/parse-json";
 
 /**
  * Comparação de duas fotos de progresso da MESMA pose.
@@ -136,7 +137,10 @@ Responde APENAS com JSON válido:
 
   let json: unknown;
   try {
-    json = JSON.parse(completion.choices[0]?.message?.content ?? "");
+    json = parseModelJson(completion.choices[0]?.message?.content);
+    // response_format é ignorado pela camada de compatibilidade da Anthropic:
+    // sem o parse tolerante, JSON embrulhado em markdown viraria 502.
+    if (json === null) throw new Error("json");
   } catch {
     return NextResponse.json({ error: "Resposta inválida do modelo. Tente novamente." }, { status: 502 });
   }
