@@ -90,11 +90,12 @@ export function DashboardShell({
       </div>
 
       <section>
-        <div className="mb-3 flex items-end justify-between gap-4">
+        {/* O cabeçalho tinha "Atividade hoje: N min", que era a TERCEIRA cópia
+            do mesmo número — as outras duas estão no card de glicemia e na
+            linha de Exercícios logo abaixo. A coluna direita desta lista é a
+            fonte única dos números do dia; repetir aqui não reforça, dilui. */}
+        <div className="mb-3">
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Módulos</h2>
-          <p className="text-xs text-zinc-600">
-            Atividade hoje: <span className="font-mono text-zinc-400">{activeMinutes} min</span>
-          </p>
         </div>
         <Card>
           <CardContent className="p-4">
@@ -112,7 +113,21 @@ export function DashboardShell({
               // deixava a recomendação sem continuidade.
               href="/exercicios/plano"
               icon={Dumbbell}
-              metric={muscleFocusLabel ?? `${activeMinutes} min · hoje`}
+              // O `??` escondia uma troca de GRANDEZA: `muscleFocusLabel` é o
+              // treino PLANEJADO do dia ("Inferior A"), e `activeMinutes` é o
+              // que foi medido. Com plano cadastrado, a coluna deixava de
+              // mostrar o número do dia e passava a mostrar uma intenção — na
+              // mesma coluna, em `font-mono`, que em Glicemia mostra leitura de
+              // sensor. Era isso que fazia a tela dizer "Inferior A" enquanto o
+              // card de dica dizia "nenhuma atividade hoje": as duas estavam
+              // certas, sobre coisas diferentes.
+              //
+              // Agora as duas aparecem, e a medição nunca some.
+              metric={
+                muscleFocusLabel
+                  ? `${muscleFocusLabel} · ${activeMinutes} min`
+                  : `${activeMinutes} min · hoje`
+              }
             />
             <ModuleRow title="Medicação" href="/medicacao" icon={Pill} metric="Ver agenda" />
             <ModuleRow title="Exames" href="/exames" icon={FileText} metric="Lab · ECG · Raio-X" />
