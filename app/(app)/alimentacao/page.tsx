@@ -5,6 +5,9 @@ import { deleteMeal } from "@/app/actions/meals";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewMealForm } from "@/components/alimentacao/new-meal-form";
+import { WaterCard } from "@/components/dashboard/water-card";
+import { MacroGaugesCard } from "@/components/alimentacao/macro-gauge";
+import { getNutritionToday } from "@/lib/queries/nutrition-today";
 import type { Meal } from "@/types/database";
 import { demoMeals } from "@/lib/demo/data";
 
@@ -18,6 +21,7 @@ export default async function AlimentacaoPage() {
   let todayStartISO = startOfLocalDayISO(null);
   const demoMode = !isSupabaseConfigured();
   const photoUrls = new Map<string, string>();
+  const nutricao = await getNutritionToday();
 
   async function deleteMealAction(formData: FormData): Promise<void> {
     "use server";
@@ -88,6 +92,24 @@ export default async function AlimentacaoPage() {
           </CardHeader>
         </Card>
       </div>
+
+      {/* Água/bebidas e medidores de macro vieram do Painel metabólico.
+          O painel é vista breve do que fazer agora; registro e detalhe moram no
+          módulo. Os quatro medidores ocupavam ~20% da altura do painel para
+          exibir quatro zeros que significam "sem registro" — aqui eles ficam ao
+          lado do formulário que os preenche. */}
+      {!demoMode && (nutricao.macroConsumed || nutricao.beverageExtras.length || nutricao.waterMl >= 0) ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <WaterCard
+            todayMl={nutricao.waterMl}
+            goalMl={nutricao.waterGoalMl}
+            extras={nutricao.beverageExtras}
+          />
+          {nutricao.macroConsumed && nutricao.macroTargets ? (
+            <MacroGaugesCard consumed={nutricao.macroConsumed} targets={nutricao.macroTargets} />
+          ) : null}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>

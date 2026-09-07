@@ -268,6 +268,9 @@ export const demoGlucosePoints: GlucosePoint[] = demoGlucoseReadings.map((r) => 
 
 export const demoSummary = {
   latestGlucose: demoGlucoseReadings[0]?.value_mg_dl ?? null,
+  // A demo mostra o app funcionando, então a leitura precisa ser do agora: com
+  // fixture antiga o painel exibiria, com razão, o aviso de sensor parado.
+  latestGlucoseAt: demoGlucoseReadings[0]?.recorded_at ?? null,
   glucoseSeries: demoGlucoseReadings
     .slice(0, 8)
     .map((r) => r.value_mg_dl)
@@ -279,6 +282,7 @@ export const demoSummary = {
     .filter((session) => session.started_at.slice(0, 10) === day(0))
     .reduce((sum, session) => sum + (session.duration_min ?? 0), 0),
   riskLabel: "Baixo",
+  glucoseTrend: "flat" as const,
   stepsToday: demoHealthSnapshots[0]?.steps ?? null,
   sleepHoursToday: demoHealthSnapshots[0]?.sleep_hours ?? null,
 };

@@ -26,6 +26,8 @@ type Props = {
   waterMl: number;
   waterGoalMl: number;
   riskLabel: string;
+  /** Faixa alvo por extenso, ex. "70–140" — a régua sem a qual `riskLabel` é adjetivo. */
+  targetRangeLabel?: string | null;
   alerts: MetabolicAlert[];
   stepsToday?: number | null;
   sleepHoursToday?: number | null;
@@ -43,6 +45,7 @@ export function DashboardShell({
   waterMl,
   waterGoalMl,
   riskLabel,
+  targetRangeLabel = null,
   alerts,
   stepsToday = null,
   sleepHoursToday = null,
@@ -60,6 +63,7 @@ export function DashboardShell({
           glucoseTrend={glucoseTrend}
           glucoseSeries={glucoseSeries}
           riskLabel={riskLabel}
+          targetRangeLabel={targetRangeLabel}
           carbsToday={carbsToday}
           activeMinutes={activeMinutes}
           waterMl={waterMl}
@@ -153,33 +157,12 @@ export function DashboardShell({
         </Card>
       </section>
 
-      <Card className="transition hover:border-sky-600/40">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <BellRing className="h-4 w-4 text-amber-400" />
-            <CardTitle className="text-base">Alertas recentes</CardTitle>
-          </div>
-          <CardDescription>
-            <Link href="/analise/alertas" className="text-emerald-400 hover:underline">
-              Ver todos os alertas →
-            </Link>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-zinc-400">
-          {alerts.length === 0 ? (
-            <p>Nenhum alerta não lido.</p>
-          ) : (
-            <ul className="space-y-2">
-              {alerts.slice(0, 3).map((a) => (
-                <li key={a.id} className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
-                  <span className="text-xs uppercase text-amber-500/90">{a.severity}</span>
-                  <p className="text-zinc-200">{a.title}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {/* A lista de "Alertas recentes" saiu do painel e vive em /analise/alertas,
+          que já existia. Ela é histórico: o painel mostra no máximo o que ainda
+          está ABERTO, e isso é papel do card de ação, não de uma lista.
+
+          `alerts` continua na assinatura porque a contagem alimenta o card de
+          ação; o que saiu foi a renderização da lista aqui. */}
     </div>
   );
 }
