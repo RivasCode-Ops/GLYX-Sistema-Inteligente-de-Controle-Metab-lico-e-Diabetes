@@ -24,6 +24,16 @@ import {
  *
  * Quando o card de mecanismos e a folha "Levar ao médico" existirem, os
  * renderizadores deles entram na lista de `TEXTOS` abaixo.
+ *
+ * LIMITAÇÃO CONHECIDA, e ela é o preço da decisão acima. Varrer saída em vez de
+ * fonte troca uma cobertura completa e cheia de falso positivo por uma cobertura
+ * PARCIAL e precisa: o que não estiver nas fixtures não é varrido. Um caminho de
+ * renderização novo, ou um cenário que nenhuma fixture produz, passa sem ser
+ * olhado — e passa em silêncio, porque o teste continua verde.
+ *
+ * Consequência prática: **incluir o renderizador novo aqui é parte de escrevê-lo**,
+ * não uma tarefa posterior. Este comentário existe para que a próxima pessoa não
+ * leia o verde como "está tudo varrido".
  */
 
 const ALIASES = seedAliases();

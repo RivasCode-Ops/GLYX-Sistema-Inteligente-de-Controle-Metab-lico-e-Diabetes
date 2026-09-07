@@ -7,6 +7,7 @@ import {
   contrastRatio,
   oklchToHex,
   oklchToLinearRgb,
+  relativeLuminance,
   parseOklchTriple,
   type Oklch,
 } from "./oklch";
@@ -103,6 +104,54 @@ describe("contraste WCAG AA dos pares em uso", () => {
   );
 });
 
+/**
+ * Prova de que a medição é feita sobre o que o navegador PINTA, e não sobre o
+ * OKLCH declarado.
+ *
+ * A pergunta importa: se o contraste fosse calculado sobre a tripla declarada,
+ * uma cor fora do gamut seria medida numa versão que ninguém vê, e um "45/45
+ * passa AA" não valeria nada — o navegador renderiza a cor recortada.
+ *
+ * O hexadecimal é o valor final, depois do recorte e da gama. Se a luminância
+ * medida bate com a luminância recalculada a partir do hex, a medição é da
+ * saída.
+ */
+describe("a medição é do sRGB de saída, não do OKLCH declarado", () => {
+  /** Desfaz a gama do hex, voltando ao sRGB linear que a WCAG usa. */
+  function luminanciaDoHex(hex: string): number {
+    const canais = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const linear = canais.map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  }
+
+  // Os três valores de teal que a medição reprovou por gamut em 07/09/2026,
+  // antes de o croma ser reduzido. Servem justamente porque são recortados.
+  const FORA_DO_GAMUT: Oklch[] = [
+    { l: 0.7, c: 0.13, h: 180 },
+    { l: 0.62, c: 0.14, h: 180 },
+    { l: 0.52, c: 0.13, h: 180 },
+  ];
+
+  it.each(FORA_DO_GAMUT.map((c) => [`${c.l} ${c.c} ${c.h}`, c] as const))(
+    "cor fora do gamut (%s) é medida pelo valor recortado",
+    (_nome, cor) => {
+      expect(oklchToLinearRgb(cor).clipped).toBe(true);
+      const medida = relativeLuminance(oklchToLinearRgb(cor));
+      const doHex = luminanciaDoHex(oklchToHex(cor));
+      // Tolerância só do arredondamento para 8 bits por canal.
+      expect(Math.abs(medida - doHex)).toBeLessThan(0.005);
+    }
+  );
+
+  it("nenhum canal medido passa de 1, mesmo com croma absurdo", () => {
+    const { r, g, b } = oklchToLinearRgb({ l: 0.7, c: 0.5, h: 180 });
+    for (const v of [r, g, b]) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
 describe("gamut", () => {
   it("nenhum token de cor sai do sRGB", () => {
     const fora = [...TOKENS.entries()]
@@ -136,6 +185,13 @@ describe("registro dos números medidos", () => {
 Conversão OKLCH → sRGB linear e luminância relativa WCAG em
 \`lib/design/oklch.ts\`. Alvo: **${AA_TEXT}:1** para corpo, **${AA_LARGE}:1** para
 texto grande e elemento de interface.
+
+**O que foi medido:** o sRGB **de saída**, depois do recorte de gamut — não a
+tripla OKLCH declarada. É o valor que o navegador pinta. A diferença importa:
+uma cor fora do gamut é renderizada recortada, e medir a declarada atestaria uma
+cor que ninguém vê. A prova está no próprio teste (\`a medição é do sRGB de
+saída\`), que confere a luminância medida contra a luminância recalculada a
+partir do hexadecimal emitido. A coluna \`hex\` abaixo é esse valor de saída.
 
 Superfícies medidas: ${SUPERFICIES.map((s) => `\`${s}\``).join(", ")}.
 

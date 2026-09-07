@@ -131,7 +131,7 @@ export default async function MeusMedicamentosPage({
             .gte("taken_at", startOfDayISO),
           supabase
             .from("medication_snoozes")
-            .select("medication_id, snoozed_until")
+            .select("medication_id, snoozed_until, scheduled_for")
             .eq("user_id", user.id)
             .gte("created_at", startOfDayISO),
         ]);
@@ -371,14 +371,20 @@ export default async function MeusMedicamentosPage({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          {!m.reminder_times?.length ? (
-                            <form action={logMedicationTakenAction}>
-                              <input type="hidden" name="medication_id" value={m.id} />
-                              <Button type="submit" variant="outline" size="sm">
-                                Registrar dose
-                              </Button>
-                            </form>
-                          ) : null}
+                          {/* Sem a condição `!m.reminder_times?.length`.
+                              Ela escondia o botão de todo item COM horário, e a
+                              outra superfície (Doses de hoje) só o mostrava no
+                              estado `pendente` — então um remédio agendado que
+                              estivesse adiado, ou tomado antes da janela, não
+                              tinha botão de registrar em lugar nenhum do app.
+                              Duas telas com regras diferentes deixaram um buraco
+                              no meio. Aqui o botão é incondicional. */}
+                          <form action={logMedicationTakenAction}>
+                            <input type="hidden" name="medication_id" value={m.id} />
+                            <Button type="submit" variant="outline" size="sm">
+                              Registrar dose
+                            </Button>
+                          </form>
                           {(() => {
                             const medLogs = todayLogs.filter((l) => l.medication_id === m.id);
                             const medSnoozes = todaySnoozes.filter((s) => s.medication_id === m.id);

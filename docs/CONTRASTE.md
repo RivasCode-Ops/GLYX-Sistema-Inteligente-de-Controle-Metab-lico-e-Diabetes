@@ -8,6 +8,13 @@ Conversão OKLCH → sRGB linear e luminância relativa WCAG em
 `lib/design/oklch.ts`. Alvo: **4.5:1** para corpo, **3:1** para
 texto grande e elemento de interface.
 
+**O que foi medido:** o sRGB **de saída**, depois do recorte de gamut — não a
+tripla OKLCH declarada. É o valor que o navegador pinta. A diferença importa:
+uma cor fora do gamut é renderizada recortada, e medir a declarada atestaria uma
+cor que ninguém vê. A prova está no próprio teste (`a medição é do sRGB de
+saída`), que confere a luminância medida contra a luminância recalculada a
+partir do hexadecimal emitido. A coluna `hex` abaixo é esse valor de saída.
+
 Superfícies medidas: `background-50`, `background-100`, `background-200`.
 
 ## Pares texto × superfície

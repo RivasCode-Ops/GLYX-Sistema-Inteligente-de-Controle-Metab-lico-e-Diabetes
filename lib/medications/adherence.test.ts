@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computePeriodAdherence, localDaysBetween } from "./adherence";
+import {
+  computeDoseStatus,
+  computePeriodAdherence,
+  doseWindows,
+  localDaysBetween,
+} from "./adherence";
 
 const TZ = "America/Sao_Paulo";
 
@@ -122,5 +127,71 @@ describe("computePeriodAdherence", () => {
     expect(r.expectedDoses).toBe(14);
     expect(r.takenDoses).toBe(14);
     expect(r.unmatchedLogs).toBe(0);
+  });
+});
+
+/**
+ * Regressão dos dois sintomas relatados — "o adiar se prorroga sozinho" e "o
+ * registro não é aceito". Reproduzidos em 07/09/2026, e a causa não era
+ * nenhuma das duas hipóteses do briefing: o job não recalcula nada e o servidor
+ * nunca recusou registro.
+ *
+ * O que havia: `computeDoseStatus` aceitava QUALQUER adiamento do remédio para
+ * marcar QUALQUER dose vencida dele como "adiada" — e, como o botão de
+ * registrar só existia no estado `pendente`, a dose ficava sem caminho de
+ * registro na tela. Adiar uma dose apagava o botão de outra.
+ */
+describe("adiamento pertence à dose, não ao remédio", () => {
+  const janelas = () => doseWindows(["08:00", "20:00"], 2026, 9, 7, TZ);
+  /** 21:00 local — as duas doses já venceram. */
+  const AGORA = Date.UTC(2026, 8, 8, 0, 0);
+  const ate = (h: number, m: number) => new Date(Date.UTC(2026, 8, h < 3 ? 8 : 7, h, m)).toISOString();
+
+  it("um adiamento da dose das 08:00 não marca a das 20:00", () => {
+    const [oito, vinte] = janelas();
+    const snoozes = [
+      { snoozed_until: ate(0, 30), scheduled_for: oito.scheduledUTC.toISOString() },
+    ];
+    expect(
+      computeDoseStatus(oito.scheduledUTC, oito.windowEndUTC, [], snoozes, new Set(), AGORA).state
+    ).toBe("adiada");
+    expect(
+      computeDoseStatus(vinte.scheduledUTC, vinte.windowEndUTC, [], snoozes, new Set(), AGORA).state
+    ).toBe("pendente");
+  });
+
+  it("linha antiga, sem scheduled_for, vale só para a dose cuja janela contém o retorno", () => {
+    const [oito, vinte] = janelas();
+    // Retorno às 21:30 local: ainda no futuro (agora são 21:00) e dentro da
+    // janela da dose das 20:00, que vai até o fim do dia local.
+    const snoozes = [{ snoozed_until: ate(0, 30) }];
+    expect(
+      computeDoseStatus(vinte.scheduledUTC, vinte.windowEndUTC, [], snoozes, new Set(), AGORA).state
+    ).toBe("adiada");
+    expect(
+      computeDoseStatus(oito.scheduledUTC, oito.windowEndUTC, [], snoozes, new Set(), AGORA).state
+    ).toBe("pendente");
+  });
+
+  it("com vários adiamentos da mesma dose, vale o de maior retorno — não a ordem do array", () => {
+    const [oito] = janelas();
+    const alvo = oito.scheduledUTC.toISOString();
+    const cedo = { snoozed_until: ate(0, 10), scheduled_for: alvo };
+    const tarde = { snoozed_until: ate(0, 50), scheduled_for: alvo };
+    for (const ordem of [[cedo, tarde], [tarde, cedo]]) {
+      const s = computeDoseStatus(oito.scheduledUTC, oito.windowEndUTC, [], ordem, new Set(), AGORA);
+      expect(s.state).toBe("adiada");
+      if (s.state === "adiada") expect(s.until).toBe(tarde.snoozed_until);
+    }
+  });
+
+  it("registro vence adiamento: dose tomada não volta a aparecer como adiada", () => {
+    const [oito] = janelas();
+    const snoozes = [
+      { snoozed_until: ate(0, 30), scheduled_for: oito.scheduledUTC.toISOString() },
+    ];
+    const logs = [{ taken_at: new Date(Date.UTC(2026, 8, 7, 11, 5)).toISOString() }];
+    const s = computeDoseStatus(oito.scheduledUTC, oito.windowEndUTC, logs, snoozes, new Set(), AGORA);
+    expect(s.state).toBe("tomada");
   });
 });

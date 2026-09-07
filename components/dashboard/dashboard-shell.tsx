@@ -17,6 +17,9 @@ import type { MetabolicAlert } from "@/types/database";
 
 type Props = {
   latestGlucose: number | null;
+  latestGlucoseAgeLabel?: string | null;
+  latestGlucoseFreshness?: import("@/lib/health/reading-freshness").Freshness | null;
+  glucoseTrend?: "up" | "down" | "flat" | null;
   glucoseSeries: number[];
   carbsToday: number;
   activeMinutes: number;
@@ -31,6 +34,9 @@ type Props = {
 
 export function DashboardShell({
   latestGlucose,
+  latestGlucoseAgeLabel = null,
+  latestGlucoseFreshness = null,
+  glucoseTrend = null,
   glucoseSeries,
   carbsToday,
   activeMinutes,
@@ -49,6 +55,9 @@ export function DashboardShell({
       <div className="grid gap-4 md:grid-cols-2">
         <GlucoseHeroCard
           latestGlucose={latestGlucose}
+          latestGlucoseAgeLabel={latestGlucoseAgeLabel}
+          latestGlucoseFreshness={latestGlucoseFreshness}
+          glucoseTrend={glucoseTrend}
           glucoseSeries={glucoseSeries}
           riskLabel={riskLabel}
           carbsToday={carbsToday}

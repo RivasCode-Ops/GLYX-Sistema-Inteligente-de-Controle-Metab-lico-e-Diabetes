@@ -71,7 +71,7 @@ export default async function MedicacaoDosesPage() {
             .gte("taken_at", startOfDayISO),
           supabase
             .from("medication_snoozes")
-            .select("medication_id, snoozed_until")
+            .select("medication_id, snoozed_until, scheduled_for")
             .eq("user_id", user.id)
             .gte("created_at", startOfDayISO),
           supabase

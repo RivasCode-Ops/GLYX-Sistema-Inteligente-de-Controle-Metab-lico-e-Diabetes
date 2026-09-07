@@ -23,7 +23,14 @@
 import { localDayRangeUTC, wallClockToUTC } from "@/lib/time/local-day";
 
 export type DoseLog = { taken_at: string };
-export type DoseSnooze = { snoozed_until: string };
+export type DoseSnooze = {
+  snoozed_until: string;
+  /**
+   * Qual dose este adiamento empurra. Nulo nas linhas anteriores à migration
+   * `20260907132000_snooze_invariants`.
+   */
+  scheduled_for?: string | null;
+};
 
 export type DoseStatus =
   | { state: "tomada"; at: string }
@@ -75,7 +82,29 @@ export function computeDoseStatus(
     usedLogs.add(match.taken_at);
     return { state: "tomada", at: match.taken_at };
   }
-  const snooze = medSnoozes.find((s) => new Date(s.snoozed_until).getTime() > now);
+  // O adiamento é DESTA dose, não do remédio.
+  //
+  // Antes bastava existir qualquer snooze do remédio com `snoozed_until` no
+  // futuro para TODA dose vencida dele aparecer como "adiada" — e, como o botão
+  // de registrar só existia no estado `pendente`, a dose ficava impossível de
+  // registrar pela tela. Adiar a dose das 08:00 tirava o botão da dose das
+  // 20:00. Adiar de novo estendia o efeito: da parte de quem usa, o horário se
+  // prorrogava sozinho e o registro era recusado. Reproduzido em teste antes
+  // desta correção.
+  //
+  // `scheduled_for` amarra o adiamento à dose. Linha antiga não tem a coluna:
+  // para ela, vale só se o retorno cair dentro da janela desta dose — o que
+  // também marca no máximo uma. E entre as candidatas vence a de maior
+  // `snoozed_until`, para o estado não depender da ordem do array.
+  const desteDose = medSnoozes.filter((s) => {
+    const ate = new Date(s.snoozed_until).getTime();
+    if (!(ate > now)) return false;
+    if (s.scheduled_for) return new Date(s.scheduled_for).getTime() === t;
+    return ate >= t && ate <= end;
+  });
+  const snooze = desteDose.sort(
+    (a, b) => new Date(b.snoozed_until).getTime() - new Date(a.snoozed_until).getTime()
+  )[0];
   if (snooze && t <= now) return { state: "adiada", until: snooze.snoozed_until };
   if (t > now) return { state: "agendada" };
   return { state: "pendente" };

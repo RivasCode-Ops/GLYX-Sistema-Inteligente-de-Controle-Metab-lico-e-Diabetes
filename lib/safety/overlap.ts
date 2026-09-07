@@ -21,6 +21,12 @@ export type ScheduledDose = {
   at: string;
   durationHours: number;
   source: "reminder" | "insulin_log";
+  /**
+   * Em que dia esta dose ocorreu, relativo ao dia avaliado. 0 = hoje,
+   * -1 = ontem. Existe para o chamador poder passar um registro real de dia
+   * anterior — `at` sozinho é hora do dia e não sabe dizer de que dia é.
+   */
+  dayOffset?: number;
 };
 
 export type OverlapWindow = {
@@ -81,33 +87,54 @@ export function buildOverlapReport(
   const intervalos: { inicio: number; fim: number; dose: ScheduledDose; mecanismos: string[] }[] = [];
 
   for (const d of doses) {
-    const inicio = paraMinutos(d.at);
+    const horaDoDia = paraMinutos(d.at);
     const mecanismos = baixamPorCanonical.get(d.canonical) ?? [];
 
     // Sem horário, sem duração utilizável, ou sem mecanismo hipoglicemiante
     // conhecido: fica de fora do cálculo E aparece na lista. Sumir calado é o
     // que faria o número enganar — a janela teria sido calculada sem o item.
-    if (inicio === null || !(d.durationHours > 0) || mecanismos.length === 0) {
+    if (horaDoDia === null || !(d.durationHours > 0) || mecanismos.length === 0) {
       unscheduled.push(d.name);
       continue;
     }
 
-    // Recorte no fim do dia. Uma dose de ação longa segue agindo depois da
-    // meia-noite, e este relatório é do dia — ver a limitação declarada abaixo.
-    const fim = Math.min(inicio + d.durationHours * 60, MINUTOS_NO_DIA);
-    if (fim <= inicio) {
-      unscheduled.push(d.name);
-      continue;
+    const duracao = d.durationHours * 60;
+    const base = horaDoDia + (d.dayOffset ?? 0) * MINUTOS_NO_DIA;
+
+    // ---------------------------------------------------------------------
+    // Projeção das doses anteriores — a correção de 07/09/2026
+    // ---------------------------------------------------------------------
+    // A versão anterior olhava só as doses do dia, e o efeito era grave: uma
+    // basal de 24 h tomada às 22:00 nunca aparecia em janela nenhuma antes das
+    // 22:00. Ou seja, a JANELA DA TARDE — onde a hipoglicemia acontece —
+    // nunca contava insulina basal, justamente a que está ativa 24 h por dia.
+    // Um alerta de concentração de mecanismos que descarta a basal erra para o
+    // lado perigoso.
+    //
+    // `reminder` é regime DIÁRIO por definição (vem de `reminder_times`), então
+    // as ocorrências dos dias anteriores são projetadas. Quantos dias: os que a
+    // própria duração exigir. Fixar 48 h cobriria a basal e continuaria
+    // perdendo o GLP-1 semanal, que tem 168 h no seed — o mesmo defeito, uma
+    // substância adiante.
+    //
+    // `insulin_log` NÃO é projetado: é aplicação avulsa, e repeti-la como se
+    // fosse diária inventaria dose que não aconteceu. Registro real de dia
+    // anterior chega pelo `dayOffset`.
+    const diasParaTras =
+      d.source === "reminder" ? Math.ceil(d.durationHours / 24) : 0;
+
+    for (let k = 0; k <= diasParaTras; k += 1) {
+      const inicioBruto = base - k * MINUTOS_NO_DIA;
+      const fimBruto = inicioBruto + duracao;
+
+      // Recorte no dia avaliado. Fora dele a ocorrência não interessa.
+      const inicio = Math.max(inicioBruto, 0);
+      const fim = Math.min(fimBruto, MINUTOS_NO_DIA);
+      if (fim <= inicio) continue;
+
+      intervalos.push({ inicio, fim, dose: d, mecanismos });
     }
-    intervalos.push({ inicio, fim, dose: d, mecanismos });
   }
-
-  // LIMITAÇÃO DECLARADA: a dose de ONTEM que ainda está agindo não é projetada
-  // neste dia. Para insulina basal de 24 h tomada às 22:00, isso significa que
-  // as janelas da manhã não a contam. A contagem é, portanto, um PISO — nunca
-  // superestima, pode subestimar. Projetar a dose anterior mudaria a contagem
-  // esperada do caso de referência (15:00–17:00 passaria de 4 para 5), então é
-  // decisão de curadoria, não de implementação.
 
   // Varredura por evento: os pontos de início e fim recortam o dia em
   // intervalos elementares, e dentro de cada um o conjunto ativo não muda.
@@ -127,12 +154,16 @@ export function buildOverlapReport(
     const mecanismos = [...new Set(ativos.flatMap((a) => a.mecanismos))].sort();
     if (mecanismos.length < MIN_MECHANISMS) continue;
 
+    // A mesma dose pode estar ativa por duas ocorrências (a de ontem terminando
+    // e a de hoje começando). Na lista ela aparece uma vez.
+    const dosesAtivas = [...new Set(ativos.map((a) => a.dose))];
+
     windows.push({
       from: paraHHMM(de),
       to: paraHHMM(ate),
       mechanismCount: mecanismos.length,
       mechanisms: mecanismos,
-      doses: ativos.map((a) => a.dose),
+      doses: dosesAtivas,
     });
   }
 
