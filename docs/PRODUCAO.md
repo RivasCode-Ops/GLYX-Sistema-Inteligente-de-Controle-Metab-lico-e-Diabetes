@@ -53,6 +53,39 @@ Recentemente indispensáveis (se o projeto já estava em produção antes desta 
 
 Sem a #2, upsert Dexcom / PK composta falha.
 
+### 2.1 A ordem importa: migration ANTES do deploy de código
+
+Nesta leva a ordem deixou de ser boa prática e virou requisito. O código já lê e
+**grava** colunas e tabelas que só existem depois das migrations de 07/09/2026 —
+subir o código antes quebra funções que hoje funcionam:
+
+| se faltar | quebra |
+|---|---|
+| `medication_logs.scheduled_for` / `adherence_status` | **"Marcar como tomada" para de gravar.** O PostgREST recusa o insert inteiro quando a coluna não existe — não é degradação, é falha total do registro de dose |
+| `medications.timing_strictness` | **O adiar devolve 404.** A rota seleciona a coluna, recebe erro, e trata o remédio como inexistente |
+| `medication_snoozes.scheduled_for` | O adiamento volta a marcar todas as doses do remédio (o defeito corrigido em 07/09) |
+| `hypo_plan` / `hypo_events` | O card de ação não aparece; a tela de plano mostra "sem plano" para sempre |
+| `substance_aliases` / `substance_interactions` / `substance_mechanisms` | O checador de interação não encontra nada — **e ausência de achado não é ausência de risco** |
+
+Migrations desta leva, em ordem:
+
+```
+20260907120000_substance_safety.sql
+20260907130000_timing_strictness.sql
+20260907131000_adherence_status.sql
+20260907132000_snooze_invariants.sql
+20260907140000_substance_mechanisms.sql
+20260907150000_medication_cadence.sql
+20260907160000_hypo_plan.sql
+```
+
+Todas são aditivas (colunas e tabelas novas, com backfill). Nenhuma apaga ou
+reescreve dado existente.
+
+> **Não há fallback no código para coluna ausente, de propósito.** Tolerar a
+> falta silenciaria justamente o estado que precisa ser barulhento: um app de
+> diabetes rodando com o checador de interação vazio parece funcionar.
+
 ## 3. `pg_cron` ↔ domínio e segredo
 
 As functions SQL chamam o domínio Vercel com `x-cron-secret`. **Nenhum valor fica em literal no
