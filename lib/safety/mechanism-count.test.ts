@@ -33,7 +33,7 @@ describe("contagem de mecanismos", () => {
     expect(r.loweringCount).toBe(5);
     expect(r.lowering.map((m) => m.mechanism).sort()).toEqual([
       "glicosuria_renal",
-      "incretina",
+      "incretina_dpp4",
       "insulina_exogena_basal",
       "insulina_exogena_rapida",
       "sensibilizador_amp",
@@ -125,5 +125,37 @@ describe("seed de mecanismos", () => {
     for (const m of MECHANISMS) {
       expect(m.typicalDurationHours, m.canonical).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * Regressão da subcontagem corrigida em 07/09/2026.
+ *
+ * `inibidor_dpp4` e `agonista_glp1` compartilhavam a chave `incretina`, então
+ * a deduplicação tratava Januvia + Ozempic como UMA via. São vias separadas: o
+ * inibidor de DPP-4 prolonga a incretina que o corpo produz, o agonista de
+ * GLP-1 é agonismo exógeno do receptor. Num alerta de concentração de
+ * mecanismos, subcontar é o erro que não dispara.
+ */
+describe("DPP-4 e GLP-1 são vias separadas", () => {
+  it("Januvia + Ozempic contam 2 mecanismos, não 1", () => {
+    const r = buildMechanismReport(
+      [emUso("Januvia 100mg"), emUso("Ozempic 1mg")],
+      MECHANISMS
+    );
+    expect(r.loweringCount).toBe(2);
+    expect(r.lowering.map((m) => m.mechanism).sort()).toEqual([
+      "incretina_dpp4",
+      "incretina_glp1",
+    ]);
+  });
+
+  it("a dedução por chave compartilhada continua valendo para sinônimo real", () => {
+    // Os sete sensibilizadores seguem sendo UMA via — a chave estava certa lá.
+    const r = buildMechanismReport(
+      [emUso("Berberina"), emUso("Gymnema"), emUso("Feno grego")],
+      MECHANISMS
+    );
+    expect(r.loweringCount).toBe(1);
   });
 });

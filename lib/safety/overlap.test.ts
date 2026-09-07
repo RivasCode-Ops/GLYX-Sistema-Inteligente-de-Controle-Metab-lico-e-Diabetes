@@ -4,15 +4,17 @@ import { buildOverlapReport, type ScheduledDose } from "./overlap";
 
 const MECHANISMS = seedMechanisms();
 
+/** Cadência diária por padrão — é o que o backfill dá a todo item com horário. */
 function dose(
   canonical: string,
   name: string,
   at: string,
   durationHours: number,
   source: ScheduledDose["source"] = "reminder",
-  dayOffset?: number
+  dayOffset?: number,
+  cadence: ScheduledDose["cadence"] = { kind: "diaria" }
 ): ScheduledDose {
-  return { canonical, name, at, durationHours, source, dayOffset };
+  return { canonical, name, at, durationHours, source, dayOffset, cadence };
 }
 
 /**
@@ -49,7 +51,7 @@ describe("sobreposição de janelas", () => {
   it("a insulina basal do dia anterior está entre eles", () => {
     expect(r.peak?.mechanisms).toEqual([
       "glicosuria_renal",
-      "incretina",
+      "incretina_dpp4",
       "insulina_exogena_basal",
       "insulina_exogena_rapida",
       "sensibilizador_amp",
@@ -112,19 +114,88 @@ describe("projeção da dose anterior", () => {
 
   /**
    * Fixar 48 h cobriria a basal e continuaria perdendo o GLP-1 semanal, que
-   * tem 168 h no seed — o mesmo defeito, uma substância adiante.
+   * tem 168 h no seed — o mesmo defeito, uma substância adiante. A janela
+   * alcança; quem decide se houve dose naquele dia é a cadência.
    */
   it("GLP-1 semanal continua ativo dias depois da aplicação", () => {
+    // Aplicado na quarta (3); o dia avaliado é sábado (6).
     const r = buildOverlapReport(
       [
-        dose("agonista_glp1", "Ozempic", "10:00", 168),
+        dose("agonista_glp1", "Ozempic", "10:00", 168, "reminder", undefined, {
+          kind: "semanal",
+          weekday: 3,
+        }),
         dose("insulina_basal", "Lantus", "22:00", 24),
         dose("berberina", "Berberina", "09:00", 8),
       ],
-      MECHANISMS
+      MECHANISMS,
+      { weekday: 6 }
     );
     const manha = r.windows.find((w) => w.from <= "10:00" && w.to > "10:00");
-    expect(manha?.mechanisms).toContain("incretina");
+    expect(manha?.mechanisms).toContain("incretina_glp1");
+  });
+
+  /**
+   * O defeito que a cadência existe para fechar: sem ela, o semanal era
+   * projetado como diário e virava sete aplicações onde há uma.
+   */
+  it("semanal não é projetado como diário", () => {
+    const semanal = dose("agonista_glp1", "Ozempic", "10:00", 168, "reminder", undefined, {
+      kind: "semanal",
+      weekday: 3,
+    });
+    const r = buildOverlapReport([semanal], MECHANISMS, { weekday: 6 });
+    // Uma única aplicação alcança o dia: a de quarta. As janelas do dia são
+    // contínuas, sem as seis ocorrências extras que a projeção diária criava.
+    const ocorrencias = r.windows.length + r.unscheduled.length;
+    expect(ocorrencias).toBeLessThanOrEqual(1);
+  });
+
+  it("sem cadência declarada, a dose entra só no dia dela", () => {
+    const semCadencia = dose("insulina_basal", "Lantus", "22:00", 24, "reminder", undefined, null);
+    const acompanhantes = [
+      dose("inibidor_sglt2", "Jardiance", "08:00", 24),
+      dose("inibidor_dpp4", "Januvia", "08:00", 24),
+      dose("metformina", "Glifage", "08:00", 12),
+    ];
+    const r = buildOverlapReport([semCadencia, ...acompanhantes], MECHANISMS);
+    // A janela das 15:00 existe (três vias diárias), e a basal NÃO está nela:
+    // a Lantus de hoje ainda não foi tomada e, sem cadência, o app não afirma
+    // que houve uma ontem.
+    const asQuinze = r.windows.find((w) => w.from <= "15:00" && w.to > "15:00");
+    expect(asQuinze).toBeDefined();
+    expect(asQuinze?.mechanisms).not.toContain("insulina_exogena_basal");
+
+    // A MESMA dose, agora com cadência diária declarada, aparece.
+    const comCadencia = buildOverlapReport(
+      [{ ...semCadencia, cadence: { kind: "diaria" } }, ...acompanhantes],
+      MECHANISMS
+    );
+    const mesmaJanela = comCadencia.windows.find((w) => w.from <= "15:00" && w.to > "15:00");
+    expect(mesmaJanela?.mechanisms).toContain("insulina_exogena_basal");
+  });
+
+  it("cadência por intervalo projeta só nos múltiplos", () => {
+    const cada3 = (anchorDaysAgo: number) =>
+      dose("agonista_glp1", "Trulicity", "10:00", 168, "reminder", undefined, {
+        kind: "intervalo",
+        days: 3,
+        anchorDaysAgo,
+      });
+    const base = [
+      dose("insulina_basal", "Lantus", "22:00", 24),
+      dose("metformina", "Glifage", "08:00", 12),
+    ];
+
+    // Âncora 6 dias atrás: ocorrências em 6, 3 e 0 — o dia avaliado é múltiplo.
+    const noDia = buildOverlapReport([cada3(6), ...base], MECHANISMS);
+    const manha = noDia.windows.find((w) => w.from <= "10:00" && w.to > "10:00");
+    expect(manha?.mechanisms).toContain("incretina_glp1");
+
+    // Âncora 7 dias atrás: ocorrências em 7 e 4 — nenhuma em 0. A janela de
+    // 168 h da aplicação de 4 dias atrás ainda alcança o dia, e é ela que conta.
+    const foraDoDia = buildOverlapReport([cada3(7), ...base], MECHANISMS);
+    expect(foraDoDia.windows.some((w) => w.mechanisms.includes("incretina_glp1"))).toBe(true);
   });
 });
 

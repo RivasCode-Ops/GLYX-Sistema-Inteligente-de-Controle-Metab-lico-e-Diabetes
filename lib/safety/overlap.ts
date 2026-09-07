@@ -14,6 +14,21 @@ import type { MechanismRow } from "./mechanism-count";
  * sobreposição, não para prever efeito, e o usuário pode sobrescrever cada uma.
  */
 
+/**
+ * Com que frequência o item é tomado — `medications.cadence`.
+ *
+ * NULO/ausente significa frequência NÃO DECLARADA, e o cálculo não projeta
+ * doses de dias anteriores para o item. Projetar sem saber a cadência foi o que
+ * fez um GLP-1 semanal (168 h de janela) ser contado como se houvesse uma
+ * aplicação por dia: sete doses onde há uma.
+ */
+export type DoseCadence =
+  | { kind: "diaria" }
+  /** `weekday` 0 = domingo … 6 = sábado. */
+  | { kind: "semanal"; weekday: number }
+  /** A cada `days` dias, contados a partir de uma referência `anchorDaysAgo` dias atrás. */
+  | { kind: "intervalo"; days: number; anchorDaysAgo: number };
+
 export type ScheduledDose = {
   canonical: string;
   name: string;
@@ -27,6 +42,13 @@ export type ScheduledDose = {
    * anterior — `at` sozinho é hora do dia e não sabe dizer de que dia é.
    */
   dayOffset?: number;
+  /** Frequência declarada. Sem ela, a dose entra só no dia dela. */
+  cadence?: DoseCadence | null;
+};
+
+export type OverlapOptions = {
+  /** Dia da semana do dia avaliado, 0 = domingo. Necessário para cadência semanal. */
+  weekday?: number;
 };
 
 export type OverlapWindow = {
@@ -70,9 +92,40 @@ function paraHHMM(minutos: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
+/**
+ * A dose ocorreu `k` dias antes do dia avaliado?
+ *
+ * A cadência decide TODOS os dias, inclusive o próprio. Tratar `k = 0` como
+ * certo seria dizer que um semanal foi tomado hoje só porque está cadastrado —
+ * e para um semanal de duração curta isso o mostraria ativo nos sete dias.
+ *
+ * `insulin_log` é aplicação que aconteceu: vale no dia dela e em nenhum outro.
+ * Cadência ausente vale só no próprio dia — não se projeta o que não se sabe.
+ */
+function ocorreuHa(k: number, dose: ScheduledDose, weekday: number | undefined): boolean {
+  if (dose.source === "insulin_log") return k === 0;
+
+  const c = dose.cadence;
+  if (!c) return k === 0;
+
+  switch (c.kind) {
+    case "diaria":
+      return true;
+    case "semanal": {
+      // Sem saber o dia da semana do dia avaliado não há como situar a
+      // ocorrência; sobra o próprio dia, que é o que o chamador afirmou.
+      if (weekday === undefined) return k === 0;
+      return (((weekday - k) % 7) + 7) % 7 === c.weekday;
+    }
+    case "intervalo":
+      return c.days > 0 && (((c.anchorDaysAgo - k) % c.days) + c.days) % c.days === 0;
+  }
+}
+
 export function buildOverlapReport(
   doses: ScheduledDose[],
-  mechanisms: MechanismRow[]
+  mechanisms: MechanismRow[],
+  options: OverlapOptions = {}
 ): OverlapReport {
   // Só mecanismos que reduzem glicemia entram na contagem.
   const baixamPorCanonical = new Map<string, string[]>();
@@ -111,19 +164,20 @@ export function buildOverlapReport(
     // Um alerta de concentração de mecanismos que descarta a basal erra para o
     // lado perigoso.
     //
-    // `reminder` é regime DIÁRIO por definição (vem de `reminder_times`), então
-    // as ocorrências dos dias anteriores são projetadas. Quantos dias: os que a
-    // própria duração exigir. Fixar 48 h cobriria a basal e continuaria
-    // perdendo o GLP-1 semanal, que tem 168 h no seed — o mesmo defeito, uma
-    // substância adiante.
+    // Até onde olhar para trás: o que a própria duração exigir. Fixar 48 h
+    // cobriria a basal e continuaria perdendo o GLP-1 semanal, que tem 168 h no
+    // seed — o mesmo defeito, uma substância adiante.
     //
-    // `insulin_log` NÃO é projetado: é aplicação avulsa, e repeti-la como se
-    // fosse diária inventaria dose que não aconteceu. Registro real de dia
-    // anterior chega pelo `dayOffset`.
+    // QUAIS desses dias tiveram dose é decisão da CADÊNCIA, não da duração.
+    // Antes, todo `reminder` era projetado como diário, e um semanal virava
+    // sete aplicações onde há uma. `insulin_log` continua sem projeção: é
+    // aplicação avulsa, e repeti-la inventaria dose que não aconteceu —
+    // registro real de dia anterior chega pelo `dayOffset`.
     const diasParaTras =
       d.source === "reminder" ? Math.ceil(d.durationHours / 24) : 0;
 
     for (let k = 0; k <= diasParaTras; k += 1) {
+      if (!ocorreuHa(k, d, options.weekday)) continue;
       const inicioBruto = base - k * MINUTOS_NO_DIA;
       const fimBruto = inicioBruto + duracao;
 

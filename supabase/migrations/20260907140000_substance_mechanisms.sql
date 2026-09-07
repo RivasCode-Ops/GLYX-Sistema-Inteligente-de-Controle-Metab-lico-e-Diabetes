@@ -90,11 +90,22 @@ insert into public.substance_mechanisms
   ('inibidor_sglt2',    'glicosuria_renal',        true,
    'Excreção renal de glicose', 24.0),
 
-  ('inibidor_dpp4',     'incretina',               true,
-   'Via incretina', 24.0),
+  -- DPP-4 e GLP-1 são vias SEPARADAS, e não a mesma "via incretina".
+  --
+  -- O inibidor de DPP-4 prolonga a incretina que o próprio corpo produz; o
+  -- agonista de GLP-1 é agonismo exógeno do receptor, independente da produção
+  -- endógena. Compartilhar a chave `incretina` fazia a deduplicação tratar
+  -- Januvia + Ozempic como UMA via — subcontagem, que num alerta de
+  -- concentração de mecanismos é o erro que não dispara.
+  --
+  -- A deduplicação por mecanismo continua certa; o que estava errado era a
+  -- chave. Ela vale para sinônimo farmacológico (os sete sensibilizadores),
+  -- não para vias distintas com nome de família parecido.
+  ('inibidor_dpp4',     'incretina_dpp4',          true,
+   'Via incretina (DPP-4)', 24.0),
 
-  ('agonista_glp1',     'incretina',               true,
-   'Via incretina', 168.0),
+  ('agonista_glp1',     'incretina_glp1',          true,
+   'Via incretina (GLP-1)', 168.0),
 
   ('berberina',         'sensibilizador_amp',      true,
    'Sensibilizador à insulina', 8.0),

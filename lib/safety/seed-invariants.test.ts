@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { seedAliases, seedInteractions, severityCheckVocabulary } from "./__fixtures__/read-seed";
+import {
+  seedAliases,
+  seedInteractions,
+  seedMechanisms,
+  severityCheckVocabulary,
+} from "./__fixtures__/read-seed";
 import { normalizeSubstanceText } from "./normalize";
 import { orderPair } from "./interaction-check";
 
@@ -107,5 +112,53 @@ describe("substance_interactions", () => {
     const citados = new Set(INTERACTIONS.flatMap((i) => [i.substanceA, i.substanceB]));
     expect(citados.has("vitamina_d3")).toBe(false);
     expect(citados.has("omega3")).toBe(false);
+  });
+});
+
+/**
+ * Compartilhar chave de mecanismo é DECISÃO, não descuido.
+ *
+ * A chave `mechanism` é o que a contagem deduplica: dois canônicos com a mesma
+ * chave viram uma via só. Isso está certo para sinônimo farmacológico — os sete
+ * suplementos que sensibilizam à insulina — e estava ERRADO para `incretina`,
+ * que juntava inibidor de DPP-4 (prolonga a incretina endógena) com agonista de
+ * GLP-1 (agonismo exógeno do receptor). Um usuário nos dois contava 1 via em
+ * vez de 2, e num alerta de concentração subcontar é o erro que não dispara.
+ *
+ * A lista abaixo é a única forma de compartilhar chave. Um seed novo que junte
+ * duas classes sem passar por aqui reprova — o que força a pergunta "isso é
+ * mesmo a mesma via?" no momento de escrever, e não depois do incidente.
+ */
+const CHAVES_COMPARTILHADAS_INTENCIONALMENTE: Record<string, string> = {
+  sensibilizador_amp:
+    "berberina, gymnema, cromo, ALA, feno-grego, melão e canela agem pela mesma via de sensibilização; metformina idem",
+};
+
+describe("deduplicação por mecanismo", () => {
+  const MECANISMOS = seedMechanisms();
+
+  it("toda chave usada por mais de um canônico está declarada", () => {
+    const porChave = new Map<string, string[]>();
+    for (const m of MECANISMOS) {
+      porChave.set(m.mechanism, [...(porChave.get(m.mechanism) ?? []), m.canonical]);
+    }
+    const compartilhadas = [...porChave.entries()].filter(([, slugs]) => slugs.length > 1);
+    for (const [chave, slugs] of compartilhadas) {
+      expect(
+        CHAVES_COMPARTILHADAS_INTENCIONALMENTE[chave],
+        `'${chave}' é compartilhada por ${slugs.join(", ")} sem declaração`
+      ).toBeDefined();
+    }
+  });
+
+  it("a chave 'incretina' genérica não voltou", () => {
+    expect(MECANISMOS.map((m) => m.mechanism)).not.toContain("incretina");
+  });
+
+  it("DPP-4 e GLP-1 têm chaves próprias", () => {
+    const chave = (slug: string) =>
+      MECANISMOS.filter((m) => m.canonical === slug).map((m) => m.mechanism);
+    expect(chave("inibidor_dpp4")).toEqual(["incretina_dpp4"]);
+    expect(chave("agonista_glp1")).toEqual(["incretina_glp1"]);
   });
 });
