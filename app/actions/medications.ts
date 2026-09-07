@@ -6,6 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
 import { namesLookSimilar } from "@/lib/medications/similar";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  resolveAdherenceStatus,
+  type AdherenceStatus,
+  type TimingStrictness,
+} from "@/lib/medications/adherence-status";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const LABEL_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
@@ -300,7 +305,23 @@ export async function deactivateMedication(formData: FormData): Promise<ActionRe
   return { ok: true };
 }
 
-export async function logMedicationTaken(formData: FormData): Promise<ActionResult> {
+/**
+ * Grava um registro de dose.
+ *
+ * O APP NUNCA RECUSA REGISTRO. Não há, e não pode passar a haver, nenhuma
+ * validação de horário aqui: recusar registro atrasado não melhora adesão,
+ * apaga o dado. O usuário toma o item de qualquer forma, e o banco passa a
+ * afirmar que ele não tomou — histórico falso que alimenta o checador de
+ * interação, o contador de mecanismos e o relatório do médico.
+ *
+ * `adherence_status` é derivado e gravado junto, como RÓTULO. Falha ao derivar
+ * não impede a gravação: o registro entra como avulso, porque perder o dado
+ * seria pior que perder a classificação dele.
+ */
+async function inserirRegistroDeDose(
+  medicationId: string,
+  confirmed: boolean
+): Promise<ActionResult> {
   const supabase = await createClient();
   if (!supabase) return { error: "Configure o Supabase (.env.local)." };
 
@@ -309,13 +330,47 @@ export async function logMedicationTaken(formData: FormData): Promise<ActionResu
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
 
-  const medicationId = formData.get("medication_id") as string | null;
-  if (!medicationId) return { error: "Medicamento inválido." };
+  const takenAt = new Date();
+  let status: AdherenceStatus = "avulso";
+  let scheduledFor: Date | null = null;
+
+  try {
+    const [{ data: med }, { data: profile }] = await Promise.all([
+      supabase
+        .from("medications")
+        .select("reminder_times, timing_strictness, grace_minutes")
+        .eq("id", medicationId)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    ]);
+
+    if (med) {
+      const derivado = resolveAdherenceStatus({
+        reminderTimes: (med.reminder_times as string[] | null) ?? null,
+        strictness: (med.timing_strictness as TimingStrictness | null) ?? "flexivel",
+        graceMinutes: (med.grace_minutes as number | null) ?? null,
+        takenAt,
+        timeZone: profile?.timezone || "America/Sao_Paulo",
+      });
+      status = derivado.status;
+      scheduledFor = derivado.scheduledFor;
+    }
+  } catch {
+    /* segue como avulso: o registro importa mais que o rótulo dele */
+  }
+
+  // "Pulei hoje" é sempre fora_janela: preserva a diferença entre "não tomei" e
+  // "não registrei", que é o que o SYSTEM do copiloto já manda não confundir.
+  if (!confirmed) status = "fora_janela";
 
   const { error } = await supabase.from("medication_logs").insert({
     user_id: user.id,
     medication_id: medicationId,
-    confirmed: true,
+    confirmed,
+    taken_at: takenAt.toISOString(),
+    scheduled_for: scheduledFor?.toISOString() ?? null,
+    adherence_status: status,
   });
 
   if (error) return { error: error.message };
@@ -323,4 +378,23 @@ export async function logMedicationTaken(formData: FormData): Promise<ActionResu
   revalidatePath("/medicacao");
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+export async function logMedicationTaken(formData: FormData): Promise<ActionResult> {
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+  return inserirRegistroDeDose(medicationId, true);
+}
+
+/**
+ * "Pulei hoje" — ação distinta de adiar e de registrar.
+ *
+ * Grava `confirmed = false`. Dose pulada e dose não registrada são coisas
+ * diferentes: a primeira é informação, a segunda é lacuna, e contá-las juntas
+ * é o que faz o relatório do médico mentir nas duas direções.
+ */
+export async function logMedicationSkipped(formData: FormData): Promise<ActionResult> {
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+  return inserirRegistroDeDose(medicationId, false);
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AliasRow, InteractionFinding, Severity } from "../interaction-check";
+import type { MechanismRow } from "../mechanism-count";
 
 /**
  * Lê o seed real da migration de segurança.
@@ -18,19 +19,21 @@ import type { AliasRow, InteractionFinding, Severity } from "../interaction-chec
  * Só é importado por arquivos de teste — fica fora do bundle do app.
  */
 
-const MIGRATION = join(
-  process.cwd(),
-  "supabase",
-  "migrations",
-  "20260907120000_substance_safety.sql"
-);
+const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
+
+const MIGRATION_INTERACOES = join(MIGRATIONS_DIR, "20260907120000_substance_safety.sql");
+const MIGRATION_MECANISMOS = join(MIGRATIONS_DIR, "20260907140000_substance_mechanisms.sql");
 
 /** SQL sem comentários de linha. Nenhuma string do seed contém `--`. */
-function sql(): string {
-  return readFileSync(MIGRATION, "utf8")
+function lerSql(caminho: string): string {
+  return readFileSync(caminho, "utf8")
     .split(/\r?\n/)
     .map((line) => line.replace(/--.*$/, ""))
     .join("\n");
+}
+
+function sql(): string {
+  return lerSql(MIGRATION_INTERACOES);
 }
 
 /**
@@ -40,8 +43,7 @@ function sql(): string {
  * tupla: as mensagens clínicas contêm vírgulas, e um split ingênuo por vírgula
  * partiria a mensagem no meio.
  */
-function tuplesFor(table: string): string[][] {
-  const texto = sql();
+function tuplesFor(table: string, texto: string = sql()): string[][] {
   const inicio = texto.indexOf(`insert into public.${table}`);
   if (inicio === -1) throw new Error(`insert de ${table} não encontrado na migration`);
 
@@ -86,8 +88,8 @@ function tuplesFor(table: string): string[][] {
 }
 
 /** Garante que cada tupla tem a aridade esperada antes de virar objeto. */
-function tuplasComAridade(table: string, aridade: number): string[][] {
-  const tuplas = tuplesFor(table);
+function tuplasComAridade(table: string, aridade: number, texto?: string): string[][] {
+  const tuplas = tuplesFor(table, texto);
   for (const t of tuplas) {
     if (t.length !== aridade) {
       throw new Error(`tupla de ${table} com ${t.length} campos (esperado ${aridade}): ${t.join(" | ")}`);
@@ -113,6 +115,32 @@ export function seedInteractions(): InteractionFinding[] {
       message,
     })
   );
+}
+
+/**
+ * Seed de `substance_mechanisms`.
+ *
+ * `lowers_glucose` vem como literal SQL (`true`/`false`) e a duração como
+ * número — o tokenizador só extrai strings entre aspas, então aqui os campos
+ * não-string são lidos por regex sobre a tupla inteira.
+ */
+export function seedMechanisms(): MechanismRow[] {
+  const texto = lerSql(MIGRATION_MECANISMOS);
+  const inicio = texto.indexOf("insert into public.substance_mechanisms");
+  if (inicio === -1) throw new Error("insert de substance_mechanisms não encontrado");
+  const fimClause = texto.indexOf("on conflict", inicio);
+  const corpo = texto.slice(texto.indexOf("values", inicio), fimClause);
+
+  const linhas = [...corpo.matchAll(/\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*(true|false)\s*,\s*'([^']*)'\s*,\s*([\d.]+)\s*\)/g)];
+  if (!linhas.length) throw new Error("nenhuma tupla de substance_mechanisms lida");
+
+  return linhas.map((m) => ({
+    canonical: m[1],
+    mechanism: m[2],
+    lowersGlucose: m[3] === "true",
+    label: m[4],
+    typicalDurationHours: Number(m[5]),
+  }));
 }
 
 /** Vocabulário aceito pelo CHECK de `severity` no Postgres. */
