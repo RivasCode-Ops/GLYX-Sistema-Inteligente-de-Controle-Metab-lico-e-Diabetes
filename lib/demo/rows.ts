@@ -90,6 +90,7 @@ export function makeExerciseSession(
     calories_burned: null,
     created_at: new Date(0).toISOString(),
     duration_min: null,
+    duration_source: null,
     intensity: null,
     muscle_groups: null,
     notes: null,

@@ -150,12 +150,25 @@ export type Database = {
           calories_burned: number | null;
           created_at: string;
           duration_min: number | null;
+          duration_source: string | null;
           id: string;
           intensity: string | null;
           label: string;
           muscle_groups: string[] | null;
           notes: string | null;
           started_at: string;
+          user_id: string;
+        };
+      };
+      health_events: {
+        Row: {
+          created_at: string;
+          id: string;
+          kind: string;
+          label: string;
+          medication_id: string | null;
+          notes: string | null;
+          occurred_on: string;
           user_id: string;
         };
       };

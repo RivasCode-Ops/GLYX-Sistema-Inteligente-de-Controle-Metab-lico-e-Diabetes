@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { MUSCLE_GROUP_IDS } from "@/lib/data/muscle-groups";
 import { ACTIVITY_TYPE_IDS } from "@/lib/data/activity-types";
 import { wallClockToUTC } from "@/lib/time/local-day";
+import { LOAD_PATTERN } from "@/lib/exercicios/training-plan";
 
 const schema = z.object({
   label: z.string().min(1),
@@ -56,11 +57,24 @@ export async function logMuscleTraining(
   const parsedType = trainingTypeSchema.safeParse(trainingType);
   const type = parsedType.success ? parsedType.data : undefined;
 
+  // ---------------------------------------------------------------------------
+  // Duração herdada do plano — e MARCADA como herdada
+  // ---------------------------------------------------------------------------
+  // Este caminho (marcar grupos em Recuperação) nunca perguntou minutos, e a
+  // meta semanal é em minutos: 18 das 21 sessões ficaram sem duração, e a tela
+  // dizia "faltam 160 min" em semana treinada. Meta inatingível por construção
+  // deixa de ser lida.
+  //
+  // Herdar o previsto do plano resolve a meta sem inventar precisão — desde que
+  // o banco saiba que o número foi ESTIMADO. Sem `duration_source`, o total
+  // semanal misturaria cronômetro com presunção e ninguém depois separaria.
   const { error } = await supabase.from("exercise_sessions").insert({
     user_id: user.id,
     label: type ? TRAINING_TYPE_LABEL[type] : "Treino",
     intensity: type ?? null,
     muscle_groups: parsedGroups.data,
+    duration_min: LOAD_PATTERN.sessionMinutes,
+    duration_source: "estimado",
   });
 
   if (error) return { error: error.message };
@@ -164,10 +178,15 @@ export async function addExerciseSession(formData: FormData): Promise<ActionResu
     ? localDateTimeToUTC(started_at_local, profile?.timezone)
     : undefined;
 
+  // Aqui os minutos vêm do formulário — quando vierem, são medidos, e a origem
+  // registra isso. Sem eles, a sessão fica sem duração em vez de herdar: neste
+  // caminho o campo EXISTE e ficou vazio, o que é diferente de um caminho que
+  // nunca pergunta.
   const { error } = await supabase.from("exercise_sessions").insert({
     user_id: user.id,
     ...rest,
     ...(startedAt ? { started_at: startedAt } : {}),
+    ...(rest.duration_min != null ? { duration_source: "informado" as const } : {}),
   });
 
   if (error) return { error: error.message };
