@@ -4,7 +4,12 @@ import { listCatalogExercises } from "@/lib/queries/exercise-catalog";
 import { computeIndirectVolume, indirectSetsPerWeek } from "@/lib/exercicios/indirect-volume";
 import { computeMuscleResponse, porPrioridade } from "@/lib/exercicios/muscle-response";
 import { MuscleResponseList } from "@/components/exercicios/muscle-response-list";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlateauChecklistCard } from "@/components/exercicios/plateau-checklist-card";
+import { montarChecklistDePlato } from "@/lib/exercicios/plateau-checklist";
+import { getPlateauInputs } from "@/lib/queries/plateau-inputs";
+import { getLastTrainedByMuscleGroup, getActiveMusclePauses, getSessionCountByMuscleGroup } from "@/lib/queries/muscle-recovery";
+import { computeMuscleRecovery } from "@/lib/exercicios/muscle-recovery";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 
 /**
@@ -21,12 +26,17 @@ import Link from "next/link";
  * sobretudo ligação; o único cálculo novo é o cruzamento em `muscle-response.ts`.
  */
 export default async function EvolucaoPage() {
-  const [snapshot, strengthLogs, catalog] = await Promise.all([
-    getBodySnapshot(),
-    // Por contagem, não por data: cobre com folga as 4 semanas do volume.
-    getRecentStrengthLogs(400),
-    listCatalogExercises(),
-  ]);
+  const [snapshot, strengthLogs, catalog, plateau, lastTrained, pausas, logCounts] =
+    await Promise.all([
+      getBodySnapshot(),
+      // Por contagem, não por data: cobre com folga as 4 semanas do volume.
+      getRecentStrengthLogs(400),
+      listCatalogExercises(),
+      getPlateauInputs(PROGRESSION_WINDOW_WEEKS * 7),
+      getLastTrainedByMuscleGroup(),
+      getActiveMusclePauses(),
+      getSessionCountByMuscleGroup(),
+    ]);
 
   if (!snapshot) {
     return (
@@ -51,6 +61,13 @@ export default async function EvolucaoPage() {
 
   const progressoes = [...snapshot.progressions].sort((a, b) => b.deltaPercent - a.deltaPercent);
 
+  const recuperacao = computeMuscleRecovery(lastTrained, pausas, new Date(), logCounts);
+
+  // "Revisar" é exatamente o platô: volume dentro da faixa e carga que não
+  // subiu. O checklist aparece para o primeiro deles, que é o mais prioritário
+  // pela mesma ordenação da lista acima.
+  const emPlato = respostas.find((r) => r.veredito === "revisar") ?? null;
+
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <p className="text-sm text-zinc-400">
@@ -66,6 +83,24 @@ export default async function EvolucaoPage() {
         </p>
         <MuscleResponseList respostas={respostas} />
       </section>
+
+      {/* O checklist só existe quando existe platô: volume dentro da faixa e
+          carga parada. Mostrá-lo sempre transformaria uma investigação em
+          decoração de tela, e ninguém leria quando importasse. */}
+      {emPlato ? (
+        <PlateauChecklistCard
+          itens={montarChecklistDePlato({
+            ...plateau,
+            gruposEmRecuperacao: recuperacao.filter((r) => r.status === "recovering").length,
+            gruposPausados: recuperacao.filter((r) => r.status === "paused").length,
+            gruposTotais: recuperacao.length,
+            volumeSetsPorSemana: emPlato.volume.setsPerWeek,
+            volumePiso: emPlato.volume.minTarget,
+          })}
+          grupo={emPlato.label.toLowerCase()}
+          dias={plateau.dias}
+        />
+      ) : null}
 
       <section>
         <h2 className="mb-1 text-lg font-semibold text-zinc-100">Progresso de força</h2>
