@@ -129,7 +129,18 @@ export function computeMuscleResponse(
   indiretasPorSemana: Map<MuscleGroupId, number>,
   history: BodyMeasurement[],
   weeks: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  /**
+   * Último treino do grupo pelas SESSÕES (`exercise_sessions.muscle_groups`) —
+   * fonte diferente das séries de carga (`strength_logs`) que alimentam o
+   * volume.
+   *
+   * Sem isto, as duas telas se contradiziam: Recuperação dizia "Peito · pronto
+   * há 25 dias" (houve sessão) e Evolução dizia "nenhuma série registrada nas
+   * últimas 8 semanas" (não houve carga anotada). As duas frases eram
+   * verdadeiras sobre fontes diferentes, e juntas soavam como erro do app.
+   */
+  lastTrainedByGroup: Partial<Record<MuscleGroupId, string>> = {}
 ): RespostaMuscular[] {
   const mapa = medidasPorMusculo();
 
@@ -160,10 +171,24 @@ export function computeMuscleResponse(
     }
 
     if (v.status === "sem_registro") {
+      const ultimoTreino = lastTrainedByGroup[v.id];
+      if (ultimoTreino) {
+        // Treinou e não anotou carga. Chamar isso de "estímulo insuficiente"
+        // seria afirmar sobre o treino a partir da ausência de UM registro —
+        // e é o que fazia a tela discordar de Recuperação.
+        const dias = Math.floor((now.getTime() - new Date(ultimoTreino).getTime()) / 86_400_000);
+        return {
+          ...base,
+          veredito: "sem_base" as const,
+          motivo: `Sessão registrada ${
+            dias <= 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`
+          }, mas sem série de carga anotada — o app não tem como medir estímulo nem progressão. Anote peso, repetições e séries em Recuperação → Progressão de carga.`,
+        };
+      }
       return {
         ...base,
         veredito: "estimulo_insuficiente" as const,
-        motivo: `Nenhuma série registrada nas últimas ${weeks} semanas.`,
+        motivo: `Nenhuma série nem sessão registrada nas últimas ${weeks} semanas.`,
       };
     }
 

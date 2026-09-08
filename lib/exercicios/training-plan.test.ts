@@ -145,3 +145,31 @@ describe("planSummaryLabel", () => {
   });
 });
 
+
+describe("a razão do plano cobre os dois cortes", () => {
+  it("não diz 'todos recuperados' quando há grupo fora pelo tempo", () => {
+    // O caso da auditoria: nenhum grupo descansando, três fora do tempo, e a
+    // frase dizia "Todos os grupos de hoje estão recuperados" logo abaixo das
+    // pílulas "fora do tempo".
+    const todosProntos = MUSCLE_GROUP_IDS.map((id) => ({
+      id,
+      label: id,
+      lastTrainedAt: null,
+      status: "ready" as const,
+      hoursRemaining: null,
+      hoursReady: 100,
+      pauseReason: null,
+      establishedHistory: true,
+      prioritizeAsNever: false,
+    }));
+    // 30 minutos corta a maior parte dos grupos do dia.
+    const plano = suggestFromPlan(todosProntos, new Date(2026, 6, 20), 30);
+    if (plano.deferred.length > 0) {
+      expect(plano.reason).not.toContain("Todos os grupos de hoje estão recuperados.");
+      expect(plano.reason).toContain("tempo da sessão");
+    } else {
+      // Sem ninguém de fora, a frase pode afirmar as duas coisas.
+      expect(plano.reason).toContain("cabem no tempo");
+    }
+  });
+});

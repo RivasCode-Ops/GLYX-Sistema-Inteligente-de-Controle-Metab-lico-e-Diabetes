@@ -219,3 +219,37 @@ describe("computeMuscleResponse", () => {
     expect(ordenado).toEqual(["C", "D", "A", "B"]);
   });
 });
+
+describe("sessão sem carga anotada", () => {
+  // Sem histórico estabelecido em grupo NENHUM — é o estado real de quem tem
+  // poucos registros de carga, e é quando a guarda de "grupo novo no modelo"
+  // não silencia: aí "nenhuma série" chega à tela e contradiz Recuperação.
+  const poucosLogs = [log("peito", 4, 2, "ex-peito")];
+
+  it("não chama de estímulo insuficiente o grupo que Recuperação mostra treinado", () => {
+    // O caso da auditoria: Peito com "pronto há 25 dias" numa tela e "nenhuma
+    // série nas últimas 8 semanas" na outra. As duas frases eram verdadeiras
+    // sobre fontes diferentes — sessão × série de carga.
+    const treinado = new Date(AGORA.getTime() - 25 * 86_400_000).toISOString();
+    const res = computeMuscleResponse(
+      volumeCom(poucosLogs),
+      [],
+      new Map(),
+      [],
+      JANELA,
+      AGORA,
+      { ombros: treinado }
+    );
+    const ombros = acha(res, "ombros");
+    expect(ombros.veredito).toBe("sem_base");
+    expect(ombros.motivo).toContain("25 dias");
+    expect(ombros.motivo).toContain("sem série de carga anotada");
+  });
+
+  it("sem sessão E sem série, aí sim é estímulo insuficiente", () => {
+    const res = computeMuscleResponse(volumeCom(poucosLogs), [], new Map(), [], JANELA, AGORA, {});
+    const ombros = acha(res, "ombros");
+    expect(ombros.veredito).toBe("estimulo_insuficiente");
+    expect(ombros.motivo).toContain("nem sessão");
+  });
+});

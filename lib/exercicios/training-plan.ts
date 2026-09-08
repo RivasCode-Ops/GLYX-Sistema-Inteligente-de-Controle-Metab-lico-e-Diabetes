@@ -149,6 +149,27 @@ function splitByAvailability(day: TrainingDay, byId: Map<MuscleGroupId, MuscleRe
  * do plano com maior atraso acumulado em vez de mandar treinar em cima de
  * músculo que não recuperou — mesma lógica de prioridade de `suggestMuscleSplit`.
  */
+/** Uma frase que reconhece os dois cortes: quem está descansando e quem ficou
+ *  fora pelo tempo da sessão. */
+function montarRazao(
+  resting: { label: string }[],
+  deferred: { label: string }[]
+): string {
+  const partes: string[] = [];
+  if (resting.length) {
+    partes.push(`${resting.map((r) => r.label).join(", ")} ainda descansando`);
+  }
+  if (deferred.length) {
+    partes.push(
+      `${deferred.map((d) => d.label).join(", ")} ${
+        deferred.length === 1 ? "ficou" : "ficaram"
+      } fora pelo tempo da sessão`
+    );
+  }
+  if (!partes.length) return "Todos os grupos de hoje estão recuperados e cabem no tempo.";
+  return `${partes.join("; ")} — treine o resto do dia.`;
+}
+
 export function suggestFromPlan(
   statuses: MuscleRecoveryStatus[],
   today: Date = new Date(),
@@ -179,9 +200,12 @@ export function suggestFromPlan(
       included,
       deferred,
       resting: own.resting,
-      reason: own.resting.length
-        ? `${own.resting.map((r) => r.label).join(", ")} ainda descansando — treine o resto do dia.`
-        : "Todos os grupos de hoje estão recuperados.",
+      // A frase precisa cobrir os DOIS cortes, senão ela contradiz a tela ao
+      // lado: com nenhum grupo descansando e três fora do tempo, dizia "Todos
+      // os grupos de hoje estão recuperados" logo abaixo de três pílulas "fora
+      // do tempo". As duas coisas eram verdadeiras — recuperação e tempo de
+      // sessão são eixos diferentes — e juntas soavam como erro.
+      reason: montarRazao(own.resting, deferred),
     };
   }
 

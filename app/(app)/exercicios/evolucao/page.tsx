@@ -56,7 +56,11 @@ export default async function EvolucaoPage() {
     snapshot.progressions,
     indiretas,
     snapshot.history,
-    PROGRESSION_WINDOW_WEEKS
+    PROGRESSION_WINDOW_WEEKS,
+    new Date(),
+    // As sessões entram para a tela não dizer "nenhuma série" sobre um grupo
+    // que Recuperação mostra como treinado — duas fontes, uma frase só.
+    lastTrained
   ).sort(porPrioridade);
 
   const progressoes = [...snapshot.progressions].sort((a, b) => b.deltaPercent - a.deltaPercent);
