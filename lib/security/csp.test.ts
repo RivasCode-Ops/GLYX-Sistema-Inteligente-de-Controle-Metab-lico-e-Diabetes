@@ -77,3 +77,46 @@ describe("novoNonce", () => {
     expect(valores.size).toBe(50);
   });
 });
+
+describe("'unsafe-inline' em estilo só é seguro enquanto os destinos ficam fechados", () => {
+  /**
+   * Apontado pelo ZAP em 08/09/2026 (regra 10055-6, `style-src unsafe-inline`).
+   *
+   * O alerta é procedente e a diretiva fica — sem ela os gráficos e todo
+   * `style=` do React somem. O que torna esse `unsafe-inline` inofensivo NÃO é
+   * ele mesmo: CSS injetado exfiltra dado sem executar código, com um seletor
+   * de atributo que casa com o valor de um campo e dispara uma requisição.
+   *
+   * O que fecha o vetor são os DESTINOS. Este teste amarra a combinação, porque
+   * o dia em que alguém abrir `img-src *` "só para uma imagem externa", o
+   * `unsafe-inline` de estilo deixa de ser inofensivo no mesmo commit — e
+   * nenhum teste por diretiva isolada perceberia.
+   */
+  const DESTINOS = ["img-src", "font-src", "connect-src", "media-src"];
+
+  it("nenhum destino de recurso é curinga enquanto o estilo aceita inline", () => {
+    const csp = montarCsp("nonce-de-teste");
+    const estiloAceitaInline = diretiva(csp, "style-src").includes("'unsafe-inline'");
+    if (!estiloAceitaInline) return; // fechou o estilo: a combinação deixou de importar
+
+    for (const nome of DESTINOS) {
+      const d = diretiva(csp, nome);
+      if (!d) continue;
+      expect(d, `${nome} não pode ser curinga com style-src 'unsafe-inline'`).not.toMatch(
+        /\s\*($|\s)/
+      );
+      expect(d, `${nome} não pode liberar http:/https: genérico`).not.toMatch(
+        /\s(https?:)($|\s)/
+      );
+    }
+  });
+
+  it("estilo aceita inline mas NÃO aceita origem externa arbitrária", () => {
+    const d = diretiva(montarCsp("nonce-de-teste"), "style-src");
+    expect(d).toContain("'unsafe-inline'");
+    expect(d).not.toMatch(/\s\*($|\s)/);
+    // `unsafe-eval` em estilo não existe, mas em script seria fatal — e o teste
+    // acima já cobre script. Aqui basta garantir que ninguém acrescentou host.
+    expect(d.replace("style-src ", "").split(" ").every((t) => t === "'self'" || t === "'unsafe-inline'")).toBe(true);
+  });
+});
