@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getGlucoseReadingsSince } from "@/lib/queries/glucose-series";
 import { GlucoseTrendChart } from "@/components/glicemia/glucose-trend-chart";
 import { GlucoseRangeBar } from "@/components/glicemia/glucose-range-bar";
-import { ModuleTabs } from "@/components/ui/module-tabs";
 import { QuickReadingDialog } from "@/components/dashboard/quick-reading-dialog";
 import { InsulinQuickDialog } from "@/components/glicemia/insulin-quick-dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,7 +58,6 @@ export default async function GlicemiaOverviewPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <ModuleTabs />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Leitura atual, com a régua ao lado do número. */}

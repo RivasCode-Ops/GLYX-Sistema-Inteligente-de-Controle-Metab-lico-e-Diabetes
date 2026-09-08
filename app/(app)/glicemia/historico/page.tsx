@@ -6,7 +6,6 @@ import {
 } from "@/lib/queries/glucose-series";
 import { demoGlucosePoints } from "@/lib/demo/data";
 import { createClient } from "@/lib/supabase/server";
-import { ModuleTabs } from "@/components/ui/module-tabs";
 
 export default async function GlicemiaHistoricoPage() {
   let days: ReturnType<typeof aggregateGlucoseByDay> = [];
@@ -38,7 +37,6 @@ export default async function GlicemiaHistoricoPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <ModuleTabs />
 
       {days.length ? (
         <div className="grid gap-4 sm:grid-cols-3">
