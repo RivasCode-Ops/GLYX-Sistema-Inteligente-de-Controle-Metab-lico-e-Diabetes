@@ -142,10 +142,26 @@ export function DailyDosesCard({
                       recusa estava aqui, na condição de render. Registro
                       atrasado ou adiantado é informação correta; registro
                       ausente é informação errada. */}
-                  <form action={markTakenAction} className="shrink-0">
+                  {/* O campo de hora existe porque `taken_at` era a hora do
+                      CLIQUE, e o clique acontece quando dá — não quando a dose
+                      foi tomada. Vem pré-preenchido com o horário previsto e
+                      pode ser deixado como está: registrar segue sendo um
+                      toque. Sem ele, o cruzamento dose × glicemia lê rajadas de
+                      registro em vez das doses. */}
+                  <form action={markTakenAction} className="flex shrink-0 items-center gap-1.5">
                     <input type="hidden" name="medication_id" value={med.id} />
+                    <label className="sr-only" htmlFor={`hora-${med.id}-${time}`}>
+                      Hora em que tomou {med.name}
+                    </label>
+                    <input
+                      id={`hora-${med.id}-${time}`}
+                      type="time"
+                      name="taken_at_local"
+                      defaultValue={time}
+                      className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2 font-mono text-xs text-zinc-300"
+                    />
                     <Button type="submit" variant="outline" size="sm">
-                      Marcar como tomada
+                      Registrar
                     </Button>
                   </form>
                 </>

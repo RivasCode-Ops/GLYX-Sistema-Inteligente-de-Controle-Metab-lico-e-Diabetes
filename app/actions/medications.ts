@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
 import { namesLookSimilar } from "@/lib/medications/similar";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { localDateKey, wallClockToUTC } from "@/lib/time/local-day";
 import {
   resolveAdherenceStatus,
   type AdherenceStatus,
@@ -320,7 +321,20 @@ export async function deactivateMedication(formData: FormData): Promise<ActionRe
  */
 async function inserirRegistroDeDose(
   medicationId: string,
-  confirmed: boolean
+  confirmed: boolean,
+  /**
+   * Hora em que a dose REALMENTE aconteceu, quando quem registra a informa.
+   *
+   * Sem isto, `taken_at` é a hora do CLIQUE — e o clique acontece quando dá,
+   * não quando a dose foi tomada. Medido em 06/09: quatro registros de Fiasp
+   * entre 12:00 e 12:06, marcados em rajada. Isso condena qualquer cruzamento
+   * dose × glicemia, que é justamente o que responderia "a basal das 07:00
+   * está segurando minha madrugada?".
+   *
+   * Nulo mantém o comportamento antigo: registrar rápido continua sendo um
+   * toque só, e o app não passa a exigir precisão que ninguém tem sempre.
+   */
+  takenAtInformado?: Date | null
 ): Promise<ActionResult> {
   const supabase = await createClient();
   if (!supabase) return { error: "Configure o Supabase (.env.local)." };
@@ -330,7 +344,7 @@ async function inserirRegistroDeDose(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
 
-  const takenAt = new Date();
+  const takenAt = takenAtInformado ?? new Date();
   let status: AdherenceStatus = "avulso";
   let scheduledFor: Date | null = null;
 
@@ -380,10 +394,50 @@ async function inserirRegistroDeDose(
   return { ok: true };
 }
 
+/**
+ * "HH:MM" do dia local → instante UTC, ou null.
+ *
+ * Hora no futuro é rejeitada (volta null, não erro): registrar às 14:00 que
+ * tomou às 22:00 é engano de digitação, e gravar produziria uma dose que ainda
+ * não aconteceu. Dose de ontem registrada hoje continua sendo caso do campo
+ * de data, que não existe — aqui o dia é sempre o de hoje.
+ */
+async function horaInformadaParaUTC(valor: FormDataEntryValue | null): Promise<Date | null> {
+  const texto = typeof valor === "string" ? valor.trim() : "";
+  const m = /^(\d{1,2}):(\d{2})$/.exec(texto);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  if (h > 23 || mi > 59) return null;
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: p } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const tz = p?.timezone || "America/Sao_Paulo";
+  const agora = new Date();
+  const [y, mo, d] = localDateKey(agora.toISOString(), tz).split("-").map(Number);
+  const quando = wallClockToUTC(y, mo, d, h, mi, 0, tz);
+  return quando.getTime() > agora.getTime() ? null : quando;
+}
+
 export async function logMedicationTaken(formData: FormData): Promise<ActionResult> {
   const medicationId = formData.get("medication_id") as string | null;
   if (!medicationId) return { error: "Medicamento inválido." };
-  return inserirRegistroDeDose(medicationId, true);
+
+  // Campo opcional "tomei às", em HH:MM do dia local. Ausente ou inválido, o
+  // registro segue com a hora do clique — o app NUNCA recusa um registro por
+  // causa do formato de um campo acessório.
+  const informado = await horaInformadaParaUTC(formData.get("taken_at_local"));
+  return inserirRegistroDeDose(medicationId, true, informado);
 }
 
 /**
