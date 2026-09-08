@@ -9,7 +9,12 @@ import type { Medication } from "@/types/database";
 // o que já foi tomado, então parecia que o registro não pegava.
 
 export type TodayLog = { medication_id: string | null; taken_at: string };
-export type TodaySnooze = { medication_id: string; snoozed_until: string };
+export type TodaySnooze = {
+  medication_id: string;
+  snoozed_until: string;
+  /** Qual dose este adiamento empurra; nulo nas linhas anteriores à migration. */
+  scheduled_for?: string | null;
+};
 
 export { computeDoseStatus } from "@/lib/medications/adherence";
 
@@ -117,21 +122,32 @@ export function DailyDosesCard({
                 <span className="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
                   ✓ tomada às {hora(status.at, tz)}
                 </span>
-              ) : status.state === "adiada" ? (
-                <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
-                  ⏰ adiada até {hora(status.until, tz)}
-                </span>
-              ) : status.state === "agendada" ? (
-                <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-500">
-                  mais tarde
-                </span>
               ) : (
-                <form action={markTakenAction} className="shrink-0">
-                  <input type="hidden" name="medication_id" value={med.id} />
-                  <Button type="submit" variant="outline" size="sm">
-                    Marcar como tomada
-                  </Button>
-                </form>
+                <>
+                  {status.state === "adiada" ? (
+                    <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
+                      ⏰ adiada até {hora(status.until, tz)}
+                    </span>
+                  ) : status.state === "agendada" ? (
+                    <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-500">
+                      mais tarde
+                    </span>
+                  ) : null}
+                  {/* O BOTÃO SEMPRE EXISTE enquanto a dose não foi registrada.
+                      Antes ele só aparecia no estado `pendente`: dose adiada ou
+                      ainda não vencida não tinha como ser registrada pela tela,
+                      e quem tomou o remédio mais cedo — ou tinha adiado — ficava
+                      sem caminho nenhum. O servidor nunca recusou registro; a
+                      recusa estava aqui, na condição de render. Registro
+                      atrasado ou adiantado é informação correta; registro
+                      ausente é informação errada. */}
+                  <form action={markTakenAction} className="shrink-0">
+                    <input type="hidden" name="medication_id" value={med.id} />
+                    <Button type="submit" variant="outline" size="sm">
+                      Marcar como tomada
+                    </Button>
+                  </form>
+                </>
               )}
             </li>
           ))}

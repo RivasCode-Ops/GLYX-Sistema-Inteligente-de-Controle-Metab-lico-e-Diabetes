@@ -1,16 +1,37 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { PwaSetup } from "@/components/pwa/pwa-setup";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-dm-sans",
+/**
+ * Fontes servidas do próprio domínio, sem dependência externa em runtime.
+ *
+ * O app já não pedia fonte ao Google no navegador: `next/font/google` baixava no
+ * build e servia de `/_next/static/media`, e o CSP daqui tem `font-src 'self'`
+ * (medido no build: 8 woff2 locais, nenhuma requisição a gstatic). O que sai
+ * agora é a dependência de BUILD — os arquivos moram no repositório, então o
+ * build não depende de o Google estar no ar.
+ *
+ * São DOIS arquivos, não quatro: o Google serve Outfit e Inter como fontes
+ * VARIÁVEIS, e um arquivo cobre a faixa inteira de pesos. Isso também elimina o
+ * risco de negrito sintético — o eixo tem 400, 500, 600 e 700 de verdade, que
+ * são exatamente os quatro pesos que o app declara (medido: 3 font-normal,
+ * 149 font-medium, 70 font-semibold, 16 font-bold).
+ *
+ * A monoespaçada é a do sistema: não se baixa fonte para mostrar número.
+ */
+const outfit = localFont({
+  src: "../public/fonts/Outfit-Variable.woff2",
+  variable: "--font-outfit",
+  weight: "400 700",
+  display: "swap",
 });
 
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
+const inter = localFont({
+  src: "../public/fonts/Inter-Variable.woff2",
+  variable: "--font-inter",
+  weight: "400 700",
+  display: "swap",
 });
 
 /**
@@ -56,8 +77,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body
-        className={`${dmSans.variable} ${jetbrains.variable} font-sans glyx-bg`}
-        style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
+        className={`${outfit.variable} ${inter.variable} font-sans glyx-bg`}
       >
         {children}
         <PwaSetup />

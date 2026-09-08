@@ -1,6 +1,7 @@
 import {
   MIN_LOGS_FOR_ESTABLISHED_HISTORY,
   MUSCLE_GROUPS,
+  MUSCLE_GROUP_BY_ID,
   type MuscleGroupId,
 } from "@/lib/data/muscle-groups";
 
@@ -130,6 +131,33 @@ export function suggestMuscleFocus(statuses: MuscleRecoveryStatus[]): MuscleReco
 
 export function isAvailable(s: MuscleRecoveryStatus): boolean {
   return s.status === "ready" || s.status === "never";
+}
+
+/**
+ * Quanto da janela de recuperação do grupo já passou, em %.
+ *
+ * Existe para a barra da tela de Recuperação. É derivado do MESMO
+ * `hoursRemaining` que o texto já mostra — barra com conta própria seria a
+ * segunda contagem da mesma grandeza, lado a lado com a primeira.
+ *
+ * Devolve `null` de propósito em dois casos, e nos dois a ausência de barra é a
+ * informação:
+ *
+ * - `never`: sem último treino não há janela correndo. Uma barra em 100% ali
+ *   diria "totalmente recuperado" sobre um grupo do qual o app não sabe nada.
+ * - `paused`: pausa manual vence o cronômetro (dor, lesão leve, falta de
+ *   tempo). Mostrar a barra devolveria a decisão ao relógio, que é justamente o
+ *   que a pausa suspendeu.
+ */
+export function recoveryPct(s: MuscleRecoveryStatus): number | null {
+  if (s.status === "ready") return 100;
+  if (s.status !== "recovering") return null;
+  const janela = MUSCLE_GROUP_BY_ID[s.id]?.recoveryHours;
+  if (!janela || s.hoursRemaining == null) return null;
+  const decorrido = janela - s.hoursRemaining;
+  // Teto em 99: 100% é "pronto", e um grupo ainda em recuperação não pode
+  // exibir o número que significa liberado.
+  return Math.max(0, Math.min(99, Math.round((decorrido / janela) * 100)));
 }
 
 /** Nunca-treinado primeiro, depois quem está pronto há mais tempo — mesmo

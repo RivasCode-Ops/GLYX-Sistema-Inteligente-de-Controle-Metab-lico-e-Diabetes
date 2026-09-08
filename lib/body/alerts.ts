@@ -63,6 +63,61 @@ export type StagnantMeasure = {
 };
 
 /**
+ * Variação de UMA medida na janela, com sinal — a conta que a estagnação usa
+ * para dizer "parado" e que a resposta muscular usa para dizer "cresceu".
+ *
+ * Ela vive sozinha porque as duas perguntas partem do mesmo número e só
+ * discordam no que fazem com ele. Duas implementações discordariam também sobre
+ * qual medição é a "anterior", e aí a mesma medida apareceria parada numa tela
+ * e crescendo na outra.
+ *
+ * `null` quando não há medição dos dois lados da janela: aí "parado" seria
+ * falta de registro, não falta de resultado.
+ */
+export function measureDeltaInWindow(
+  history: BodyMeasurement[],
+  key: BodyMeasurementKey,
+  weeks: number = STAGNATION_WEEKS,
+  now: Date = new Date()
+): StagnantMeasure | null {
+  const cutoff = new Date(now.getTime() - weeks * 7 * 86_400_000).toISOString().slice(0, 10);
+  const sorted = [...history].sort((a, b) => a.measured_on.localeCompare(b.measured_on));
+
+  const withValue = sorted.filter((m) => measurementValue(m, key) != null);
+  if (withValue.length < 2) return null;
+
+  // A medição mais RECENTE anterior ao corte, não a mais antiga do histórico.
+  // `.find()` numa lista ascendente devolveria a primeira de todas: com um ano
+  // de medições, a comparação viraria "hoje contra um ano atrás", a variação
+  // passaria do piso de ruído e a estagnação dos últimos dois meses — que é o
+  // que este alerta existe para pegar — nunca apareceria.
+  const old = withValue.filter((m) => m.measured_on <= cutoff).at(-1);
+  const latest = withValue[withValue.length - 1];
+  if (!old || old.measured_on === latest.measured_on) return null;
+
+  const from = measurementValue(old, key)!;
+  const to = measurementValue(latest, key)!;
+  const delta = Math.round((to - from) * 10) / 10;
+
+  const spanDays =
+    (new Date(`${latest.measured_on}T12:00:00Z`).getTime() -
+      new Date(`${old.measured_on}T12:00:00Z`).getTime()) /
+    86_400_000;
+
+  return {
+    key,
+    label: BODY_FIELD_BY_KEY[key].label,
+    weeks: Math.round(spanDays / 7),
+    delta,
+  };
+}
+
+/** Variação menor que isto é ruído de fita, não resultado — para os dois lados. */
+export function isNoise(delta: number): boolean {
+  return Math.abs(delta) < NOISE_FLOOR_CM;
+}
+
+/**
  * Medidas de músculo que não saíram do lugar na janela — só conta quando existe
  * medição no começo E no fim dela, senão "parado" é só falta de registro.
  */
@@ -72,41 +127,11 @@ export function findStagnantMeasures(
   weeks: number = STAGNATION_WEEKS,
   now: Date = new Date()
 ): StagnantMeasure[] {
-  const cutoff = new Date(now.getTime() - weeks * 7 * 86_400_000).toISOString().slice(0, 10);
-  const sorted = [...history].sort((a, b) => a.measured_on.localeCompare(b.measured_on));
   const out: StagnantMeasure[] = [];
-
   for (const key of keys) {
-    const withValue = sorted.filter((m) => measurementValue(m, key) != null);
-    if (withValue.length < 2) continue;
-
-    // A medição mais RECENTE anterior ao corte, não a mais antiga do histórico.
-    // `.find()` numa lista ascendente devolveria a primeira de todas: com um ano
-    // de medições, a comparação viraria "hoje contra um ano atrás", a variação
-    // passaria do piso de ruído e a estagnação dos últimos dois meses — que é o
-    // que este alerta existe para pegar — nunca apareceria.
-    const old = withValue.filter((m) => m.measured_on <= cutoff).at(-1);
-    const latest = withValue[withValue.length - 1];
-    if (!old || old.measured_on === latest.measured_on) continue;
-
-    const from = measurementValue(old, key)!;
-    const to = measurementValue(latest, key)!;
-    const delta = Math.round((to - from) * 10) / 10;
-    if (Math.abs(delta) >= NOISE_FLOOR_CM) continue;
-
-    const spanDays =
-      (new Date(`${latest.measured_on}T12:00:00Z`).getTime() -
-        new Date(`${old.measured_on}T12:00:00Z`).getTime()) /
-      86_400_000;
-
-    out.push({
-      key,
-      label: BODY_FIELD_BY_KEY[key].label,
-      weeks: Math.round(spanDays / 7),
-      delta,
-    });
+    const d = measureDeltaInWindow(history, key, weeks, now);
+    if (d && isNoise(d.delta)) out.push(d);
   }
-
   return out;
 }
 

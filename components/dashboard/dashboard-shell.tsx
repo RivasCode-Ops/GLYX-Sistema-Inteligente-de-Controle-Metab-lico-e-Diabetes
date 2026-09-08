@@ -4,12 +4,11 @@ import {
   UtensilsCrossed,
   Dumbbell,
   Pill,
-  BellRing,
   Plug,
   LineChart,
   FileText,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { GlucoseHeroCard } from "@/components/dashboard/glucose-hero-card";
 import { NextStepCard } from "@/components/dashboard/next-step-card";
 import { ModuleRow } from "@/components/dashboard/module-row";
@@ -17,12 +16,18 @@ import type { MetabolicAlert } from "@/types/database";
 
 type Props = {
   latestGlucose: number | null;
+  latestGlucoseAgeLabel?: string | null;
+  latestGlucoseFreshness?: import("@/lib/health/reading-freshness").Freshness | null;
+  glucoseTrend?: "up" | "down" | "flat" | null;
   glucoseSeries: number[];
   carbsToday: number;
   activeMinutes: number;
   waterMl: number;
   waterGoalMl: number;
   riskLabel: string;
+  /** Faixa alvo por extenso, ex. "70–140" — a régua sem a qual `riskLabel` é adjetivo. */
+  targetRangeLabel?: string | null;
+  /** Contagem alimenta o card de acao; a lista mora em /analise/alertas. */
   alerts: MetabolicAlert[];
   stepsToday?: number | null;
   sleepHoursToday?: number | null;
@@ -31,13 +36,16 @@ type Props = {
 
 export function DashboardShell({
   latestGlucose,
+  latestGlucoseAgeLabel = null,
+  latestGlucoseFreshness = null,
+  glucoseTrend = null,
   glucoseSeries,
   carbsToday,
   activeMinutes,
   waterMl,
   waterGoalMl,
   riskLabel,
-  alerts,
+  targetRangeLabel = null,
   stepsToday = null,
   sleepHoursToday = null,
   muscleFocusLabel = null,
@@ -49,8 +57,12 @@ export function DashboardShell({
       <div className="grid gap-4 md:grid-cols-2">
         <GlucoseHeroCard
           latestGlucose={latestGlucose}
+          latestGlucoseAgeLabel={latestGlucoseAgeLabel}
+          latestGlucoseFreshness={latestGlucoseFreshness}
+          glucoseTrend={glucoseTrend}
           glucoseSeries={glucoseSeries}
           riskLabel={riskLabel}
+          targetRangeLabel={targetRangeLabel}
           carbsToday={carbsToday}
           activeMinutes={activeMinutes}
           waterMl={waterMl}
@@ -90,11 +102,12 @@ export function DashboardShell({
       </div>
 
       <section>
-        <div className="mb-3 flex items-end justify-between gap-4">
+        {/* O cabeçalho tinha "Atividade hoje: N min", que era a TERCEIRA cópia
+            do mesmo número — as outras duas estão no card de glicemia e na
+            linha de Exercícios logo abaixo. A coluna direita desta lista é a
+            fonte única dos números do dia; repetir aqui não reforça, dilui. */}
+        <div className="mb-3">
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Módulos</h2>
-          <p className="text-xs text-zinc-600">
-            Atividade hoje: <span className="font-mono text-zinc-400">{activeMinutes} min</span>
-          </p>
         </div>
         <Card>
           <CardContent className="p-4">
@@ -112,7 +125,21 @@ export function DashboardShell({
               // deixava a recomendação sem continuidade.
               href="/exercicios/plano"
               icon={Dumbbell}
-              metric={muscleFocusLabel ?? `${activeMinutes} min · hoje`}
+              // O `??` escondia uma troca de GRANDEZA: `muscleFocusLabel` é o
+              // treino PLANEJADO do dia ("Inferior A"), e `activeMinutes` é o
+              // que foi medido. Com plano cadastrado, a coluna deixava de
+              // mostrar o número do dia e passava a mostrar uma intenção — na
+              // mesma coluna, em `font-mono`, que em Glicemia mostra leitura de
+              // sensor. Era isso que fazia a tela dizer "Inferior A" enquanto o
+              // card de dica dizia "nenhuma atividade hoje": as duas estavam
+              // certas, sobre coisas diferentes.
+              //
+              // Agora as duas aparecem, e a medição nunca some.
+              metric={
+                muscleFocusLabel
+                  ? `${muscleFocusLabel} · ${activeMinutes} min`
+                  : `${activeMinutes} min · hoje`
+              }
             />
             <ModuleRow title="Medicação" href="/medicacao" icon={Pill} metric="Ver agenda" />
             <ModuleRow title="Exames" href="/exames" icon={FileText} metric="Lab · ECG · Raio-X" />
@@ -129,33 +156,12 @@ export function DashboardShell({
         </Card>
       </section>
 
-      <Card className="transition hover:border-sky-600/40">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <BellRing className="h-4 w-4 text-amber-400" />
-            <CardTitle className="text-base">Alertas recentes</CardTitle>
-          </div>
-          <CardDescription>
-            <Link href="/analise/alertas" className="text-emerald-400 hover:underline">
-              Ver todos os alertas →
-            </Link>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-zinc-400">
-          {alerts.length === 0 ? (
-            <p>Nenhum alerta não lido.</p>
-          ) : (
-            <ul className="space-y-2">
-              {alerts.slice(0, 3).map((a) => (
-                <li key={a.id} className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
-                  <span className="text-xs uppercase text-amber-500/90">{a.severity}</span>
-                  <p className="text-zinc-200">{a.title}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {/* A lista de "Alertas recentes" saiu do painel e vive em /analise/alertas,
+          que já existia. Ela é histórico: o painel mostra no máximo o que ainda
+          está ABERTO, e isso é papel do card de ação, não de uma lista.
+
+          `alerts` continua na assinatura porque a contagem alimenta o card de
+          ação; o que saiu foi a renderização da lista aqui. */}
     </div>
   );
 }

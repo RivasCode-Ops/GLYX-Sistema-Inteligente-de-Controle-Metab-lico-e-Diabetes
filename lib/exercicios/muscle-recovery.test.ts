@@ -1,8 +1,9 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MUSCLE_GROUP_IDS, type MuscleGroupId } from "@/lib/data/muscle-groups";
 import {
   computeMuscleRecovery,
   limitAvailableByTime,
+  recoveryPct,
   suggestMuscleFocus,
   suggestMuscleSplit,
 } from "./muscle-recovery";
@@ -197,3 +198,49 @@ describe("limitAvailableByTime", () => {
   });
 });
 
+
+describe("recoveryPct", () => {
+  const AGORA = new Date("2026-07-22T12:00:00Z");
+
+  function statusDe(id: MuscleGroupId, horasAtras: number) {
+    const treinado = new Date(AGORA.getTime() - horasAtras * 3_600_000).toISOString();
+    const todos = computeMuscleRecovery({ [id]: treinado }, {}, AGORA);
+    return todos.find((s) => s.id === id)!;
+  }
+
+  it("mede a fração já decorrida da janela do grupo", () => {
+    // Peito recupera em 48h; 24h atrás = metade.
+    expect(recoveryPct(statusDe("peito", 24))).toBe(50);
+    // Quadríceps recupera em 72h; 18h atrás = 25%.
+    expect(recoveryPct(statusDe("quadriceps", 18))).toBe(25);
+  });
+
+  it("nunca mostra 100% em grupo ainda em recuperação", () => {
+    const quase = statusDe("peito", 47.9);
+    expect(quase.status).toBe("recovering");
+    expect(recoveryPct(quase)).toBeLessThanOrEqual(99);
+  });
+
+  it("grupo pronto é 100%", () => {
+    expect(recoveryPct(statusDe("peito", 60))).toBe(100);
+  });
+
+  it("não mostra barra para grupo nunca treinado", () => {
+    const nunca = computeMuscleRecovery({}, {}, AGORA).find((s) => s.id === "peito")!;
+    expect(nunca.status).toBe("never");
+    // Barra em 100% ali diria "recuperado" sobre um grupo do qual nada se sabe.
+    expect(recoveryPct(nunca)).toBeNull();
+  });
+
+  it("não mostra barra para grupo em pausa manual", () => {
+    const treinado = new Date(AGORA.getTime() - 6 * 3_600_000).toISOString();
+    const pausado = computeMuscleRecovery(
+      { peito: treinado },
+      { peito: "dor no ombro" },
+      AGORA
+    ).find((s) => s.id === "peito")!;
+    expect(pausado.status).toBe("paused");
+    // A pausa suspendeu o cronômetro; a barra o devolveria ao comando.
+    expect(recoveryPct(pausado)).toBeNull();
+  });
+});

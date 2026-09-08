@@ -73,8 +73,7 @@ export function ExamInterpretSection({ examId, initialSummary, openAiConfigured 
         <CardContent className="flex flex-col gap-3">
           {!openAiConfigured ? (
             <p className="text-sm text-amber-200/90">
-              Configure <code className="font-mono text-xs">KIMI_API_KEY</code> no servidor para gerar o
-              resumo estruturado.
+              Configure a chave do provedor de IA no servidor para gerar o resumo estruturado.
             </p>
           ) : (
             <Button type="button" variant="outline" disabled={pending} onClick={run}>

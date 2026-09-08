@@ -6,6 +6,7 @@ import { CompositionSummary } from "@/components/composicao/composition-summary"
 import { BodyAlertsList } from "@/components/composicao/body-alerts-list";
 import { AiReportCard } from "@/components/composicao/ai-report-card";
 import { progressSummary } from "@/lib/body/progress";
+import { checarForca } from "@/lib/body/strength-check";
 
 export const metadata = { title: "Composição corporal — GLYX" };
 
@@ -28,6 +29,10 @@ export default async function ComposicaoPage() {
   }
 
   const { latest, latestComposition, progress, bars, alerts, profile } = snapshot;
+
+  // A progressão de carga já vem no snapshot — é a MESMA que a aba Evolução
+  // usa. Recalcular aqui daria duas leituras da mesma janela na mesma conta.
+  const forca = checarForca(progress?.verdict ?? null, snapshot.progressions);
   const missingProfile = !profile.sex || !profile.heightCm;
 
   return (
@@ -76,6 +81,15 @@ export default async function ComposicaoPage() {
           <p className="text-sm font-semibold">{progress.verdict.headline}</p>
           <p className="mt-1 text-sm leading-relaxed text-zinc-200">{progress.verdict.detail}</p>
           <p className="mt-1 text-xs text-zinc-400">{progressSummary(progress)}</p>
+          {/* A força entra DEPOIS do veredito e visualmente separada: ela
+              confirma ou contradiz a leitura corporal, e não a substitui.
+              Fundir as duas faria a performance derrubar uma leitura correta da
+              balança, ou a balança esconder uma performance parada. */}
+          {forca ? (
+            <p className="mt-2 border-t border-current/15 pt-2 text-xs leading-relaxed text-zinc-400">
+              {forca.texto}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

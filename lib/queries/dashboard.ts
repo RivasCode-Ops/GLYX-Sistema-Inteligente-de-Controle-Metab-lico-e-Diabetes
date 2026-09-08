@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { glucoseTrend, readingAge, type Freshness } from "@/lib/health/reading-freshness";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { getTodayHealthBest } from "@/lib/queries/health-today";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
@@ -6,12 +7,26 @@ import type { MetabolicAlert } from "@/types/database";
 
 export type DashboardSummary = {
   latestGlucose: number | null;
+  /** Quando a última leitura foi medida, e há quanto tempo isso foi. */
+  latestGlucoseAt: string | null;
+  latestGlucoseAgeLabel: string | null;
+  latestGlucoseFreshness: Freshness | null;
+  /** Direção medida entre as duas últimas leituras, ou null quando não dá para afirmar. */
+  glucoseTrend: "up" | "down" | "flat" | null;
   /** Últimas leituras (ordem cronológica), para o sparkline do card de glicemia. */
   glucoseSeries: number[];
   carbsToday: number;
   activeMinutes: number;
   alerts: MetabolicAlert[];
   riskLabel: string;
+  /**
+   * A faixa alvo por extenso, ex. "70–140".
+   *
+   * `riskLabel` sozinho diz "Moderado" sem dizer moderado em relação a quê — e
+   * a faixa é configurada com o médico, então ela varia de pessoa para pessoa.
+   * Rótulo de risco sem a régua ao lado é adjetivo, não medida.
+   */
+  targetRangeLabel: string;
   stepsToday: number | null;
   sleepHoursToday: number | null;
 };
@@ -36,7 +51,10 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
   const [glucoseRes, mealsRes, exercisesRes, alertsRes] = await Promise.all([
     supabase
       .from("glucose_readings")
-      .select("value_mg_dl")
+      // `recorded_at` entra aqui porque sem ele nenhuma tela consegue saber a
+      // idade do dado — era essa a raiz de o painel anunciar "Glicemia atual"
+      // com leitura de três semanas.
+      .select("value_mg_dl, recorded_at")
       .eq("user_id", user.id)
       .order("recorded_at", { ascending: false })
       .limit(8),
@@ -59,11 +77,19 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       .limit(5),
   ]);
 
-  const recentGlucose = (glucoseRes.data ?? []) as { value_mg_dl: number }[];
+  const recentGlucose = (glucoseRes.data ?? []) as {
+    value_mg_dl: number;
+    recorded_at: string;
+  }[];
   const latestGlucose = recentGlucose[0]?.value_mg_dl ?? null;
-  const glucoseSeries = recentGlucose
-    .map((r) => r.value_mg_dl)
-    .reverse();
+  const latestGlucoseAt = recentGlucose[0]?.recorded_at ?? null;
+  const idade = latestGlucoseAt ? readingAge(latestGlucoseAt) : null;
+  // Ordem cronológica: o banco devolve do mais novo para o mais velho.
+  const cronologico = [...recentGlucose].reverse();
+  const glucoseSeries = cronologico.map((r) => r.value_mg_dl);
+  const trend = glucoseTrend(
+    cronologico.map((r) => ({ value: r.value_mg_dl, recordedAt: r.recorded_at }))
+  );
   const carbsSum =
     mealsRes.data?.reduce(
       (acc: number, m: { carbs_g: number | null }) =>
@@ -77,8 +103,13 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
     ) ?? 0;
 
   // Faixa alvo do perfil (definida com o médico); 70–180 é só o padrão inicial.
+  //
+  // Leitura velha NÃO vira classificação de risco. Dizer "Baixo" a partir de um
+  // número de três semanas atrás é afirmar sobre o presente com dado do
+  // passado — e é a afirmação que mais pesa na tela, porque some com a dúvida
+  // de quem vai decidir dose.
   let riskLabel = "—";
-  if (latestGlucose != null) {
+  if (latestGlucose != null && idade?.freshness !== "stale") {
     const moderateFrom = Math.round(targetMin + (targetMax - targetMin) * 0.65);
     if (latestGlucose >= targetMax || latestGlucose < targetMin) riskLabel = "Atenção";
     else if (latestGlucose >= moderateFrom) riskLabel = "Moderado";
@@ -99,11 +130,16 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
 
   return {
     latestGlucose,
+    latestGlucoseAt,
+    latestGlucoseAgeLabel: idade?.label ?? null,
+    latestGlucoseFreshness: idade?.freshness ?? null,
+    glucoseTrend: idade?.freshness === "stale" ? null : trend,
     glucoseSeries,
     carbsToday: Math.round(carbsSum * 10) / 10,
     activeMinutes: activeMin,
     alerts: (alertsRes.data ?? []) as MetabolicAlert[],
     riskLabel,
+    targetRangeLabel: `${targetMin}–${targetMax}`,
     stepsToday,
     sleepHoursToday,
   };

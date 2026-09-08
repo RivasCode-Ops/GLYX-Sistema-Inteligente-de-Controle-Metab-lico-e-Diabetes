@@ -146,7 +146,7 @@ export function IaChat() {
                 ? "Buscando a conversa anterior…"
                 : threadId
                   ? "Retomando de onde você parou. O histórico fica na sua conta e entra no export e no apagamento da LGPD."
-                  : "Requer sessão e, para respostas do modelo, KIMI_API_KEY."}
+                  : "Requer sessão e, para respostas do modelo, a chave do provedor de IA configurada no servidor."}
             </CardDescription>
           </div>
           {threadId ? (

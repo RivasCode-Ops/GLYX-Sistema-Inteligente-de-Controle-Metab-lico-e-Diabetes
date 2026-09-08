@@ -6,6 +6,7 @@ import {
   safeWeeklyRateKg,
   smoothedWeight,
   tdee,
+  PROTEIN_G_PER_KG,
 } from "./energy";
 
 const homem = { sex: "m" as const, age: 40, heightCm: 175, weightKg: 90, activity: "light" as const };
@@ -119,5 +120,36 @@ describe("adaptiveAdjustment", () => {
     expect(adj!.plannedWeeklyKg).toBe(0);
     expect(adj!.deltaKcal).toBeLessThan(0);
     expect(adj!.reason).toContain("recomposição");
+  });
+});
+
+describe("PROTEIN_G_PER_KG", () => {
+  const perfil = {
+    sex: "m" as const,
+    age: 40,
+    heightCm: 175,
+    weightKg: 80,
+    activity: "moderate" as const,
+  };
+
+  // A tela mostra "1,8 g/kg" e o card mostra "144 g". Se a constante e o cálculo
+  // se separarem, os dois números aparecem juntos na mesma tela discordando —
+  // e quem lê não tem como saber qual está certo.
+  it.each(["lose", "gain", "maintain", "recomp"] as const)(
+    "a meta em gramas de %s é a razão declarada vezes o peso",
+    (objetivo) => {
+      const alvo = dailyTargets(perfil, objetivo);
+      expect(alvo.protein_g).toBe(Math.round(PROTEIN_G_PER_KG[objetivo] * perfil.weightKg));
+    }
+  );
+
+  it("toda razão fica dentro da faixa que a literatura sustenta", () => {
+    for (const valor of Object.values(PROTEIN_G_PER_KG)) {
+      // Piso da recomendação geral e teto acima do qual não há ganho descrito
+      // para pessoa fisicamente ativa. Uma razão fora disto seria prescrição,
+      // não referência.
+      expect(valor).toBeGreaterThanOrEqual(1.2);
+      expect(valor).toBeLessThanOrEqual(2.2);
+    }
   });
 });

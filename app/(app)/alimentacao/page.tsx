@@ -5,6 +5,10 @@ import { deleteMeal } from "@/app/actions/meals";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NewMealForm } from "@/components/alimentacao/new-meal-form";
+import { WaterCard } from "@/components/dashboard/water-card";
+import { DayProgressRing } from "@/components/alimentacao/day-progress-ring";
+import { getNutritionToday } from "@/lib/queries/nutrition-today";
+import { GOAL_LABEL, PROTEIN_G_PER_KG } from "@/lib/health/energy";
 import type { Meal } from "@/types/database";
 import { demoMeals } from "@/lib/demo/data";
 
@@ -18,6 +22,7 @@ export default async function AlimentacaoPage() {
   let todayStartISO = startOfLocalDayISO(null);
   const demoMode = !isSupabaseConfigured();
   const photoUrls = new Map<string, string>();
+  const nutricao = await getNutritionToday();
 
   async function deleteMealAction(formData: FormData): Promise<void> {
     "use server";
@@ -63,31 +68,107 @@ export default async function AlimentacaoPage() {
 
   // Em demo, as refeições fictícias contam como "hoje" para os tiles fazerem sentido.
   const todayMeals = demoMode ? meals : meals.filter((m) => m.eaten_at >= todayStartISO);
-  const totalCarbs = Math.round(todayMeals.reduce((s, m) => s + (m.carbs_g ?? 0), 0) * 10) / 10;
+  // Macros de hoje somados das MESMAS refeições que a lista abaixo mostra.
+  const consumidoHoje = todayMeals.reduce(
+    (acc, m) => ({
+      calories: acc.calories + (m.calories ?? 0),
+      carbs_g: acc.carbs_g + (m.carbs_g ?? 0),
+      protein_g: acc.protein_g + (m.protein_g ?? 0),
+      fat_g: acc.fat_g + (m.fat_g ?? 0),
+    }),
+    { calories: 0, carbs_g: 0, protein_g: 0, fat_g: 0 }
+  );
   const maxGlycemic = todayMeals.reduce((max, m) => Math.max(max, m.glycemic_load_estimate ?? 0), 0);
+
+  // Uma vez, aqui: o tile e a nota abaixo dele leem a MESMA string. Dois
+  // `toFixed` em lugares diferentes acabam divergindo no dia em que um deles
+  // ganhar uma casa decimal.
+  const proteinaPorKg =
+    nutricao.weightKg && nutricao.weightKg > 0
+      ? `${(consumidoHoje.protein_g / nutricao.weightKg).toFixed(1)} g/kg`
+      : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-emerald-500/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-2xl">{totalCarbs} g</CardTitle>
-            <CardDescription>carboidratos hoje{demoMode ? " (demo)" : ""}</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-2xl">{todayMeals.length}</CardTitle>
-            <CardDescription>refeições hoje{demoMode ? " (demo)" : ""}</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-2xl text-emerald-300">{maxGlycemic || "—"}</CardTitle>
-            <CardDescription>maior carga glicêmica hoje{demoMode ? " (demo)" : ""}</CardDescription>
-          </CardHeader>
-        </Card>
+      {/* Quatro macros do dia, com a mesma leitura do painel de nutrição. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { rotulo: "kcal consumidas", valor: Math.round(consumidoHoje.calories), cor: "text-zinc-100", nota: null },
+          { rotulo: "carboidratos", valor: `${Math.round(consumidoHoje.carbs_g)} g`, cor: "text-amber-300", nota: null },
+          {
+            rotulo: "proteínas",
+            valor: `${Math.round(consumidoHoje.protein_g)} g`,
+            cor: "text-sky-300",
+            // Gramas sozinhas não respondem se está adequado: a referência de
+            // proteína existe em g/kg, e é a razão que se compara. Sem peso
+            // registrado a linha some, em vez de o app inventar um peso.
+            nota: proteinaPorKg,
+          },
+          { rotulo: "gorduras", valor: `${Math.round(consumidoHoje.fat_g)} g`, cor: "text-purple-300", nota: null },
+        ].map((t) => (
+          <div key={t.rotulo} className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+            <p className={`font-mono text-2xl ${t.cor}`}>{t.valor}</p>
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{t.rotulo}</p>
+            {t.nota ? <p className="mt-0.5 font-mono text-[11px] text-zinc-500">{t.nota}</p> : null}
+          </div>
+        ))}
       </div>
+
+      {proteinaPorKg && nutricao.bodyGoal ? (
+        <p className="-mt-4 text-[11px] leading-relaxed text-zinc-500">
+          Alvo de {PROTEIN_G_PER_KG[nutricao.bodyGoal].toFixed(1)} g/kg para{" "}
+          {GOAL_LABEL[nutricao.bodyGoal].toLowerCase()}, sobre {nutricao.weightKg} kg. É faixa geral
+          para pessoa fisicamente ativa — condição renal, hepática ou medicação que mude a demanda
+          proteica pedem meta feita por nutricionista.
+        </p>
+      ) : null}
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-4 p-4">
+          {nutricao.macroTargets ? (
+            <DayProgressRing
+              consumed={consumidoHoje.calories}
+              target={nutricao.macroTargets.calories}
+            />
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-zinc-200">Progresso do dia</p>
+            {nutricao.macroTargets ? (
+              <p className="font-mono text-sm text-zinc-400">
+                {Math.round(consumidoHoje.calories)} de {nutricao.macroTargets.calories} kcal
+              </p>
+            ) : (
+              // Sem os dados corporais não há meta calculada — e o app não
+              // inventa uma. A frase diz onde resolver, em vez de mostrar um
+              // número que ninguém definiu.
+              <p className="text-xs text-zinc-500">
+                Complete sexo, idade, altura, peso e nível de atividade no Perfil para calcular sua
+                meta diária.
+              </p>
+            )}
+            <p className="mt-1 text-xs text-zinc-500">
+              {todayMeals.length} refeição(ões) hoje
+              {maxGlycemic ? ` · maior carga glicêmica ${maxGlycemic}` : ""}
+              {demoMode ? " (demo)" : ""}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Água e bebidas vieram do Painel metabólico: o painel é vista breve do
+          que fazer agora, e registro mora no módulo.
+
+          Os medidores de macro que vieram junto saíram: os quatro tiles acima e o
+          mesma coisa, e duas leituras do mesmo número na mesma tela é o defeito
+          que este app já pagou três vezes. Bebidas ficam, porque são grandeza
+          própria e não aparecem em lugar nenhum acima. */}
+      {!demoMode ? (
+        <WaterCard
+          todayMl={nutricao.waterMl}
+          goalMl={nutricao.waterGoalMl}
+          extras={nutricao.beverageExtras}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

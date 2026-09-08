@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
+import { parseModelJson } from "@/lib/ai/parse-json";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
+import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
+import { toSafetyPayload, type SafetyPayload } from "@/lib/safety/present";
 import { createClient } from "@/lib/supabase/server";
 import { DOSE_UNITS } from "@/lib/medications/dose-units";
 
@@ -113,19 +116,15 @@ export async function POST(req: Request) {
 
   await recordAiTokens(supabase, rate.usageId, completion.usage, aiModel());
 
-  const raw = completion.choices[0]?.message?.content ?? "{}";
-  let parsed: MedLabelResult;
-  try {
-    const json = JSON.parse(raw.replace(/```json\n?|\n?```/g, "").trim());
-    const result = resultSchema.safeParse(json);
-    if (!result.success) throw new Error("schema");
-    parsed = result.data;
-  } catch {
+  const raw = completion.choices[0]?.message?.content;
+  const result = resultSchema.safeParse(parseModelJson(raw));
+  if (!result.success) {
     return NextResponse.json(
       { error: "Não consegui ler este rótulo — tente uma foto mais nítida e de frente." },
       { status: 422 }
     );
   }
+  const parsed: MedLabelResult = result.data;
 
   if (!parsed.name.trim()) {
     return NextResponse.json(
@@ -134,7 +133,21 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json({ result: parsed });
+  // Suplemento lido por foto vai direto para a tela de cadastro. Sem a checagem
+  // aqui, o usuário salvaria berberina ao lado da insulina e só descobriria o
+  // risco se fosse perguntar — que é como o incidente aconteceu. A checagem é
+  // determinística e não passa por modelo; falha dela não impede o cadastro,
+  // mas nunca é apresentada como ausência de risco.
+  let safety: SafetyPayload | null = null;
+  if (parsed.kind === "supplement") {
+    try {
+      safety = toSafetyPayload(await checkSubstanceSafety(supabase, user.id, [parsed.name]));
+    } catch {
+      /* cadastro segue; a tela mostra o alerta só quando ele existe de fato */
+    }
+  }
+
+  return NextResponse.json({ result: parsed, safety });
 }
 
 export const runtime = "nodejs";

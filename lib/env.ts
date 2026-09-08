@@ -5,31 +5,107 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Provedor de IA
+// ---------------------------------------------------------------------------
+// A seleção é EXPLÍCITA (`AI_PROVIDER`), com fallback por presença de chave.
+// Antes era só por presença de chave, o que tornava impossível ter duas chaves
+// no ambiente e escolher qual usar — e a escolha mudava sozinha no dia em que
+// alguém adicionasse uma chave para testar.
+//
+// Todas as rotas seguem falando com a camada de compatibilidade OpenAI
+// (`createAiClient()` + `aiModel()`), então a troca não toca nenhuma delas.
+
+export const ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1/";
+export const ANTHROPIC_MODEL = "claude-sonnet-5";
+
 export const KIMI_BASE_URL = "https://api.moonshot.ai/v1";
 export const KIMI_MODEL = "kimi-k2.6";
+
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const OPENAI_MODEL = "gpt-4o-mini";
 
+export type AiProvider = "anthropic" | "kimi" | "openai";
+
+export function aiProvider(): AiProvider {
+  const forced = process.env.AI_PROVIDER?.trim().toLowerCase();
+  if (forced === "anthropic" || forced === "kimi" || forced === "openai") {
+    return forced;
+  }
+
+  // KIMI CONTINUA SENDO O PADRÃO, e a ordem aqui é a decisão.
+  //
+  // Antes, a mera presença de `ANTHROPIC_API_KEY` no ambiente trocava o
+  // provedor sozinha — alguém adicionar a chave para testar mudaria o modelo
+  // que analisa dado clínico, sem ninguém pedir e sem nada na tela avisando.
+  // Trocar de provedor passa a exigir `AI_PROVIDER=anthropic`, escrito de
+  // propósito.
+  //
+  // A Anthropic só entra por presença de chave quando não há Kimi nenhum para
+  // usar — aí não é troca, é o único provedor disponível.
+  if (process.env.KIMI_API_KEY?.trim()) return "kimi";
+  if (process.env.ANTHROPIC_API_KEY?.trim()) return "anthropic";
+  return "openai";
+}
+
 export function aiApiKey(): string | undefined {
-  return process.env.KIMI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined;
+  switch (aiProvider()) {
+    case "anthropic":
+      return process.env.ANTHROPIC_API_KEY?.trim() || undefined;
+    case "kimi":
+      return process.env.KIMI_API_KEY?.trim() || undefined;
+    case "openai":
+      return process.env.OPENAI_API_KEY?.trim() || undefined;
+  }
 }
 
 export function isOpenAIConfigured(): boolean {
   return Boolean(aiApiKey());
 }
 
-export function aiBaseUrl(): string {
-  return (
-    process.env.OPENAI_BASE_URL?.trim() ||
-    (process.env.KIMI_API_KEY?.trim() ? KIMI_BASE_URL : OPENAI_BASE_URL)
-  );
+/** Nome da variável de ambiente que o provedor ativo espera. Usado em mensagem de erro. */
+export function aiKeyEnvName(): string {
+  switch (aiProvider()) {
+    case "anthropic":
+      return "ANTHROPIC_API_KEY";
+    case "kimi":
+      return "KIMI_API_KEY";
+    case "openai":
+      return "OPENAI_API_KEY";
+  }
 }
 
-// Kimi é o padrão quando KIMI_API_KEY existe. Instalações ainda não migradas
-// continuam na OpenAI até receberem a nova chave no ambiente de produção.
+export function aiBaseUrl(): string {
+  // `OPENAI_BASE_URL` é o nome antigo e continua valendo: é o que está definido
+  // hoje na Vercel apontando para a Moonshot, e também é como um proxy tipo
+  // OpenRouter é configurado. Ignorá-lo em silêncio mandaria as instalações
+  // existentes para o provedor errado sem nenhum erro.
+  const override = process.env.AI_BASE_URL?.trim() || process.env.OPENAI_BASE_URL?.trim();
+  if (override) return override;
+
+  switch (aiProvider()) {
+    case "anthropic":
+      return ANTHROPIC_BASE_URL;
+    case "kimi":
+      return KIMI_BASE_URL;
+    case "openai":
+      return OPENAI_BASE_URL;
+  }
+}
+
+// `AI_MODEL` continua sendo o override por ambiente. Para as rotas de
+// classificação simples (`status`, `medication-schedule`) vale apontar um
+// modelo mais barato — em Anthropic, `claude-haiku-4-5`.
 export function aiModel(): string {
-  return (
-    process.env.AI_MODEL?.trim() ||
-    (process.env.KIMI_API_KEY?.trim() ? KIMI_MODEL : OPENAI_MODEL)
-  );
+  const override = process.env.AI_MODEL?.trim();
+  if (override) return override;
+
+  switch (aiProvider()) {
+    case "anthropic":
+      return ANTHROPIC_MODEL;
+    case "kimi":
+      return KIMI_MODEL;
+    case "openai":
+      return OPENAI_MODEL;
+  }
 }

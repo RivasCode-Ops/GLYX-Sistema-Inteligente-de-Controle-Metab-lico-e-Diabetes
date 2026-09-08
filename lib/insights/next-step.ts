@@ -46,20 +46,30 @@ export function getNextStepInsight(input: {
     };
   }
 
+  // SUGESTÃO DE EXERCÍCIO REMOVIDA — 07/09/2026.
+  //
+  // Aqui havia, para glicemia entre 140 e 179 sem atividade no dia: "Uma
+  // caminhada de 15 minutos pode ajudar", com link para o plano de exercício.
+  //
+  // A entrada desta função é `{ latestGlucose, carbsToday, activeMinutes }`.
+  // Não é que faltasse checar insulina rápida ativa: o dado não chega aqui.
+  // E a faixa é justamente a pior — com insulina rápida em ação, exercício
+  // SOMA ao efeito hipoglicemiante, que é a mesma somatória que o contador de
+  // mecanismos (`lib/safety/mechanism-count.ts`) conta como via distinta.
+  // Sugerir atividade sem olhar `insulin_logs` empurra para baixo uma glicemia
+  // que já está caindo.
+  //
+  // Volta quando a guarda `exerciseSuppressed` existir, com a janela de ação
+  // da insulina rápida (5 h no seed de mecanismos) consultada antes de
+  // sugerir. Até lá, a orientação alimentar cobre os dois ramos — ela não tem
+  // como piorar uma hipoglicemia.
   if (latestGlucose >= 140) {
-    return activeMinutes === 0
-      ? {
-          text: "Glicemia acima da meta e nenhuma atividade hoje. Uma caminhada de 15 minutos pode ajudar.",
-          actionLabel: "Ver plano de exercício",
-          actionHref: "/exercicios/plano",
-          tone: "warning",
-        }
-      : {
-          text: "Glicemia um pouco acima da meta. Vale controlar o carboidrato da próxima refeição.",
-          actionLabel: "Registrar refeição",
-          actionHref: "/alimentacao/foto",
-          tone: "warning",
-        };
+    return {
+      text: "Glicemia um pouco acima da meta. Vale controlar o carboidrato da próxima refeição.",
+      actionLabel: "Registrar refeição",
+      actionHref: "/alimentacao/foto",
+      tone: "warning",
+    };
   }
 
   if (carbsToday === 0 && activeMinutes === 0) {

@@ -2,12 +2,115 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Tokens do sistema visual — tema escuro
+ * ---------------------------------------------------------------------------
+ * Portados da landing (OKLCH) por remapeamento de luminosidade, com croma e
+ * matiz preservados. Matiz do neutro: 85 (quente). Nas faixas mais escuras o
+ * croma cai quase a zero, para chegar perto do #09090b que o app já usava, e a
+ * temperatura reaparece conforme clareia.
+ *
+ * A SEMÂNTICA DAS ESCALAS É MANTIDA: `background-50` é a superfície base e
+ * `foreground-950` é o texto primário — o inverso da intuição de "50 é claro",
+ * e de propósito, para as classes existentes continuarem significando a mesma
+ * coisa dos dois lados da ponte landing/app.
+ *
+ * Os valores são a tripla `L C H`, sem o `oklch()`. Quem consome envolve:
+ * `oklch(var(--background-50))`. É o que permite o Tailwind aplicar opacidade
+ * por cima (`/ <alpha-value>`).
+ *
+ * Contraste NÃO é presumido: `scripts/medir-contraste.mjs` mede todo par
+ * texto/superfície e grava os números em `docs/CONTRASTE.md`.
+ * --------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
+
+  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* superfícies — 50 = base (mais escura), 950 = mais clara */
+  --background-50: 0.14 0.004 85;
+  --background-100: 0.17 0.005 85;
+  --background-200: 0.21 0.006 85;
+  --background-300: 0.26 0.007 85;
+  --background-400: 0.33 0.008 85;
+  --background-500: 0.44 0.008 85;
+  --background-600: 0.55 0.008 85;
+  --background-700: 0.66 0.008 85;
+  --background-800: 0.77 0.007 85;
+  --background-900: 0.87 0.006 85;
+  --background-950: 0.95 0.005 85;
+
+  /* texto — 950 = primário, 400 = terciário */
+  --foreground-400: 0.52 0.006 85;
+  --foreground-500: 0.62 0.006 85;
+  --foreground-600: 0.72 0.006 85;
+  --foreground-700: 0.8 0.005 85;
+  --foreground-800: 0.87 0.005 85;
+  --foreground-900: 0.92 0.004 85;
+  --foreground-950: 0.97 0.004 85;
+
+  /* primary — teal, matiz 180, herdado da landing
+   *
+   * Croma dos passos 500/600/700 REDUZIDO em relação à landing, e não por
+   * gosto: em matiz 180 o gamut sRGB é estreito e estreita mais conforme a
+   * luminosidade cai. Medido em `contrast.test.ts` → o croma máximo é 0.127 em
+   * L=0.70, 0.112 em L=0.62 e 0.094 em L=0.52. Os valores originais (0.13,
+   * 0.14, 0.13) ficavam FORA: o navegador recortaria, e o token passaria a
+   * declarar uma cor que ninguém vê — medição atestando o que não é exibido.
+   * Luminosidade e matiz ficam intactas, então a escala continua a mesma. */
+  --primary-300: 0.86 0.08 180;
+  --primary-400: 0.78 0.11 180;
+  --primary-500: 0.7 0.125 180;
+  --primary-600: 0.62 0.11 180;
+  --primary-700: 0.52 0.092 180;
+
+  /* accent — laranja, matiz 30, herdado da landing */
+  --accent-300: 0.84 0.08 30;
+  --accent-400: 0.76 0.11 30;
+  --accent-500: 0.68 0.13 30;
+  --accent-600: 0.6 0.14 30;
+
+  /* -------------------------------------------------------------------------
+   * Cor por módulo, e a razão de Glicemia ter mudado
+   * -------------------------------------------------------------------------
+   * Na landing, Glicemia era rose. Rose é a cor que se lê como ALARME: dar rose
+   * ao módulo que o usuário abre justamente quando está preocupado faz a tela
+   * parecer alerta mesmo com tudo na faixa. Glicemia passa a usar o `primary`,
+   * que é cor de marca e não estava alocada — coerente, por ser o módulo
+   * central do produto.
+   *
+   * Âmbar continua em Medicação E em severidade `atencao`. Isso só não colide
+   * porque a distinção é de ÁREA, não de matiz: módulo pinta ponto (ícone de
+   * 16px e o valor da coluna direita), severidade pinta bloco (borda esquerda e
+   * superfície elevada). Mesmo quem confunda a matiz separa pela área.
+   *
+   * rose é RESERVADA para severidade crítica. Nenhum módulo a usa.
+   * ------------------------------------------------------------------------- */
+  /* Uma matiz por módulo, medidas: todas dentro do gamut sRGB e todas acima de
+   * 6.6:1 sobre a superfície mais clara (`contrast.test.ts` afere as duas
+   * coisas). Os hexadecimais correspondentes são #f77684, #e28f2e, #bd87f6 e
+   * #4dacf6.
+   *
+   * Glicemia é ROSA, e isso reabre a colisão com `severity-critico`. Ela é
+   * resolvida do jeito que o próprio sistema previu: severidade é TRATAMENTO,
+   * não matiz — módulo pinta ponto (ícone e valor), severidade pinta bloco
+   * (borda esquerda e superfície). E o token existe justamente para o rose
+   * bruto do Tailwind continuar barrado pelo lint. */
+  --module-glicemia: 0.72 0.159 15;
+  --module-alimentacao: 0.72 0.145 65;
+  --module-medicacao: 0.72 0.164 305;
+  --module-exercicio: 0.72 0.14 245;
+  --module-neutro: 0.66 0.008 85; /* = background-700 — exames, análise, integrações */
+
+  --severity-critico: 0.7 0.16 20;
+  --severity-atencao: 0.8 0.12 85;
 }
 
 body {
-  @apply min-h-dvh bg-zinc-950 text-zinc-100 antialiased;
+  @apply min-h-dvh antialiased;
+  background-color: oklch(var(--background-50));
+  color: oklch(var(--foreground-950));
 }
 
 /* subtle grid */
@@ -18,4 +121,27 @@ body {
       transparent
     ),
     linear-gradient(to bottom, #09090b, #09090b);
+}
+
+/* ---------------------------------------------------------------------------
+ * Movimento
+ * ---------------------------------------------------------------------------
+ * O painel é consultado várias vezes por dia. Entrada animada numa tela aberta
+ * vinte vezes ao dia vira atraso percebido — pior no card de ação, onde o
+ * alerta que desliza para dentro chega depois do olho.
+ *
+ * Esta media query não é preferência de estilo: para quem tem transtorno
+ * vestibular, movimento não pedido causa sintoma físico. O `!important` existe
+ * porque ela precisa vencer utilitário de animação vindo de qualquer lugar,
+ * inclusive de biblioteca.
+ * --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

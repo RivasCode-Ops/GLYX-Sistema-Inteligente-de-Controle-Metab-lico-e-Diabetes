@@ -7,16 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { logMuscleTraining, pauseMuscleGroup, resumeMuscleGroup } from "@/app/actions/exercise";
-import { MUSCLE_GROUPS } from "@/lib/data/muscle-groups";
 import {
   limitAvailableByTime,
+  recoveryPct,
   suggestMuscleSplit,
   TIME_BUDGETS,
   type MuscleRecoveryStatus,
   type TimeBudgetMinutes,
 } from "@/lib/exercicios/muscle-recovery";
-
-const RECOVERY_HOURS = Object.fromEntries(MUSCLE_GROUPS.map((g) => [g.id, g.recoveryHours]));
 
 type TrainingType = "forca" | "resistencia";
 
@@ -25,17 +23,31 @@ const SCHEME: Record<TrainingType, { label: string; sets: string; rest: string }
   resistencia: { label: "Resistência", sets: "3 séries × 15-20 reps", rest: "Descanso 45s" },
 };
 
+// Classe, não hexadecimal cru: o hex escapa da paleta e ninguém o encontra
+// quando a cor muda. `paused` é vermelho porque pausa costuma ser dor ou lesão.
 const STATUS_STROKE: Record<MuscleRecoveryStatus["status"], string> = {
-  never: "#3f3f46",
-  recovering: "#fbbf24",
-  ready: "#10b981",
-  paused: "#f87171",
+  never: "stroke-zinc-700",
+  recovering: "stroke-amber-400",
+  ready: "stroke-emerald-500",
+  paused: "stroke-red-400",
 };
 
-function StatusRing({ status, fraction }: { status: MuscleRecoveryStatus["status"]; fraction: number }) {
+/**
+ * `pct === null` desenha só o trilho — é o caso de grupo sem registro e de
+ * grupo pausado. Antes os dois vinham com o anel CHEIO, porque a fração caía
+ * no `: 1` do ternário: o painel dizia "recuperado" justamente sobre o grupo
+ * que a pessoa pausou por dor.
+ */
+function StatusRing({
+  status,
+  pct,
+}: {
+  status: MuscleRecoveryStatus["status"];
+  pct: number | null;
+}) {
   const r = 15;
   const c = 2 * Math.PI * r;
-  const offset = status === "never" ? c : c * (1 - fraction);
+  const offset = pct == null ? c : c * (1 - pct / 100);
   return (
     <svg viewBox="0 0 36 36" className="h-[34px] w-[34px] shrink-0" aria-hidden>
       <circle cx="18" cy="18" r={r} fill="none" stroke="#27272a" strokeWidth={5} />
@@ -44,7 +56,7 @@ function StatusRing({ status, fraction }: { status: MuscleRecoveryStatus["status
         cy="18"
         r={r}
         fill="none"
-        stroke={STATUS_STROKE[status]}
+        className={STATUS_STROKE[status]}
         strokeWidth={5}
         strokeLinecap="round"
         strokeDasharray={c}
@@ -72,11 +84,9 @@ function StatusRow({ status }: { status: MuscleRecoveryStatus }) {
   const [pausing, setPausing] = useState(false);
   const [reason, setReason] = useState("");
   const meta = statusText(status);
-  const totalHours = RECOVERY_HOURS[status.id] ?? 1;
-  const fraction =
-    status.status === "recovering"
-      ? Math.max(0, Math.min(1, 1 - (status.hoursRemaining ?? 0) / totalHours))
-      : 1;
+  // A fração vem da regra única, junto do texto que já mostra as horas — anel
+  // com conta própria seria a segunda contagem da mesma grandeza, lado a lado.
+  const pct = recoveryPct(status);
 
   function confirmPause() {
     startTransition(async () => {
@@ -98,10 +108,25 @@ function StatusRow({ status }: { status: MuscleRecoveryStatus }) {
     <Card>
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
-          <StatusRing status={status.status} fraction={fraction} />
-          <div className="flex-1">
-            <p className="text-sm text-zinc-200">{status.label}</p>
-            <p className={`text-xs ${meta.className}`}>{meta.text}</p>
+          <StatusRing status={status.status} pct={pct} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm text-zinc-200">{status.label}</p>
+              {pct != null ? (
+                <span className="shrink-0 font-mono text-xs text-zinc-500">{pct}%</span>
+              ) : null}
+            </div>
+            {pct != null ? (
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className={`h-full rounded-full ${
+                    status.status === "ready" ? "bg-emerald-500" : "bg-amber-400"
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            ) : null}
+            <p className={`mt-1 text-xs ${meta.className}`}>{meta.text}</p>
           </div>
           {status.status === "paused" ? (
             <Button type="button" variant="outline" size="sm" disabled={pending} onClick={resume}>

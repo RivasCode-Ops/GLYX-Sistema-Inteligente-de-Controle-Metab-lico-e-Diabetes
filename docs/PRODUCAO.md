@@ -15,8 +15,11 @@ Defina **todas** as variáveis obrigatórias (ver `.env.example`):
 | `SIGNUP_INVITE_CODE` | sim | Sem isto o register retorna 503 |
 | `CRON_SECRET` | sim | Igual ao header nas funções SQL `pg_cron` |
 | `CGM_CREDENTIALS_SECRET` | sim (forte) | **Diferente** do `CRON_SECRET` |
-| `KIMI_API_KEY` | sim (se IA) | Chave da API oficial Moonshot; somente servidor |
-| `OPENAI_BASE_URL` / `AI_MODEL` | sim (se IA) | `https://api.moonshot.ai/v1` / `kimi-k2.6` |
+| `KIMI_API_KEY` | sim (se IA) | Chave da API oficial Moonshot; somente servidor. **Provedor padrão** |
+| `AI_PROVIDER` | opcional | `anthropic` \| `kimi` \| `openai`. **Trocar de provedor exige esta variável**: adicionar `ANTHROPIC_API_KEY` ao ambiente NÃO troca o modelo sozinho |
+| `AI_MODEL` | opcional | Padrão por provedor (`kimi-k2.6` no Kimi) |
+| `AI_BASE_URL` | opcional | Só para proxy (ex.: OpenRouter). `OPENAI_BASE_URL` segue aceito como nome legado |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | opcional | Provedores alternativos, só ativos por `AI_PROVIDER` |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | sim (push) | `npx web-push generate-vapid-keys` |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | recomendado | Mesmo valor |
 | `NEXT_PUBLIC_SITE_URL` | recomendado | Domínio público (Dexcom redirect) |
@@ -49,6 +52,135 @@ Recentemente indispensáveis (se o projeto já estava em produção antes desta 
 2. `20260715150000_cgm_multi_provider.sql`
 
 Sem a #2, upsert Dexcom / PK composta falha.
+
+### 2.1 A ordem importa: migration ANTES do deploy de código
+
+Nesta leva a ordem deixou de ser boa prática e virou requisito. O código já lê e
+**grava** colunas e tabelas que só existem depois das migrations de 07/09/2026 —
+subir o código antes quebra funções que hoje funcionam:
+
+| se faltar | quebra |
+|---|---|
+| `medication_logs.scheduled_for` / `adherence_status` | **"Marcar como tomada" para de gravar.** O PostgREST recusa o insert inteiro quando a coluna não existe — não é degradação, é falha total do registro de dose |
+| `medications.timing_strictness` | **O adiar devolve 404.** A rota seleciona a coluna, recebe erro, e trata o remédio como inexistente |
+| `medication_snoozes.scheduled_for` | O adiamento volta a marcar todas as doses do remédio (o defeito corrigido em 07/09) |
+| `hypo_plan` / `hypo_events` | O card de ação não aparece; a tela de plano mostra "sem plano" para sempre |
+| `substance_aliases` / `substance_interactions` / `substance_mechanisms` | O checador de interação não encontra nada — **e ausência de achado não é ausência de risco** |
+
+Migrations desta leva, em ordem:
+
+```
+20260907120000_substance_safety.sql
+20260907130000_timing_strictness.sql
+20260907131000_adherence_status.sql
+20260907132000_snooze_invariants.sql
+20260907140000_substance_mechanisms.sql
+20260907150000_medication_cadence.sql
+20260907160000_hypo_plan.sql
+```
+
+Todas são aditivas **para o dado**: nenhuma apaga ou reescreve o que já existe.
+
+> **Aditiva para o dado não é o mesmo que compatível com o código anterior — e
+> essa confusão custou caro em 08/09/2026.** A `snooze_invariants` pôs
+> `medication_snoozes.scheduled_for` como NOT NULL sem default. O código que
+> estava em produção insere naquela tabela sem essa coluna, e **todo adiamento
+> passou a falhar no instante em que a migration entrou**. Foi preciso a
+> corretiva `20260908030000` para restaurar.
+>
+> A regra "migration antes do deploy" só vale para migration que o código
+> ANTERIOR tolera. Quando não tolera — coluna NOT NULL sem default numa tabela
+> em que o código já grava — a ordem é outra: a coluna entra permissiva (com
+> default ou nullable), o código sobe, e só uma migration posterior aperta.
+>
+> A pergunta que faltava no checklist: *para cada tabela que já existe, o insert
+> do código que está em produção agora continua válido depois desta migration?*
+> A consulta que responde está em 2.3.
+
+> **Não há fallback no código para coluna ausente, de propósito.** Tolerar a
+> falta silenciaria justamente o estado que precisa ser barulhento: um app de
+> diabetes rodando com o checador de interação vazio parece funcionar.
+
+### 2.2 Rodar de novo é seguro — e é o caso comum, não o raro
+
+As sete são **reexecutáveis**. Isso não era verdade até 07/09/2026: `create
+policy` e `add constraint` não aceitam `if not exists` no Postgres, e sem um
+`drop … if exists` antes a segunda execução falha. Falharia **depois** de já ter
+criado tabela e índice, que são idempotentes — deixando o estado no meio, que é
+o pior lugar para parar.
+
+E o retry é o caso comum: aplicação manual pelo painel, falha no meio de uma
+sequência de sete, ou simplesmente rodar de novo por dúvida sobre ter
+completado. Seis políticas e quatro constraints ganharam o `drop` antes.
+
+Os backfills são guardados para não desfazer escolha de quem usa:
+
+| migration | guarda |
+|---|---|
+| `timing_strictness` | `created_at < '2026-09-08'` |
+| `adherence_status` | `adherence_status is null` |
+| `snooze_invariants` | `attempt is null` |
+| `medication_cadence` | `cadence is null` |
+
+O corte por data no `timing_strictness` entrou em 07/09/2026 corrigindo um
+comentário que **afirmava uma proteção que o `where` não dava**: ele filtrava
+por `timing_strictness = 'flexivel'`, o que protege o caso trivial (item já
+rígido não muda) e deixa passar o que importa — um `med` marcado como flexível
+de propósito voltaria a rígido na segunda execução, desfazendo a escolha em
+silêncio.
+
+### 2.3 Depois de aplicar, conferir cada uma
+
+Aplicar não é o mesmo que estar aplicado. Uma consulta por migration, para
+transformar "rodei o arquivo" em "o objeto existe":
+
+```sql
+-- 1. substance_safety — devem voltar 75 e 21
+select count(*) from public.substance_aliases;
+select count(*) from public.substance_interactions;
+
+-- 2/3/4. colunas de medicação
+select column_name from information_schema.columns
+ where table_name = 'medications'
+   and column_name in ('timing_strictness','grace_minutes',
+                       'cadence','cadence_weekday','cadence_interval_days','cadence_anchor_on');
+select column_name from information_schema.columns
+ where table_name = 'medication_logs' and column_name in ('scheduled_for','adherence_status');
+select column_name from information_schema.columns
+ where table_name = 'medication_snoozes' and column_name in ('scheduled_for','attempt');
+
+-- 5. mechanisms — 18 linhas, com as duas vias de incretina separadas
+select count(*) from public.substance_mechanisms;
+select distinct mechanism from public.substance_mechanisms
+ where mechanism like 'incretina%';   -- deve trazer incretina_dpp4 E incretina_glp1
+
+-- 0. ANTES de aplicar: alguma coluna NOT NULL sem default entra numa tabela em
+--    que o código atual já grava? Se sim, o insert dele quebra na hora.
+select table_name, column_name
+  from information_schema.columns
+ where table_schema = 'public'
+   and is_nullable = 'NO' and column_default is null
+   and table_name in ('medications','medication_logs','medication_snoozes',
+                      'glucose_readings','meals','exercise_sessions','strength_logs','profiles')
+   and column_name not in ('id','user_id','created_at');
+
+-- 7. hypo — as duas tabelas, e RLS ligada nas duas
+select tablename, rowsecurity from pg_tables
+ where schemaname = 'public' and tablename in ('hypo_plan','hypo_events');
+```
+
+**A conferência de RLS não é formalidade.** Cinco tabelas novas guardam dado de
+saúde; `substance_*` são de leitura pública por serem base curada, mas
+`user_substance_windows`, `hypo_plan` e `hypo_events` são do usuário. Tabela
+nova sem RLS num projeto Supabase fica legível por qualquer chave anon.
+
+### 2.4 Ordem entre migration, merge e deploy
+
+1. Aplicar as sete migrations, na ordem de `2.1`, conferindo com `2.3`.
+2. Só então mesclar na `main`.
+3. O deploy sai do merge — e a partir daí o §5 (smoke) vale.
+
+Inverter 1 e 2 quebra o que hoje funciona, pelas razões da tabela em `2.1`.
 
 ## 3. `pg_cron` ↔ domínio e segredo
 

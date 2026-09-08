@@ -25,8 +25,41 @@ export default async function GlicemiaHistoricoPage() {
     days = aggregateGlucoseByDay(readings, profile?.timezone);
   }
 
+  // Estatísticas do período, calculadas dos MESMOS dias que a lista abaixo
+  // mostra — não de uma segunda consulta. Duas contagens da mesma grandeza em
+  // telas diferentes é o defeito que já apareceu neste app.
+  const totalLeituras = days.reduce((s, d) => s + d.count, 0);
+  const mediaPeriodo = totalLeituras
+    ? Math.round(days.reduce((s, d) => s + d.avg * d.count, 0) / totalLeituras)
+    : null;
+  const menor = days.length ? Math.min(...days.map((d) => d.min)) : null;
+  const maior = days.length ? Math.max(...days.map((d) => d.max)) : null;
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
+
+      {days.length ? (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Média do período</p>
+            <p className="font-mono text-2xl text-zinc-100">{mediaPeriodo ?? "—"}</p>
+            <p className="text-xs text-zinc-500">
+              {totalLeituras} leitura(s) em {days.length} dia(s)
+            </p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Menor valor</p>
+            <p className="font-mono text-2xl text-zinc-100">{menor ?? "—"}</p>
+            <p className="text-xs text-zinc-500">mg/dL</p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Maior valor</p>
+            <p className="font-mono text-2xl text-zinc-100">{maior ?? "—"}</p>
+            <p className="text-xs text-zinc-500">mg/dL</p>
+          </div>
+        </div>
+      ) : null}
+
       <p className="text-sm text-zinc-400">
         Dias com pelo menos uma leitura — abra para ver detalhe por data (YYYY-MM-DD).
       </p>

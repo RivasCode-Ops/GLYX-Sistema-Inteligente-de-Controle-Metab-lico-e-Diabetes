@@ -11,6 +11,7 @@ import { METHOD_LABEL } from "@/lib/body/composition";
 import { progressSummary } from "@/lib/body/progress";
 import { projectionMessage } from "@/lib/body/goals";
 import { dailyTargets, GOAL_LABEL } from "@/lib/health/energy";
+import { parseModelJson } from "@/lib/ai/parse-json";
 
 const resultSchema = z.object({
   headline: z.string(),
@@ -218,7 +219,10 @@ Responde APENAS com JSON válido:
 
   let json: unknown;
   try {
-    json = JSON.parse(completion.choices[0]?.message?.content ?? "");
+    json = parseModelJson(completion.choices[0]?.message?.content);
+    // response_format é ignorado pela camada de compatibilidade da Anthropic:
+    // sem o parse tolerante, JSON embrulhado em markdown viraria 502.
+    if (json === null) throw new Error("json");
   } catch {
     return NextResponse.json({ error: "Resposta inválida do modelo. Tente novamente." }, { status: 502 });
   }

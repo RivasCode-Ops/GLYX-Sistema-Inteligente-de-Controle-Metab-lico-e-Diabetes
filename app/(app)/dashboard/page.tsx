@@ -3,7 +3,7 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
-import { startOfLocalDayISO } from "@/lib/time/local-day";
+import { getNutritionToday } from "@/lib/queries/nutrition-today";
 import {
   getLastTrainedByMuscleGroup,
   getActiveMusclePauses,
@@ -14,18 +14,10 @@ import { planSummaryLabel, suggestFromPlan } from "@/lib/exercicios/training-pla
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardDemo } from "@/components/dashboard/dashboard-demo";
 import { DashboardAutoRefresh } from "@/components/dashboard/auto-refresh";
-import { OtherAccountsNotice } from "@/components/admin/other-accounts-notice";
-import {
-  summarizeOtherAccounts,
-  type AccountRow,
-  type OtherAccountsSummary,
-} from "@/lib/admin/other-accounts";
 import { SensorRadar } from "@/components/glicemia/sensor-radar";
-import { WaterCard, type BeverageSummary } from "@/components/dashboard/water-card";
-import { isHydrating, isBeverageKind } from "@/lib/health/beverages";
-import { MacroGaugesCard } from "@/components/alimentacao/macro-gauge";
-import { dailyTargets } from "@/lib/health/energy";
-import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
+import { CardAgoraView } from "@/components/painel/card-agora";
+import { ReciboContexto } from "@/components/painel/recibo-contexto";
+import { getCardAgora, type CardAgoraResult } from "@/lib/queries/card-agora";
 
 const FOCUS_STRIP: Record<
   "diabetes" | "lose" | "gain",
@@ -64,15 +56,19 @@ export default async function DashboardPage() {
 
   type Focus = "diabetes" | "lose" | "gain";
   let focus: Focus | null = null;
-  let waterMl = 0;
-  let waterGoalMl = 2000;
-  let beverageExtras: BeverageSummary[] = [];
-  let macroConsumed: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
-    null;
-  let macroTargets: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null =
-    null;
   let muscleFocusLabel: string | null = null;
-  let otherAccounts: OtherAccountsSummary | null = null;
+  let userId: string | null = null;
+  let perfil: {
+    timezone?: string | null;
+    target_glucose_min?: number | null;
+    target_glucose_max?: number | null;
+  } | null = null;
+
+  // Água e macros saíram do painel e foram para o módulo Alimentação, junto do
+  // formulário que os preenche. O que fica aqui é só o que o card de glicemia
+  // ainda mostra — e o cálculo é o mesmo dos dois lados, por função
+  // compartilhada, em vez de duas contagens da mesma grandeza.
+  const nutricao = await getNutritionToday();
 
   const supabase = await createClient();
   if (supabase) {
@@ -83,31 +79,12 @@ export default async function DashboardPage() {
       const { data: p } = await supabase
         .from("profiles")
         .select(
-          "onboarding_done, primary_focus, sex, birth_year, height_cm, activity_level, body_goal, timezone, is_admin"
+          "onboarding_done, primary_focus, timezone, target_glucose_min, target_glucose_max"
         )
         .eq("id", user.id)
         .maybeSingle();
-      const startOfDayISO = startOfLocalDayISO(p?.timezone);
 
-      const [waterRes, mealsRes, weightRes, lastTrainedByGroup, pausedGroups, logCounts] =
-        await Promise.all([
-        supabase
-          .from("water_logs")
-          .select("amount_ml, kind")
-          .eq("user_id", user.id)
-          .gte("logged_at", startOfDayISO),
-        supabase
-          .from("meals")
-          .select("calories, carbs_g, protein_g, fat_g")
-          .eq("user_id", user.id)
-          .gte("eaten_at", startOfDayISO),
-        supabase
-          .from("weight_logs")
-          .select("weight_kg")
-          .eq("user_id", user.id)
-          .order("logged_on", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+      const [lastTrainedByGroup, pausedGroups, logCounts] = await Promise.all([
         getLastTrainedByMuscleGroup(),
         getActiveMusclePauses(),
         getSessionCountByMuscleGroup(),
@@ -122,58 +99,8 @@ export default async function DashboardPage() {
 
       if (p && !p.onboarding_done) redirect("/bem-vindo");
       focus = (p?.primary_focus as Focus | null) ?? null;
-
-      // Só para admin: a RPC recusa qualquer outro chamador, e o painel inicial
-      // é onde o aviso encontra a pessoa — /admin só é visto por quem já foi
-      // procurar. Falha aqui não pode derrubar o dashboard inteiro.
-      if (p?.is_admin) {
-        const { data: rows, error } = await supabase.rpc("admin_user_stats");
-        if (!error && rows) {
-          otherAccounts = summarizeOtherAccounts(rows as AccountRow[], user.id);
-        }
-      }
-
-      // Só bebidas hidratantes contam pra meta; o resto vira o resumo de extras.
-      const beverageRows = (waterRes.data ?? []) as { amount_ml: number | null; kind: string | null }[];
-      waterMl = beverageRows
-        .filter((w) => isHydrating(w.kind ?? "agua"))
-        .reduce((s, w) => s + (w.amount_ml ?? 0), 0);
-      const extrasMap = new Map<string, BeverageSummary>();
-      for (const w of beverageRows) {
-        const kind = w.kind ?? "agua";
-        if (isHydrating(kind) || !isBeverageKind(kind)) continue;
-        const cur = extrasMap.get(kind) ?? { kind, count: 0, totalMl: 0 };
-        cur.count += 1;
-        cur.totalMl += w.amount_ml ?? 0;
-        extrasMap.set(kind, cur);
-      }
-      beverageExtras = [...extrasMap.values()];
-      const weightKg = weightRes.data?.weight_kg ? Number(weightRes.data.weight_kg) : null;
-      if (weightKg) waterGoalMl = Math.round(weightKg * 35);
-
-      macroConsumed = (mealsRes.data ?? []).reduce(
-        (acc, m) => ({
-          calories: acc.calories + (m.calories ?? 0),
-          carbs_g: acc.carbs_g + (m.carbs_g ?? 0),
-          protein_g: acc.protein_g + (m.protein_g ?? 0),
-          fat_g: acc.fat_g + (m.fat_g ?? 0),
-        }),
-        { calories: 0, carbs_g: 0, protein_g: 0, fat_g: 0 }
-      );
-
-      if (p?.sex && p.birth_year && p.height_cm && p.activity_level && weightKg) {
-        const targets = dailyTargets(
-          {
-            sex: p.sex as Sex,
-            age: new Date().getFullYear() - p.birth_year,
-            heightCm: p.height_cm,
-            weightKg,
-            activity: p.activity_level as ActivityLevel,
-          },
-          (p.body_goal as BodyGoal | null) ?? "maintain"
-        );
-        macroTargets = targets;
-      }
+      perfil = p;
+      userId = user.id;
     }
   }
 
@@ -182,13 +109,38 @@ export default async function DashboardPage() {
     return <DashboardDemo />;
   }
 
+  // Card de ação e recibo: o motor decide qual card, e a montagem do contexto
+  // fica em `lib/queries/card-agora.ts`. Falha aqui não derruba o painel — o
+  // resto da tela continua servindo, e o card simplesmente não aparece.
+  let agora: CardAgoraResult | null = null;
+  if (supabase && userId) {
+    try {
+      agora = await getCardAgora(supabase, userId, {
+        lastGlucose: summary.latestGlucose,
+        lastGlucoseAt: summary.latestGlucoseAt,
+        glucoseTrend: summary.glucoseTrend,
+        plannedWorkoutLabel: muscleFocusLabel,
+        profile: perfil,
+      });
+    } catch {
+      /* painel segue sem o card */
+    }
+  }
+
   const strip = focus ? FOCUS_STRIP[focus] : null;
 
   return (
     <div className="space-y-6">
       <DashboardAutoRefresh />
-      {otherAccounts ? <OtherAccountsNotice summary={otherAccounts} /> : null}
+      {/* O aviso de outra conta com acesso foi para Perfil → Conta. Ele é
+          administrativo: não responde "o que eu faço agora", e ocupava a melhor
+          posição da tela com um evento de um mês atrás. */}
       <SensorRadar />
+      {/* Card de ação: primeiro elemento depois da faixa de sensor. É o que
+          responde "o que faço agora" — e é o único lugar do painel onde uma
+          sugestão de treino pode nascer, porque só ele passa pela guarda
+          `exerciseSuppressed`. */}
+      {agora ? <CardAgoraView card={agora.card} /> : null}
       {strip ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <p className="text-sm font-medium text-emerald-200">{strip.label}</p>
@@ -207,29 +159,33 @@ export default async function DashboardPage() {
       ) : null}
       <DashboardShell
         latestGlucose={summary.latestGlucose}
+        latestGlucoseAgeLabel={summary.latestGlucoseAgeLabel}
+        latestGlucoseFreshness={summary.latestGlucoseFreshness}
+        glucoseTrend={summary.glucoseTrend}
         glucoseSeries={summary.glucoseSeries}
         carbsToday={summary.carbsToday}
         activeMinutes={summary.activeMinutes}
-        waterMl={waterMl}
-        waterGoalMl={waterGoalMl}
+        waterMl={nutricao.waterMl}
+        waterGoalMl={nutricao.waterGoalMl}
         riskLabel={summary.riskLabel}
+        targetRangeLabel={summary.targetRangeLabel}
         alerts={summary.alerts}
         stepsToday={summary.stepsToday}
         sleepHoursToday={summary.sleepHoursToday}
         muscleFocusLabel={muscleFocusLabel}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <WaterCard todayMl={waterMl} goalMl={waterGoalMl} extras={beverageExtras} />
-        {macroConsumed && macroTargets ? (
-          <MacroGaugesCard consumed={macroConsumed} targets={macroTargets} />
-        ) : null}
-      </div>
-      <Link
-        href="/analise"
-        className="block rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-zinc-300 transition hover:border-emerald-500/40 hover:text-zinc-100"
-      >
-        Análise — auditoria metabólica do seu período →
-      </Link>
+      {/* Saíram daqui, e para onde foram:
+          · card de água e bebidas  → módulo Alimentação (é registro, não decisão)
+          · quatro medidores de macro → módulo Alimentação
+          · link "Análise — auditoria" → removido: duplicava a linha do módulo
+            Análise, que fica logo acima na mesma tela
+
+          O painel é vista breve do que fazer agora. Detalhe e registro moram no
+          módulo, alcançáveis pelo menu e pela própria lista MÓDULOS. */}
+
+      {/* Recibo por último e fechado: é conferência do que o app sabe, não
+          decisão. Aberto, mostra a mesma leitura que vai para o copiloto. */}
+      {agora ? <ReciboContexto receipt={agora.receipt} /> : null}
     </div>
   );
 }

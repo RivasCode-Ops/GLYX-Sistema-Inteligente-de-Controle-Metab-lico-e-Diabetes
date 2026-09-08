@@ -106,20 +106,31 @@ self.addEventListener("notificationclick", (event) => {
         credentials: "include",
         body: JSON.stringify({ medication_id: info.medId, minutes: 15 }),
       })
-        .then((res) =>
-          self.registration.showNotification(
-            res.ok ? "⏰ Adiado — volta às " + returnAt : "❌ Não consegui adiar (erro " + res.status + ")",
-            {
-              body: res.ok
-                ? "Anotado. O lembrete do remédio volta a tocar às " + returnAt + " (±5 min)."
-                : "Abra o app, confirme que está logado e tente de novo.",
-              icon: "/icon-192",
-              tag: "glyx-snooze-confirm",
-              renotify: true,
-              vibrate: res.ok ? [200, 100, 200] : [400, 100, 400],
-            }
-          )
-        )
+        // 409 não é falha: é o limite de adiamentos, o item sem horário ou a
+        // dose de outro dia. O servidor manda a frase; repeti-la é o que
+        // impede o usuário de ficar tentando adiar o que não adia mais —
+        // e "erro 409" genérico faria parecer defeito.
+        .then((res) => res.json().catch(() => ({})).then((body) => ({ res, body })))
+        .then(({ res, body }) => {
+          const recusado = res.status === 409;
+          const titulo = res.ok
+            ? "⏰ Adiado — volta às " + returnAt
+            : recusado
+              ? "⏰ Não dá para adiar de novo"
+              : "❌ Não consegui adiar (erro " + res.status + ")";
+          const texto = res.ok
+            ? "Anotado. O lembrete do remédio volta a tocar às " + returnAt + " (±5 min)."
+            : recusado
+              ? body.error || "Registre que tomou, ou marque que pulou hoje."
+              : "Abra o app, confirme que está logado e tente de novo.";
+          return self.registration.showNotification(titulo, {
+            body: texto,
+            icon: "/icon-192",
+            tag: "glyx-snooze-confirm",
+            renotify: true,
+            vibrate: res.ok ? [200, 100, 200] : [400, 100, 400],
+          });
+        })
         .catch(() =>
           self.registration.showNotification("❌ Não consegui adiar (sem conexão)", {
             body: "Verifique a internet e tente de novo, ou abra o app.",
