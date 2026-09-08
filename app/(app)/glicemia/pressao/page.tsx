@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { classifyBloodPressure, BLOOD_PRESSURE_TIER_LABEL } from "@/lib/health/blood-pressure";
 import type { BloodPressureLog } from "@/types/database";
+import { ModuleTabs } from "@/components/ui/module-tabs";
 
 const TIER_STYLE: Record<string, string> = {
   normal: "bg-emerald-500/15 text-emerald-300",
@@ -53,6 +54,7 @@ export default async function PressaoArterialPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
+      <ModuleTabs />
       <p className="text-sm text-zinc-400">
         Hipertensão é comorbidade comum com diabetes — registre junto pra ter os dois na mesma
         história.
