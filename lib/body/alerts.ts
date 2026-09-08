@@ -24,6 +24,7 @@ import type { GoalProgress } from "@/lib/body/goals";
 import { shouldSuppressVolumeDiagnosis, type GroupVolume } from "@/lib/exercicios/weekly-volume";
 import { bilateralAsymmetryPercent, waistToHeightBand, type BodyComposition } from "@/lib/body/composition";
 import type { MuscleGroupId } from "@/lib/data/muscle-groups";
+import { findImplausible } from "@/lib/body/plausibility";
 
 export type BodyAlertTone = "otimo" | "bom" | "atencao" | "info";
 
@@ -150,7 +151,29 @@ export type AlertInput = {
 export function buildBodyAlerts(input: AlertInput): BodyAlert[] {
   const { progress, goals, volume, history, latestComposition, latestMeasurement } = input;
   const now = input.now ?? new Date();
+
+  // ---------------------------------------------------------------------------
+  // Plausibilidade PRIMEIRO: medida impossível não vira meta nem prescrição
+  // ---------------------------------------------------------------------------
+  // O peitoral do usuário oscilava 110 → 100 → 110 → 100, e o app prescrevia 8
+  // séries de peito porque "faltam 14 cm". O mesmo app que recusa afirmar
+  // variação abaixo de 1 cm aceitava dez vezes isso na direção contrária.
+  const suspeitas = findImplausible(history, Object.keys(MEASURE_TO_MUSCLE) as BodyMeasurementKey[]);
   const alerts: BodyAlert[] = [];
+  if (suspeitas.length) {
+    const pior = [...suspeitas].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+    alerts.push({
+      id: "medida_implausivel",
+      title: `${suspeitas.length === 1 ? "Uma medida parece" : `${suspeitas.length} medidas parecem`} ter erro de digitação`,
+      body:
+        `${BODY_FIELD_BY_KEY[pior.key].label}: ${pior.from} → ${pior.to} cm em ${pior.days} ` +
+        `dia(s). Variação assim não é fisiológica — costuma ser fita mal posicionada ou dígito ` +
+        `trocado. Enquanto não for corrigida, o app não usa essas medidas para calcular meta nem ` +
+        `para sugerir séries.`,
+      tone: "atencao",
+      href: "/composicao/medidas",
+    });
+  }
 
   // 1. Leitura da evolução — o alerta mais importante, sempre primeiro.
   if (progress) {
