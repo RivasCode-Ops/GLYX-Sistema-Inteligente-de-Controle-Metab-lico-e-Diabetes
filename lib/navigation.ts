@@ -115,6 +115,10 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
     { title: "Interações", href: "/medicacao/interacoes" },
     { title: "Calculadora", href: "/medicacao/calculadora" },
   ],
+  "/exames": [
+    { title: "Documentos", href: "/exames" },
+    { title: "Resultados", href: "/exames/series" },
+  ],
   "/perfil": [
     { title: "Metabólico", href: "/perfil" },
     { title: "Corpo & peso", href: "/perfil/corpo" },

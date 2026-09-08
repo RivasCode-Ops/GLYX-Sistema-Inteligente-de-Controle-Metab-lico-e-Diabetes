@@ -12,9 +12,27 @@ import { EXAM_TYPE_LABEL, parseExamType } from "@/lib/exams/types";
 import { buildExamParameterSeries } from "@/lib/exams/parameter-series";
 import { ExamParameterChart } from "@/components/exams/exam-parameter-chart";
 import { formatarData } from "@/lib/time/format";
+import { definirDataDaColeta, extrairValoresDoExame } from "@/app/actions/exam-values";
+import { formatarDiaISO } from "@/lib/time/format";
 
 export default async function ExamesPage() {
-  let exams: { id: string; title: string | null; created_at: string; exam_type?: string | null }[] =
+  async function extrairValoresAction(formData: FormData): Promise<void> {
+    "use server";
+    await extrairValoresDoExame(formData);
+  }
+  async function definirDataDaColetaAction(formData: FormData): Promise<void> {
+    "use server";
+    await definirDataDaColeta(formData);
+  }
+
+  let exams: {
+    id: string;
+    title: string | null;
+    created_at: string;
+    exam_type?: string | null;
+    collected_on?: string | null;
+    raw_text?: string | null;
+  }[] =
     [];
   let parameterSeries: ReturnType<typeof buildExamParameterSeries> = [];
   const demoMode = !isSupabaseConfigured();
@@ -35,7 +53,7 @@ export default async function ExamesPage() {
       if (user) {
         const { data } = await supabase
           .from("exams")
-          .select("id, title, created_at, exam_type")
+          .select("id, title, created_at, exam_type, collected_on, raw_text")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(20);
@@ -128,10 +146,10 @@ export default async function ExamesPage() {
         ) : (
           <ul className="space-y-2">
             {exams.map((e) => (
-              <li key={e.id}>
+              <li key={e.id} className="rounded-xl border border-zinc-800 bg-zinc-900/40">
                 <Link
                   href={`/exames/${e.id}`}
-                  className="flex justify-between rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm hover:border-emerald-500/30"
+                  className="flex justify-between px-4 py-3 text-sm hover:border-emerald-500/30"
                 >
                   <span className="text-zinc-200">
                     <span className="mr-2 rounded-md border border-zinc-700 px-1.5 py-0.5 text-[10px] uppercase text-zinc-400">
@@ -140,9 +158,42 @@ export default async function ExamesPage() {
                     {e.title ?? "Sem título"}
                   </span>
                   <span className="font-mono text-xs text-zinc-500">
-                    {formatarData(e.created_at)} →
+                    {/* Data da COLETA quando informada. `created_at` é quando se
+                        cadastrou, e os três primeiros laudos do usuário são de
+                        junho e julho cadastrados em setembro — datar pela
+                        segunda põe qualquer série na ordem errada. */}
+                    {e.collected_on ? formatarDiaISO(e.collected_on) : `cadastro ${formatarData(e.created_at)}`}{" "}
+                    →
                   </span>
                 </Link>
+
+                <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/70 px-4 py-2.5">
+                  <form action={definirDataDaColetaAction} className="flex items-center gap-1.5">
+                    <input type="hidden" name="exam_id" value={e.id} />
+                    <label className="text-[11px] text-zinc-500" htmlFor={`coleta-${e.id}`}>
+                      Coleta
+                    </label>
+                    <input
+                      id={`coleta-${e.id}`}
+                      type="date"
+                      name="collected_on"
+                      defaultValue={e.collected_on ?? ""}
+                      className="h-7 rounded-md border border-zinc-800 bg-zinc-950 px-2 font-mono text-[11px] text-zinc-300"
+                    />
+                    <Button type="submit" variant="ghost" size="sm" className="h-7 text-[11px]">
+                      Salvar
+                    </Button>
+                  </form>
+
+                  {e.raw_text ? (
+                    <form action={extrairValoresAction}>
+                      <input type="hidden" name="exam_id" value={e.id} />
+                      <Button type="submit" variant="outline" size="sm" className="h-7 text-[11px]">
+                        Extrair valores
+                      </Button>
+                    </form>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>

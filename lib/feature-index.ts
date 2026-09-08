@@ -257,6 +257,23 @@ export const FEATURES: Feature[] = [
     terms: ["faixa alvo", "meta de glicemia", "razão de carboidrato", "fator de correção"],
   },
   {
+    title: "Resultados de exame ao longo do tempo",
+    href: "/exames/series",
+    where: ["Exames", "Resultados"],
+    what: "Cada analito (HbA1c, LDL, creatinina…) nas coletas sucessivas, com a referência impressa no laudo.",
+    terms: [
+      "hba1c",
+      "hemoglobina glicada",
+      "ldl",
+      "colesterol",
+      "creatinina",
+      "serie de exame",
+      "resultado de exame",
+      "evolucao do exame",
+      "analito",
+    ],
+  },
+  {
     title: "Interações entre os seus itens",
     href: "/medicacao/interacoes",
     where: ["Medicação", "Interações"],
