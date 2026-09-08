@@ -4,6 +4,12 @@ import { computePeriodAdherence } from "@/lib/medications/adherence";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import type { MetabolicAuditRow } from "@/lib/audit/types";
 import { fetchAllRows } from "@/lib/queries/fetch-all";
+import {
+  computeGlucoseMetrics,
+  findHourPattern,
+  type GlucoseMetrics,
+  type HourPattern,
+} from "@/lib/health/glucose-metrics";
 
 export type ReportExtreme = { day: string; count: number; firstAt: string; peak: number };
 
@@ -26,6 +32,15 @@ export type MedicalReportData = {
   hyperDays: ReportExtreme[];
   hypoDays: ReportExtreme[];
   medications: ReportMedAdherence[];
+  /**
+   * As métricas que a consulta pede primeiro — GMI, CV, tempos em faixa em
+   * percentual, episódios (não leituras) e cobertura do sensor. O relatório
+   * entregava contagem e média sobre 5.044 leituras, que é o que um caderno
+   * entregaria.
+   */
+  metrics: GlucoseMetrics;
+  /** Concentração de hipoglicemias numa faixa de horas, quando existe. */
+  hipoPattern: HourPattern | null;
   generatedAt: string;
 };
 
@@ -71,6 +86,10 @@ export async function buildMedicalReportData(
     userId,
     { orderColumn: "recorded_at", since: startISO, before: endISO }
   );
+
+  // Uma passada só sobre as mesmas leituras que os extremos usam — não há
+  // segunda consulta nem segunda contagem.
+  const metrics = computeGlucoseMetrics(readings, { targetMin, targetMax }, tz);
 
   const hyperByDay = new Map<string, { count: number; firstAt: string; peak: number }>();
   const hypoByDay = new Map<string, { count: number; firstAt: string; peak: number }>();
@@ -159,6 +178,8 @@ export async function buildMedicalReportData(
     hyperDays: toSorted(hyperByDay),
     hypoDays: toSorted(hypoByDay),
     medications,
+    metrics,
+    hipoPattern: findHourPattern(metrics.hipoByHour),
     generatedAt: new Date().toISOString(),
   };
 }

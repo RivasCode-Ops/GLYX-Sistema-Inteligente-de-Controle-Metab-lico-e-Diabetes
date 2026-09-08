@@ -63,6 +63,8 @@ export default async function RelatorioMedicoPage() {
   // tabela listava dois dias hiper, com 5 e 27 leituras e pico de 348. Passa a
   // sair da mesma conta que a tabela mostra; a métrica salva só cobre quando o
   // recálculo não tem base.
+  const mt = report.metrics;
+  const hipoPattern = report.hipoPattern;
   const severeHyperRecalculado = report.hyperDays.reduce((soma, d) => soma + d.count, 0);
   const severeHyper =
     report.hyperDays.length > 0 ? severeHyperRecalculado : (m.severeHyperCount ?? null);
@@ -152,6 +154,61 @@ export default async function RelatorioMedicoPage() {
           ) : (
             `Cobertura de sensor: ${m.daysWithGlucose} de ${report.audit.window_days} dias, ${m.readingCount} leituras.`
           )}
+        </p>
+
+        {/* ------------------------------------------------------------------
+            Métricas do consenso de CGM — o que a consulta pede primeiro
+            ------------------------------------------------------------------ */}
+        <h2 className="mt-5 border-b-2 border-zinc-900 pb-1 text-[13px] font-semibold uppercase tracking-wide text-zinc-800">
+          Métricas do sensor
+        </h2>
+        <div className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
+          {[
+            { rotulo: "Média", valor: mt.mean != null ? `${mt.mean} mg/dL` : "—" },
+            { rotulo: "GMI (estimado)", valor: mt.gmiPercent != null ? `${mt.gmiPercent}%` : "—" },
+            { rotulo: "CV", valor: mt.cvPercent != null ? `${mt.cvPercent}%` : "—" },
+            { rotulo: "TIR", valor: mt.tirPercent != null ? `${mt.tirPercent}%` : "—" },
+            { rotulo: "TBR", valor: mt.tbrPercent != null ? `${mt.tbrPercent}%` : "—" },
+            { rotulo: "TAR", valor: mt.tarPercent != null ? `${mt.tarPercent}%` : "—" },
+          ].map((k) => (
+            <div key={k.rotulo} className="min-w-[92px]">
+              <div className="text-xl font-bold">{k.valor}</div>
+              <div className="text-[11px] uppercase tracking-wide text-zinc-600">{k.rotulo}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* EPISÓDIO, não leitura: com sensor de 5 em 5 min, uma hiper de duas
+            horas e meia vira 27 ocorrências — número que descreve a frequência
+            do sensor tanto quanto a do paciente. Critério de 15 min contínuos
+            do consenso (Battelino 2019), o mesmo do relatório do fabricante. */}
+        <p className="mt-3 text-xs text-zinc-700">
+          <strong>
+            {mt.hipoEpisodes} episódio(s) de hipoglicemia e {mt.hiperEpisodes} de hiperglicemia
+          </strong>{" "}
+          no período — episódios, não leituras (critério de 15 min contínuos).
+        </p>
+
+        {hipoPattern ? (
+          <p className="mt-2 border-2 border-zinc-900 px-3 py-2 text-xs font-medium leading-relaxed">
+            {/* A frase que vale a consulta. O app tinha este dado desde julho e
+                mostrava as hipoglicemias como avisos soltos, em ordem
+                cronológica, sem nunca dizer que se concentravam num horário. */}
+            Concentração de hipoglicemias entre {String(hipoPattern.fromHour).padStart(2, "0")}h e{" "}
+            {String(hipoPattern.toHour).padStart(2, "0")}h: {hipoPattern.count} de{" "}
+            {hipoPattern.total} episódios ({hipoPattern.percent}%). Descrição dos registros, para
+            avaliação médica.
+          </p>
+        ) : null}
+
+        <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
+          Cobertura do sensor: {mt.coverage.daysWithData} de {mt.coverage.daysInPeriod} dias
+          {mt.coverage.percent != null ? ` (${mt.coverage.percent}%)` : ""}.
+          {mt.coverage.gaps.length > 0
+            ? ` Maior intervalo sem leitura: ${mt.coverage.gaps[0].days} dias (${mt.coverage.gaps[0].fromDay} a ${mt.coverage.gaps[0].toDay}).`
+            : ""}{" "}
+          Percentuais calculados sobre os dias com leitura. O GMI é estimativa a partir da média do
+          sensor e não substitui a HbA1c de laboratório.
         </p>
 
         <h2 className="mt-5 border-b-2 border-zinc-900 pb-1 text-[13px] font-semibold uppercase tracking-wide text-zinc-800">
