@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 
 /**
  * Cliente da API do LibreLinkUp — o mesmo canal que o app de
@@ -212,7 +212,46 @@ export async function lluFetchMeasurements(
 // Preferir CGM_CREDENTIALS_SECRET (dedicada). CRON_SECRET fica só como legado
 // de leitura enquanto conexões antigas são re-criptografadas no próximo sync.
 
+/**
+ * Derivação da chave de cifra — HKDF, não hash simples.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE MUDOU
+ * ---------------------------------------------------------------------------
+ * Era `sha256(secret + ":libre-cred-v1")`. SHA-256 é uma função de HASH, não de
+ * derivação de chave: ela é rápida de propósito, e é exatamente essa velocidade
+ * que a torna ruim aqui. Se `CGM_CREDENTIALS_SECRET` for uma frase escolhida por
+ * uma pessoa — e nada no app obriga o contrário — quem tiver a coluna
+ * `credentials_enc` pode testar bilhões de candidatas por segundo até abrir a
+ * senha do LibreLinkUp e do Google Fit.
+ *
+ * HKDF é a função certa para este caso (segredo já existente, sem custo de
+ * trabalho ajustável): ela faz extract-and-expand com salt e info, e o `info`
+ * mantém a separação de domínio que o sufixo `:libre-cred-v1` já dava.
+ *
+ * O salt é FIXO e público de propósito. Salt variável exigiria guardá-lo junto
+ * de cada credencial, e o formato gravado hoje não tem espaço para ele — mudar
+ * o formato tornaria ilegível tudo que já está no banco. Com segredo de alta
+ * entropia, salt fixo não enfraquece o extract; com segredo fraco, quem protege
+ * é a troca do segredo, não o salt.
+ *
+ * ---------------------------------------------------------------------------
+ * COMPATIBILIDADE
+ * ---------------------------------------------------------------------------
+ * Credencial já gravada foi cifrada com a chave antiga. `deriveLegacyCredKey`
+ * continua existindo e a decifra cai nela quando a nova falha — o mesmo caminho
+ * que o segredo legado já usava, com `usedLegacyKey` mandando o chamador
+ * re-criptografar no próximo sync.
+ */
+const CRED_SALT = Buffer.from("glyx:cgm-credentials:v2");
+const CRED_INFO = Buffer.from("libre-cred-v2");
+
 function deriveCredKey(secret: string): Buffer {
+  return Buffer.from(hkdfSync("sha256", Buffer.from(secret), CRED_SALT, CRED_INFO, 32));
+}
+
+/** Derivação anterior (SHA-256 simples), mantida só para LER o que já existe. */
+function deriveLegacyCredKey(secret: string): Buffer {
   return createHash("sha256").update(`${secret}:libre-cred-v1`).digest();
 }
 
@@ -259,19 +298,34 @@ export type DecryptCredentialResult = {
 };
 
 export function decryptCredentialDetailed(payload: string): DecryptCredentialResult {
-  try {
-    return {
-      plain: decryptWithKey(deriveCredKey(primaryCredSecret()), payload),
-      usedLegacyKey: false,
-    };
-  } catch (primaryError) {
-    const legacy = legacyCredSecret();
-    if (!legacy) throw primaryError;
-    return {
-      plain: decryptWithKey(deriveCredKey(legacy), payload),
-      usedLegacyKey: true,
-    };
+  const primario = primaryCredSecret();
+  const legado = legacyCredSecret();
+
+  // Ordem: chave nova do segredo atual, depois derivação antiga do segredo
+  // atual, depois as duas do segredo legado. Cada tentativa que não é a
+  // primeira marca `usedLegacyKey`, e o chamador re-criptografa no próximo
+  // sync — é assim que a base migra sozinha, sem janela em que o usuário
+  // perde a conexão.
+  const tentativas: { key: Buffer; legacy: boolean }[] = [
+    { key: deriveCredKey(primario), legacy: false },
+    { key: deriveLegacyCredKey(primario), legacy: true },
+    ...(legado
+      ? [
+          { key: deriveCredKey(legado), legacy: true },
+          { key: deriveLegacyCredKey(legado), legacy: true },
+        ]
+      : []),
+  ];
+
+  let ultimoErro: unknown = null;
+  for (const t of tentativas) {
+    try {
+      return { plain: decryptWithKey(t.key, payload), usedLegacyKey: t.legacy };
+    } catch (e) {
+      ultimoErro = e;
+    }
   }
+  throw ultimoErro;
 }
 
 export function decryptCredential(payload: string): string {
