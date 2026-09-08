@@ -79,8 +79,23 @@ Migrations desta leva, em ordem:
 20260907160000_hypo_plan.sql
 ```
 
-Todas são aditivas (colunas e tabelas novas, com backfill). Nenhuma apaga ou
-reescreve dado existente.
+Todas são aditivas **para o dado**: nenhuma apaga ou reescreve o que já existe.
+
+> **Aditiva para o dado não é o mesmo que compatível com o código anterior — e
+> essa confusão custou caro em 08/09/2026.** A `snooze_invariants` pôs
+> `medication_snoozes.scheduled_for` como NOT NULL sem default. O código que
+> estava em produção insere naquela tabela sem essa coluna, e **todo adiamento
+> passou a falhar no instante em que a migration entrou**. Foi preciso a
+> corretiva `20260908030000` para restaurar.
+>
+> A regra "migration antes do deploy" só vale para migration que o código
+> ANTERIOR tolera. Quando não tolera — coluna NOT NULL sem default numa tabela
+> em que o código já grava — a ordem é outra: a coluna entra permissiva (com
+> default ou nullable), o código sobe, e só uma migration posterior aperta.
+>
+> A pergunta que faltava no checklist: *para cada tabela que já existe, o insert
+> do código que está em produção agora continua válido depois desta migration?*
+> A consulta que responde está em 2.3.
 
 > **Não há fallback no código para coluna ausente, de propósito.** Tolerar a
 > falta silenciaria justamente o estado que precisa ser barulhento: um app de
@@ -138,6 +153,16 @@ select column_name from information_schema.columns
 select count(*) from public.substance_mechanisms;
 select distinct mechanism from public.substance_mechanisms
  where mechanism like 'incretina%';   -- deve trazer incretina_dpp4 E incretina_glp1
+
+-- 0. ANTES de aplicar: alguma coluna NOT NULL sem default entra numa tabela em
+--    que o código atual já grava? Se sim, o insert dele quebra na hora.
+select table_name, column_name
+  from information_schema.columns
+ where table_schema = 'public'
+   and is_nullable = 'NO' and column_default is null
+   and table_name in ('medications','medication_logs','medication_snoozes',
+                      'glucose_readings','meals','exercise_sessions','strength_logs','profiles')
+   and column_name not in ('id','user_id','created_at');
 
 -- 7. hypo — as duas tabelas, e RLS ligada nas duas
 select tablename, rowsecurity from pg_tables
