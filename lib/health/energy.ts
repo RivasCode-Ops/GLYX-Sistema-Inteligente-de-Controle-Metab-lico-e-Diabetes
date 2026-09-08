@@ -75,23 +75,45 @@ function splitCarbsFat(calories: number, proteinG: number): { carbs_g: number; f
   };
 }
 
+/**
+ * Proteína por quilo de peso, por objetivo — a razão, não o gramo.
+ *
+ * Estava embutida em quatro `Math.round(1.x * peso)` dentro do `switch`. Vira
+ * constante nomeada porque a TELA precisa dela: mostrar "160 g" sozinho não
+ * responde se está adequado, e recalcular a razão na tela seria a segunda
+ * definição do mesmo número — o dia em que o objetivo mudasse de fator, uma das
+ * duas ficaria para trás.
+ *
+ * A faixa é referência geral para pessoa fisicamente ativa (ISSN cita 1,4-2,0
+ * g/kg/dia), não prescrição individual. Quem tem condição renal, hepática ou
+ * usa medicação que muda a demanda proteica precisa de meta feita por
+ * nutricionista — e o app diz isso na tela em vez de deixar o número falar
+ * sozinho.
+ */
+export const PROTEIN_G_PER_KG: Record<BodyGoal, number> = {
+  lose: 1.6,
+  gain: 1.8,
+  maintain: 1.2,
+  recomp: 2.0,
+};
+
 /** Metas diárias por objetivo. Piso de 1200 kcal (nunca sugerir menos). */
 export function dailyTargets(profile: BodyProfile, goal: BodyGoal): DailyTargets {
   const expenditure = tdee(profile);
   switch (goal) {
     case "lose": {
       const calories = Math.max(1200, expenditure - 500);
-      const protein_g = Math.round(1.6 * profile.weightKg);
+      const protein_g = Math.round(PROTEIN_G_PER_KG.lose * profile.weightKg);
       return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: -500 };
     }
     case "gain": {
       const calories = expenditure + 300;
-      const protein_g = Math.round(1.8 * profile.weightKg);
+      const protein_g = Math.round(PROTEIN_G_PER_KG.gain * profile.weightKg);
       return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: 300 };
     }
     case "maintain": {
       const calories = expenditure;
-      const protein_g = Math.round(1.2 * profile.weightKg);
+      const protein_g = Math.round(PROTEIN_G_PER_KG.maintain * profile.weightKg);
       return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: 0 };
     }
     case "recomp": {
@@ -100,7 +122,7 @@ export function dailyTargets(profile: BodyProfile, goal: BodyGoal): DailyTargets
       // treino/síntese proteica) + proteína bem alta pra preservar/construir
       // músculo mesmo em déficit — abordagem padrão da literatura esportiva.
       const calories = Math.max(1200, expenditure - 200);
-      const protein_g = Math.round(2.0 * profile.weightKg);
+      const protein_g = Math.round(PROTEIN_G_PER_KG.recomp * profile.weightKg);
       return { calories, protein_g, ...splitCarbsFat(calories, protein_g), deficitOrSurplus: -200 };
     }
   }

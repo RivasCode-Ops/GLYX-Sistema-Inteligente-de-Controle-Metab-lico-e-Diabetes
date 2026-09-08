@@ -8,6 +8,7 @@ import { NewMealForm } from "@/components/alimentacao/new-meal-form";
 import { WaterCard } from "@/components/dashboard/water-card";
 import { DayProgressRing } from "@/components/alimentacao/day-progress-ring";
 import { getNutritionToday } from "@/lib/queries/nutrition-today";
+import { GOAL_LABEL, PROTEIN_G_PER_KG } from "@/lib/health/energy";
 import type { Meal } from "@/types/database";
 import { demoMeals } from "@/lib/demo/data";
 
@@ -79,22 +80,48 @@ export default async function AlimentacaoPage() {
   );
   const maxGlycemic = todayMeals.reduce((max, m) => Math.max(max, m.glycemic_load_estimate ?? 0), 0);
 
+  // Uma vez, aqui: o tile e a nota abaixo dele leem a MESMA string. Dois
+  // `toFixed` em lugares diferentes acabam divergindo no dia em que um deles
+  // ganhar uma casa decimal.
+  const proteinaPorKg =
+    nutricao.weightKg && nutricao.weightKg > 0
+      ? `${(consumidoHoje.protein_g / nutricao.weightKg).toFixed(1)} g/kg`
+      : null;
+
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       {/* Quatro macros do dia, com a mesma leitura do painel de nutrição. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { rotulo: "kcal consumidas", valor: Math.round(consumidoHoje.calories), cor: "text-zinc-100" },
-          { rotulo: "carboidratos", valor: `${Math.round(consumidoHoje.carbs_g)} g`, cor: "text-amber-300" },
-          { rotulo: "proteínas", valor: `${Math.round(consumidoHoje.protein_g)} g`, cor: "text-sky-300" },
-          { rotulo: "gorduras", valor: `${Math.round(consumidoHoje.fat_g)} g`, cor: "text-purple-300" },
+          { rotulo: "kcal consumidas", valor: Math.round(consumidoHoje.calories), cor: "text-zinc-100", nota: null },
+          { rotulo: "carboidratos", valor: `${Math.round(consumidoHoje.carbs_g)} g`, cor: "text-amber-300", nota: null },
+          {
+            rotulo: "proteínas",
+            valor: `${Math.round(consumidoHoje.protein_g)} g`,
+            cor: "text-sky-300",
+            // Gramas sozinhas não respondem se está adequado: a referência de
+            // proteína existe em g/kg, e é a razão que se compara. Sem peso
+            // registrado a linha some, em vez de o app inventar um peso.
+            nota: proteinaPorKg,
+          },
+          { rotulo: "gorduras", valor: `${Math.round(consumidoHoje.fat_g)} g`, cor: "text-purple-300", nota: null },
         ].map((t) => (
           <div key={t.rotulo} className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
             <p className={`font-mono text-2xl ${t.cor}`}>{t.valor}</p>
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">{t.rotulo}</p>
+            {t.nota ? <p className="mt-0.5 font-mono text-[11px] text-zinc-500">{t.nota}</p> : null}
           </div>
         ))}
       </div>
+
+      {proteinaPorKg && nutricao.bodyGoal ? (
+        <p className="-mt-4 text-[11px] leading-relaxed text-zinc-500">
+          Alvo de {PROTEIN_G_PER_KG[nutricao.bodyGoal].toFixed(1)} g/kg para{" "}
+          {GOAL_LABEL[nutricao.bodyGoal].toLowerCase()}, sobre {nutricao.weightKg} kg. É faixa geral
+          para pessoa fisicamente ativa — condição renal, hepática ou medicação que mude a demanda
+          proteica pedem meta feita por nutricionista.
+        </p>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4 p-4">

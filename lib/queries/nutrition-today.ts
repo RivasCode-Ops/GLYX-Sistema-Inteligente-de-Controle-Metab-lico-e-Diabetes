@@ -27,6 +27,14 @@ export type NutritionToday = {
   beverageExtras: BeverageSummary[];
   macroConsumed: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null;
   macroTargets: { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null;
+  /**
+   * Peso e objetivo saem daqui porque a tela precisa deles para dizer a
+   * proteína em g/kg. Sem o peso, "160 g" não responde se está adequado; e
+   * buscar o peso de novo na página seria a segunda leitura da mesma linha,
+   * podendo pegar outra medição.
+   */
+  weightKg: number | null;
+  bodyGoal: BodyGoal | null;
 };
 
 const VAZIO: NutritionToday = {
@@ -35,6 +43,8 @@ const VAZIO: NutritionToday = {
   beverageExtras: [],
   macroConsumed: null,
   macroTargets: null,
+  weightKg: null,
+  bodyGoal: null,
 };
 
 export async function getNutritionToday(): Promise<NutritionToday> {
@@ -122,5 +132,7 @@ export async function getNutritionToday(): Promise<NutritionToday> {
     beverageExtras: [...extrasMap.values()],
     macroConsumed,
     macroTargets,
+    weightKg,
+    bodyGoal: (p?.body_goal as BodyGoal | null) ?? null,
   };
 }
