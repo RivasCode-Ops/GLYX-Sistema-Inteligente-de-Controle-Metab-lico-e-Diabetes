@@ -34,11 +34,19 @@ alter table public.medications
 -- Cadência pela metade é pior que cadência ausente: 'semanal' sem dia da semana
 -- e 'intervalo' sem intervalo seriam lidos como declarados e não teriam como
 -- ser calculados.
+-- Reexecutável de propósito: `create policy` e `add constraint` NÃO têm
+-- `if not exists` no Postgres. Sem o `drop` antes, aplicar esta migration duas
+-- vezes falha — e o retry é o caso COMUM, não o raro: aplicação manual pelo
+-- painel, falha no meio de uma sequência de sete, ou rodar de novo por dúvida
+-- sobre ter completado. Pior, falharia DEPOIS de já ter criado tabela e índice
+-- (que são idempotentes), deixando o estado pela metade.
+alter table public.medications drop constraint if exists medications_cadence_completa;
 alter table public.medications
   add constraint medications_cadence_completa check (
     cadence is distinct from 'semanal' or cadence_weekday is not null
   );
 
+alter table public.medications drop constraint if exists medications_cadence_intervalo_completo;
 alter table public.medications
   add constraint medications_cadence_intervalo_completo check (
     cadence is distinct from 'intervalo'

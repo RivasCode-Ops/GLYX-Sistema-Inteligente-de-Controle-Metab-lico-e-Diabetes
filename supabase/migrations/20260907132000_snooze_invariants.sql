@@ -75,6 +75,13 @@ alter table public.medication_snoozes
 alter table public.medication_snoozes
   alter column attempt set default 1;
 
+-- Reexecutável de propósito: `create policy` e `add constraint` NÃO têm
+-- `if not exists` no Postgres. Sem o `drop` antes, aplicar esta migration duas
+-- vezes falha — e o retry é o caso COMUM, não o raro: aplicação manual pelo
+-- painel, falha no meio de uma sequência de sete, ou rodar de novo por dúvida
+-- sobre ter completado. Pior, falharia DEPOIS de já ter criado tabela e índice
+-- (que são idempotentes), deixando o estado pela metade.
+alter table public.medication_snoozes drop constraint if exists medication_snoozes_attempt_range;
 alter table public.medication_snoozes
   add constraint medication_snoozes_attempt_range
     check (attempt between 1 and 10);
@@ -82,6 +89,7 @@ alter table public.medication_snoozes
 -- A trava que impede reescrita silenciosa: uma segunda gravação da MESMA
 -- tentativa passa a falhar em vez de deslizar o horário. Adiar de novo cria
 -- linha nova com `attempt` incrementado — nunca atualiza a anterior.
+alter table public.medication_snoozes drop constraint if exists medication_snoozes_unique_attempt;
 alter table public.medication_snoozes
   add constraint medication_snoozes_unique_attempt
     unique (user_id, medication_id, scheduled_for, attempt);

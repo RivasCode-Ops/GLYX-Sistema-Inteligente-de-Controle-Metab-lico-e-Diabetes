@@ -28,6 +28,13 @@ create table if not exists public.hypo_plan (
 
 alter table public.hypo_plan enable row level security;
 
+-- Reexecutável de propósito: `create policy` e `add constraint` NÃO têm
+-- `if not exists` no Postgres. Sem o `drop` antes, aplicar esta migration duas
+-- vezes falha — e o retry é o caso COMUM, não o raro: aplicação manual pelo
+-- painel, falha no meio de uma sequência de sete, ou rodar de novo por dúvida
+-- sobre ter completado. Pior, falharia DEPOIS de já ter criado tabela e índice
+-- (que são idempotentes), deixando o estado pela metade.
+drop policy if exists "hypo_plan_own" on public.hypo_plan;
 create policy "hypo_plan_own" on public.hypo_plan
   for all to authenticated
   using (user_id = auth.uid())
@@ -53,6 +60,7 @@ create table if not exists public.hypo_events (
 
 alter table public.hypo_events enable row level security;
 
+drop policy if exists "hypo_events_own" on public.hypo_events;
 create policy "hypo_events_own" on public.hypo_events
   for all to authenticated
   using (user_id = auth.uid())

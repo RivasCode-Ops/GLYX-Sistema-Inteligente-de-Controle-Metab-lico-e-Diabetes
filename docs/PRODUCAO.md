@@ -86,6 +86,77 @@ reescreve dado existente.
 > falta silenciaria justamente o estado que precisa ser barulhento: um app de
 > diabetes rodando com o checador de interação vazio parece funcionar.
 
+### 2.2 Rodar de novo é seguro — e é o caso comum, não o raro
+
+As sete são **reexecutáveis**. Isso não era verdade até 07/09/2026: `create
+policy` e `add constraint` não aceitam `if not exists` no Postgres, e sem um
+`drop … if exists` antes a segunda execução falha. Falharia **depois** de já ter
+criado tabela e índice, que são idempotentes — deixando o estado no meio, que é
+o pior lugar para parar.
+
+E o retry é o caso comum: aplicação manual pelo painel, falha no meio de uma
+sequência de sete, ou simplesmente rodar de novo por dúvida sobre ter
+completado. Seis políticas e quatro constraints ganharam o `drop` antes.
+
+Os backfills são guardados para não desfazer escolha de quem usa:
+
+| migration | guarda |
+|---|---|
+| `timing_strictness` | `created_at < '2026-09-08'` |
+| `adherence_status` | `adherence_status is null` |
+| `snooze_invariants` | `attempt is null` |
+| `medication_cadence` | `cadence is null` |
+
+O corte por data no `timing_strictness` entrou em 07/09/2026 corrigindo um
+comentário que **afirmava uma proteção que o `where` não dava**: ele filtrava
+por `timing_strictness = 'flexivel'`, o que protege o caso trivial (item já
+rígido não muda) e deixa passar o que importa — um `med` marcado como flexível
+de propósito voltaria a rígido na segunda execução, desfazendo a escolha em
+silêncio.
+
+### 2.3 Depois de aplicar, conferir cada uma
+
+Aplicar não é o mesmo que estar aplicado. Uma consulta por migration, para
+transformar "rodei o arquivo" em "o objeto existe":
+
+```sql
+-- 1. substance_safety — devem voltar 75 e 21
+select count(*) from public.substance_aliases;
+select count(*) from public.substance_interactions;
+
+-- 2/3/4. colunas de medicação
+select column_name from information_schema.columns
+ where table_name = 'medications'
+   and column_name in ('timing_strictness','grace_minutes',
+                       'cadence','cadence_weekday','cadence_interval_days','cadence_anchor_on');
+select column_name from information_schema.columns
+ where table_name = 'medication_logs' and column_name in ('scheduled_for','adherence_status');
+select column_name from information_schema.columns
+ where table_name = 'medication_snoozes' and column_name in ('scheduled_for','attempt');
+
+-- 5. mechanisms — 18 linhas, com as duas vias de incretina separadas
+select count(*) from public.substance_mechanisms;
+select distinct mechanism from public.substance_mechanisms
+ where mechanism like 'incretina%';   -- deve trazer incretina_dpp4 E incretina_glp1
+
+-- 7. hypo — as duas tabelas, e RLS ligada nas duas
+select tablename, rowsecurity from pg_tables
+ where schemaname = 'public' and tablename in ('hypo_plan','hypo_events');
+```
+
+**A conferência de RLS não é formalidade.** Cinco tabelas novas guardam dado de
+saúde; `substance_*` são de leitura pública por serem base curada, mas
+`user_substance_windows`, `hypo_plan` e `hypo_events` são do usuário. Tabela
+nova sem RLS num projeto Supabase fica legível por qualquer chave anon.
+
+### 2.4 Ordem entre migration, merge e deploy
+
+1. Aplicar as sete migrations, na ordem de `2.1`, conferindo com `2.3`.
+2. Só então mesclar na `main`.
+3. O deploy sai do merge — e a partir daí o §5 (smoke) vale.
+
+Inverter 1 e 2 quebra o que hoje funciona, pelas razões da tabela em `2.1`.
+
 ## 3. `pg_cron` ↔ domínio e segredo
 
 As functions SQL chamam o domínio Vercel com `x-cron-secret`. **Nenhum valor fica em literal no

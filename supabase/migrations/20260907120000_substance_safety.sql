@@ -43,6 +43,13 @@ create index if not exists substance_aliases_canonical_idx
 
 alter table public.substance_aliases enable row level security;
 
+-- Reexecutável de propósito: `create policy` e `add constraint` NÃO têm
+-- `if not exists` no Postgres. Sem o `drop` antes, aplicar esta migration duas
+-- vezes falha — e o retry é o caso COMUM, não o raro: aplicação manual pelo
+-- painel, falha no meio de uma sequência de sete, ou rodar de novo por dúvida
+-- sobre ter completado. Pior, falharia DEPOIS de já ter criado tabela e índice
+-- (que são idempotentes), deixando o estado pela metade.
+drop policy if exists "substance_aliases_read" on public.substance_aliases;
 create policy "substance_aliases_read" on public.substance_aliases
   for select to authenticated using (true);
 
@@ -73,6 +80,7 @@ create table if not exists public.substance_interactions (
 
 alter table public.substance_interactions enable row level security;
 
+drop policy if exists "substance_interactions_read" on public.substance_interactions;
 create policy "substance_interactions_read" on public.substance_interactions
   for select to authenticated using (true);
 
