@@ -168,6 +168,7 @@ export default async function DashboardPage() {
         waterMl={nutricao.waterMl}
         waterGoalMl={nutricao.waterGoalMl}
         riskLabel={summary.riskLabel}
+        glucoseZone={summary.glucoseZone}
         targetRangeLabel={summary.targetRangeLabel}
         alerts={summary.alerts}
         stepsToday={summary.stepsToday}

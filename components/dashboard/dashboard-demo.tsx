@@ -17,6 +17,7 @@ export function DashboardDemo() {
       waterMl={600}
       waterGoalMl={2000}
       riskLabel={demoSummary.riskLabel}
+      glucoseZone={demoSummary.glucoseZone}
       alerts={demoAlerts}
       stepsToday={demoSummary.stepsToday}
       sleepHoursToday={demoSummary.sleepHoursToday}

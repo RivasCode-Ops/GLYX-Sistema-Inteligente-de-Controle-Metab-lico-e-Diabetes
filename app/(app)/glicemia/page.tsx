@@ -8,7 +8,7 @@ import { QuickReadingDialog } from "@/components/dashboard/quick-reading-dialog"
 import { InsulinQuickDialog } from "@/components/glicemia/insulin-quick-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { demoGlucosePoints } from "@/lib/demo/data";
-import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
+import { classifyGlucose, resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { readingAge } from "@/lib/health/reading-freshness";
 
 // Visão geral + Tendências fundidas: antes eram duas telas mostrando a mesma
@@ -54,7 +54,15 @@ export default async function GlicemiaOverviewPage() {
         ? { texto: `${last.value_mg_dl - targetMax} acima da meta`, cor: "text-amber-300" }
         : last.value_mg_dl < targetMin
           ? { texto: `${targetMin - last.value_mg_dl} abaixo da meta`, cor: "text-red-300" }
-          : { texto: "dentro da meta", cor: "text-emerald-300" };
+          : {
+              // Mesma régua do painel: dentro da faixa mas perto do teto passa a
+              // ser dito, em vez de virar "dentro da meta" aqui e "Moderado" lá.
+              texto:
+                classifyGlucose(last.value_mg_dl, { targetMin, targetMax }).zone === "topo_da_meta"
+                  ? "na meta, perto do teto"
+                  : "dentro da meta",
+              cor: "text-emerald-300",
+            };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

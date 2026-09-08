@@ -13,6 +13,7 @@ import { GlucoseHeroCard } from "@/components/dashboard/glucose-hero-card";
 import { NextStepCard } from "@/components/dashboard/next-step-card";
 import { ModuleRow } from "@/components/dashboard/module-row";
 import type { MetabolicAlert } from "@/types/database";
+import type { GlucoseZone } from "@/lib/health/glucose-thresholds";
 
 type Props = {
   latestGlucose: number | null;
@@ -25,6 +26,7 @@ type Props = {
   waterMl: number;
   waterGoalMl: number;
   riskLabel: string;
+  glucoseZone: GlucoseZone | null;
   /** Faixa alvo por extenso, ex. "70–140" — a régua sem a qual `riskLabel` é adjetivo. */
   targetRangeLabel?: string | null;
   /** Contagem alimenta o card de acao; a lista mora em /analise/alertas. */
@@ -45,6 +47,7 @@ export function DashboardShell({
   waterMl,
   waterGoalMl,
   riskLabel,
+  glucoseZone,
   targetRangeLabel = null,
   stepsToday = null,
   sleepHoursToday = null,
@@ -62,6 +65,7 @@ export function DashboardShell({
           glucoseTrend={glucoseTrend}
           glucoseSeries={glucoseSeries}
           riskLabel={riskLabel}
+          glucoseZone={glucoseZone}
           targetRangeLabel={targetRangeLabel}
           carbsToday={carbsToday}
           activeMinutes={activeMinutes}

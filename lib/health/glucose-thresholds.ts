@@ -100,3 +100,55 @@ export function resolveGlucoseTargets(
     severeHyper: SEVERE_HYPER_MG_DL,
   };
 }
+
+/**
+ * Classificação de uma leitura contra a faixa alvo — uma régua, duas telas.
+ *
+ * ---------------------------------------------------------------------------
+ * A CONTRADIÇÃO QUE ISTO FECHA
+ * ---------------------------------------------------------------------------
+ * Medido em 08/09/2026: 147 mg/dL, com faixa 70–180, aparecia como
+ * **"Moderado"** no painel e **"dentro da meta"** em `/glicemia`. Cada tela
+ * estava certa pela sua própria definição — o painel media a POSIÇÃO dentro da
+ * faixa (65% do caminho até o teto), a tela media PERTENCIMENTO (entre o mínimo
+ * e o máximo) — e o resultado, para quem lê, foi o app se contradizendo sobre o
+ * próprio número.
+ *
+ * As duas grandezas são legítimas e continuam existindo. O que muda é o
+ * vocabulário: "Moderado" soa como veredito de risco e conflita com "dentro da
+ * meta"; "no topo da meta" diz a mesma coisa sem negar a outra tela.
+ */
+
+export type GlucoseZone = "abaixo" | "na_meta" | "topo_da_meta" | "acima";
+
+export type GlucoseClassification = {
+  zone: GlucoseZone;
+  /** Rótulo curto para badge. */
+  label: string;
+  /** Se está dentro da faixa alvo — o que a outra tela chama de "dentro da meta". */
+  inRange: boolean;
+};
+
+/**
+ * Fração da faixa a partir da qual a leitura é "topo da meta". 0.65 é o valor
+ * que o painel já usava; fica nomeado em vez de solto no meio de um `if`.
+ */
+export const TOP_OF_RANGE_FRACTION = 0.65;
+
+export function classifyGlucose(
+  value: number,
+  targets: Pick<GlucoseTargets, "targetMin" | "targetMax">
+): GlucoseClassification {
+  if (value < targets.targetMin) {
+    return { zone: "abaixo", label: "Abaixo da meta", inRange: false };
+  }
+  if (value >= targets.targetMax) {
+    return { zone: "acima", label: "Acima da meta", inRange: false };
+  }
+  const topo =
+    targets.targetMin + (targets.targetMax - targets.targetMin) * TOP_OF_RANGE_FRACTION;
+  if (value >= topo) {
+    return { zone: "topo_da_meta", label: "No topo da meta", inRange: true };
+  }
+  return { zone: "na_meta", label: "Na meta", inRange: true };
+}

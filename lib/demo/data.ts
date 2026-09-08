@@ -281,7 +281,9 @@ export const demoSummary = {
   activeMinutes: demoExercises
     .filter((session) => session.started_at.slice(0, 10) === day(0))
     .reduce((sum, session) => sum + (session.duration_min ?? 0), 0),
-  riskLabel: "Baixo",
+  // Vocabulário da régua única (`classifyGlucose`), não o antigo "Baixo".
+  riskLabel: "Na meta",
+  glucoseZone: "na_meta" as const,
   glucoseTrend: "flat" as const,
   stepsToday: demoHealthSnapshots[0]?.steps ?? null,
   sleepHoursToday: demoHealthSnapshots[0]?.sleep_hours ?? null,

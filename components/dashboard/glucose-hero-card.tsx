@@ -6,6 +6,7 @@ import { InsulinQuickDialog } from "@/components/glicemia/insulin-quick-dialog";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import type { Freshness } from "@/lib/health/reading-freshness";
 import { cn } from "@/lib/utils";
+import type { GlucoseZone } from "@/lib/health/glucose-thresholds";
 
 type Props = {
   latestGlucose: number | null;
@@ -16,6 +17,7 @@ type Props = {
   glucoseTrend: "up" | "down" | "flat" | null;
   glucoseSeries: number[];
   riskLabel: string;
+  glucoseZone: GlucoseZone | null;
   /** Faixa alvo por extenso, ex. "70–140". */
   targetRangeLabel?: string | null;
   carbsToday: number;
@@ -24,10 +26,26 @@ type Props = {
   waterGoalMl: number;
 };
 
-const RISK_STYLE: Record<string, { pill: string; text: string; stroke: string }> = {
-  "Atenção": { pill: "bg-red-500/15 text-red-300", text: "text-red-300", stroke: "#f87171" },
-  Moderado: { pill: "bg-amber-500/15 text-amber-300", text: "text-amber-300", stroke: "#fbbf24" },
-  Baixo: { pill: "bg-emerald-500/15 text-emerald-300", text: "text-emerald-300", stroke: "#34d399" },
+/**
+ * Cor por ZONA, não pelo texto do rótulo.
+ *
+ * A chave era o próprio `riskLabel`, e o comentário abaixo já avisava: mudar a
+ * palavra trocava a cor junto. Foi o que segurou a correção da contradição
+ * "Moderado" (painel) × "dentro da meta" (Glicemia) sobre o mesmo 147 mg/dL.
+ */
+const ZONE_STYLE: Record<GlucoseZone, { pill: string; text: string; stroke: string }> = {
+  abaixo: { pill: "bg-red-500/15 text-red-300", text: "text-red-300", stroke: "#f87171" },
+  acima: { pill: "bg-red-500/15 text-red-300", text: "text-red-300", stroke: "#f87171" },
+  topo_da_meta: {
+    pill: "bg-amber-500/15 text-amber-300",
+    text: "text-amber-300",
+    stroke: "#fbbf24",
+  },
+  na_meta: {
+    pill: "bg-emerald-500/15 text-emerald-300",
+    text: "text-emerald-300",
+    stroke: "#34d399",
+  },
 };
 
 const TREND_LABEL = { up: "subindo", down: "caindo", flat: "estável" } as const;
@@ -39,6 +57,7 @@ export function GlucoseHeroCard({
   glucoseTrend,
   glucoseSeries,
   riskLabel,
+  glucoseZone,
   targetRangeLabel = null,
   carbsToday,
   activeMinutes,
@@ -48,7 +67,11 @@ export function GlucoseHeroCard({
   const velha = latestGlucoseFreshness === "stale";
   const agora = latestGlucoseFreshness === "fresh";
   const style =
-    RISK_STYLE[riskLabel] ?? { pill: "bg-zinc-800 text-zinc-400", text: "text-zinc-400", stroke: "#71717a" };
+    (glucoseZone ? ZONE_STYLE[glucoseZone] : null) ?? {
+      pill: "bg-zinc-800 text-zinc-400",
+      text: "text-zinc-400",
+      stroke: "#71717a",
+    };
   const TrendIcon =
     glucoseTrend === "up" ? ArrowUpRight : glucoseTrend === "down" ? ArrowDownRight : Minus;
 
@@ -72,10 +95,10 @@ export function GlucoseHeroCard({
           >
             {agora ? "Glicemia atual" : "Última leitura"}
           </p>
-          {/* A faixa vai AO LADO do badge, não dentro dele: `riskLabel` também é
-              a chave de `RISK_STYLE`, então mudar o texto trocaria a cor junto.
-              Sem a régua, "Moderado" é adjetivo — e a faixa é definida com o
-              médico, então ela muda de pessoa para pessoa. */}
+          {/* A faixa vai AO LADO do badge, não dentro dele: sem a régua, o
+              rótulo é adjetivo — e a faixa é definida com o médico, então ela
+              muda de pessoa para pessoa. (A cor já não depende do texto: sai de
+              `glucoseZone`.) */}
           {latestGlucose != null && riskLabel !== "—" ? (
             <span className="flex items-baseline gap-1.5">
               <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium", style.pill)}>

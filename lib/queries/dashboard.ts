@@ -4,6 +4,7 @@ import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { getTodayHealthBest } from "@/lib/queries/health-today";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { MetabolicAlert } from "@/types/database";
+import { classifyGlucose, type GlucoseZone } from "@/lib/health/glucose-thresholds";
 
 export type DashboardSummary = {
   latestGlucose: number | null;
@@ -19,6 +20,13 @@ export type DashboardSummary = {
   activeMinutes: number;
   alerts: MetabolicAlert[];
   riskLabel: string;
+  /**
+   * Zona da leitura na faixa alvo. Vai separada do rótulo porque a COR sai
+   * daqui: enquanto a chave do estilo era o próprio texto, mudar a palavra
+   * trocava a cor junto — e foi o que travou a correção da contradição
+   * "Moderado" × "dentro da meta".
+   */
+  glucoseZone: GlucoseZone | null;
   /**
    * A faixa alvo por extenso, ex. "70–140".
    *
@@ -108,12 +116,17 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
   // número de três semanas atrás é afirmar sobre o presente com dado do
   // passado — e é a afirmação que mais pesa na tela, porque some com a dúvida
   // de quem vai decidir dose.
+  // A classificação vem de `classifyGlucose`, a mesma que `/glicemia` usa.
+  // Antes cada tela tinha a sua: 147 mg/dL em 70–180 era "Moderado" aqui e
+  // "dentro da meta" lá, na mesma hora. As duas estavam certas pela própria
+  // definição — uma media POSIÇÃO na faixa, a outra PERTENCIMENTO — e o app
+  // acabava se contradizendo sobre o próprio número.
   let riskLabel = "—";
+  let glucoseZone: GlucoseZone | null = null;
   if (latestGlucose != null && idade?.freshness !== "stale") {
-    const moderateFrom = Math.round(targetMin + (targetMax - targetMin) * 0.65);
-    if (latestGlucose >= targetMax || latestGlucose < targetMin) riskLabel = "Atenção";
-    else if (latestGlucose >= moderateFrom) riskLabel = "Moderado";
-    else riskLabel = "Baixo";
+    const c = classifyGlucose(latestGlucose, { targetMin, targetMax });
+    riskLabel = c.label;
+    glucoseZone = c.zone;
   }
 
   let stepsToday: number | null = null;
@@ -139,6 +152,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
     activeMinutes: activeMin,
     alerts: (alertsRes.data ?? []) as MetabolicAlert[],
     riskLabel,
+    glucoseZone,
     targetRangeLabel: `${targetMin}–${targetMax}`,
     stepsToday,
     sleepHoursToday,
