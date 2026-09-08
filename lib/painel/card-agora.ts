@@ -228,7 +228,11 @@ export function elegerCard(ctx: CardContext): CardAgora {
       why: "O par foi encontrado na base de interações do app, com severidade grave.",
       actions: [
         { label: "Entendi", kind: "primary", intent: "/api/interacao/lida" },
-        { label: "Ver detalhes", kind: "secondary", intent: "/medicacao/medicamentos" },
+        // Antes apontava para a lista de medicamentos, que não menciona
+        // interação nenhuma: o card anunciava um achado e o botão levava a uma
+        // tela onde ele não existe. E o painel mostra só a MAIS GRAVE — as
+        // demais só passaram a ter onde aparecer com esta tela.
+        { label: "Ver detalhes", kind: "secondary", intent: "/medicacao/interacoes" },
       ],
       narratable: false,
     };

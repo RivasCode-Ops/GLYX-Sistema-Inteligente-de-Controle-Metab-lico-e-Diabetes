@@ -5,6 +5,7 @@ import {
   type AliasRow,
   type InteractionFinding,
   type SafetyVerdict,
+  type Severity,
 } from "@/lib/safety/interaction-check";
 
 /**
@@ -119,4 +120,85 @@ export async function checkSubstanceSafety(
 
   const candidate = resolveCanonical(candidateNames, base.aliases);
   return buildVerdict(candidate, userCanonical, base.interactions);
+}
+
+/** Uma interação entre dois itens que o usuário JÁ usa, com os nomes de cada lado. */
+export type InteracaoEmUso = {
+  finding: InteractionFinding;
+  /** Itens cadastrados que resolveram para `finding.substanceA`. */
+  itensA: string[];
+  itensB: string[];
+};
+
+export type PanoramaDeInteracoes = {
+  interacoes: InteracaoEmUso[];
+  /** Nomes cadastrados que a base não reconhece — dito em voz alta, nunca omitido. */
+  naoReconhecidos: string[];
+  /** Quantos itens ativos entraram na conta. */
+  totalItens: number;
+};
+
+/**
+ * Todas as interações ENTRE OS ITENS EM USO — o panorama, não a checagem.
+ *
+ * `checkSubstanceSafety` responde outra pergunta: "posso acrescentar X ao que
+ * já tomo?". Ela cruza um candidato contra o conjunto. Esta responde "o que eu
+ * já tomo conflita entre si?", que é o cruzamento do conjunto consigo mesmo.
+ *
+ * A distinção não é acadêmica: a auditoria de 08/09/2026 mediu o painel
+ * mostrando UMA interação — a mais grave — enquanto o conjunto ativo tinha
+ * cinco, e "Ver detalhes" levava a uma lista de medicamentos que não menciona
+ * interação nenhuma. As outras quatro não existiam em tela alguma.
+ *
+ * Os não reconhecidos vêm junto de propósito. Um panorama que lista só o que
+ * encontrou dá a impressão de cobertura total; dizer "destes onze, conheço
+ * seis" é a mesma régua do checador, que distingue "conheço e não achei nada"
+ * de "não conheço".
+ */
+export async function loadInteracoesEmUso(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<PanoramaDeInteracoes> {
+  const [base, user] = await Promise.all([
+    loadSafetyBase(supabase),
+    loadUserSubstances(supabase, userId),
+  ]);
+
+  const resolucao = resolveCanonical(user.names, base.aliases);
+
+  // Canônico -> nomes cadastrados que chegaram nele. É o que permite a tela
+  // dizer "Berberina + Insulina Lantus" em vez de "berberina × insulina_basal".
+  const nomesPorCanonical = new Map<string, string[]>();
+  for (const r of resolucao.resolved) {
+    for (const c of r.canonical) {
+      const atual = nomesPorCanonical.get(c) ?? [];
+      if (!atual.includes(r.name)) atual.push(r.name);
+      nomesPorCanonical.set(c, atual);
+    }
+  }
+  // Insulina registrada por coluna tipada não tem nome livre correspondente.
+  for (const c of user.directCanonical) {
+    if (!nomesPorCanonical.has(c)) nomesPorCanonical.set(c, ["Insulina registrada em aplicações"]);
+  }
+
+  const emUso = new Set(nomesPorCanonical.keys());
+
+  const interacoes: InteracaoEmUso[] = base.interactions
+    .filter((f) => emUso.has(f.substanceA) && emUso.has(f.substanceB))
+    .map((finding) => ({
+      finding,
+      itensA: nomesPorCanonical.get(finding.substanceA) ?? [],
+      itensB: nomesPorCanonical.get(finding.substanceB) ?? [],
+    }))
+    .sort((a, b) => severidadePeso(a.finding.severity) - severidadePeso(b.finding.severity));
+
+  return {
+    interacoes,
+    naoReconhecidos: resolucao.unresolved,
+    totalItens: user.names.length,
+  };
+}
+
+function severidadePeso(s: Severity): number {
+  return s === "grave" ? 0 : s === "moderada" ? 1 : 2;
 }

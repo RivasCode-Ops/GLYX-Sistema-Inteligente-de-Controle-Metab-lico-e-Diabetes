@@ -112,11 +112,17 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
   "/medicacao": [
     { title: "Doses de hoje", href: "/medicacao" },
     { title: "Meus medicamentos", href: "/medicacao/medicamentos" },
+    { title: "Interações", href: "/medicacao/interacoes" },
     { title: "Calculadora", href: "/medicacao/calculadora" },
   ],
   "/perfil": [
     { title: "Metabólico", href: "/perfil" },
     { title: "Corpo & peso", href: "/perfil/corpo" },
+    // A página existia desde 07/09 e não estava aqui: o cadastro do plano de
+    // hipoglicemia era alcançável só por URL digitada. Card de hipoglicemia
+    // dizendo "plano não configurado" sem caminho para configurar é pior que
+    // não ter o card.
+    { title: "Hipoglicemia", href: "/perfil/hipoglicemia" },
     { title: "Conta", href: "/perfil/conta" },
   ],
 };
