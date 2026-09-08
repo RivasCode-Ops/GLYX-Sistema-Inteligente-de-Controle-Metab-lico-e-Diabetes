@@ -192,6 +192,7 @@ export async function getCardAgora(
 
   const ctx: CardContext = {
     now: agora,
+    timezone: tz,
     lastGlucose: entrada.lastGlucose,
     lastGlucoseAt: entrada.lastGlucoseAt,
     glucoseTrend: entrada.glucoseTrend,

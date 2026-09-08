@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { aggregateGlucoseByDay, type GlucosePoint } from "@/lib/queries/glucose-series";
 import type { HealthSnapshotSource } from "@/lib/health/types";
+import { fetchAllRows } from "@/lib/queries/fetch-all";
 
 const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit", "mock"];
 
@@ -28,12 +29,13 @@ export async function loadInsightDatasets(
   const dayStart = since.toISOString().slice(0, 10);
 
   const [gRes, mRes, eRes, hRes] = await Promise.all([
-    supabase
-      .from("glucose_readings")
-      .select("id, value_mg_dl, recorded_at")
-      .eq("user_id", userId)
-      .gte("recorded_at", sinceIso)
-      .order("recorded_at", { ascending: true }),
+    // Paginado pelo mesmo motivo do histórico: o teto de 1000 do PostgREST
+    // devolvia só o começo da janela, e os insights liam um recorte antigo
+    // achando que liam tudo.
+    fetchAllRows<GlucosePoint>(supabase, "glucose_readings", "id, value_mg_dl, recorded_at", userId, {
+      orderColumn: "recorded_at",
+      since: sinceIso,
+    }),
     supabase
       .from("meals")
       .select("carbs_g, eaten_at")
@@ -51,7 +53,7 @@ export async function loadInsightDatasets(
       .gte("snapshot_date", dayStart),
   ]);
 
-  const gPoints = (gRes.data ?? []) as GlucosePoint[];
+  const gPoints = gRes;
   const aggs = aggregateGlucoseByDay(gPoints);
   const byDayGlucose = new Map<string, DayGlucose>();
   for (const a of aggs) {

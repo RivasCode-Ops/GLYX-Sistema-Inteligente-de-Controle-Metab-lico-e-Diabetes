@@ -12,6 +12,7 @@ import {
   type CgmErrorKind,
 } from "@/lib/cgm/circuit-breaker";
 import { friendlyCgmError } from "@/lib/cgm/friendly-error";
+import { formatarDataHora } from "@/lib/time/format";
 
 type ConnectionInfo = {
   email: string;
@@ -109,7 +110,7 @@ export function LibreLinkConnect({ connection }: { connection: ConnectionInfo })
           <CardDescription>
             Conta seguidora: {connection.email}
             {connection.lastSyncAt
-              ? ` · última sincronização ${new Date(connection.lastSyncAt).toLocaleString("pt-BR")}`
+              ? ` · última sincronização ${formatarDataHora(connection.lastSyncAt)}`
               : " · ainda sem sincronização"}
           </CardDescription>
         </CardHeader>

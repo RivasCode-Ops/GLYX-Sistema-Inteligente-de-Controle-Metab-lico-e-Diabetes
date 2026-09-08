@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plug } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatarDataHora } from "@/lib/time/format";
 
 type ConnectionInfo = {
   lastSyncAt: string | null;
@@ -88,7 +89,7 @@ export function GoogleFitConnect({
           <CardDescription>
             Passos, sono e frequência cardíaca
             {connection.lastSyncAt
-              ? ` · última sincronização ${new Date(connection.lastSyncAt).toLocaleString("pt-BR")}`
+              ? ` · última sincronização ${formatarDataHora(connection.lastSyncAt)}`
               : " · ainda sem sincronização"}
           </CardDescription>
         </CardHeader>

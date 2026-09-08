@@ -11,6 +11,7 @@ import { demoExams } from "@/lib/demo/data";
 import { EXAM_TYPE_LABEL, parseExamType } from "@/lib/exams/types";
 import { buildExamParameterSeries } from "@/lib/exams/parameter-series";
 import { ExamParameterChart } from "@/components/exams/exam-parameter-chart";
+import { formatarData } from "@/lib/time/format";
 
 export default async function ExamesPage() {
   let exams: { id: string; title: string | null; created_at: string; exam_type?: string | null }[] =
@@ -139,7 +140,7 @@ export default async function ExamesPage() {
                     {e.title ?? "Sem título"}
                   </span>
                   <span className="font-mono text-xs text-zinc-500">
-                    {new Date(e.created_at).toLocaleDateString("pt-BR")} →
+                    {formatarData(e.created_at)} →
                   </span>
                 </Link>
               </li>

@@ -14,6 +14,7 @@ import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications, demoMedicationLogs } from "@/lib/demo/data";
 import { resumirDosesDoDia } from "@/lib/medications/day-summary";
+import { formatarDataHora } from "@/lib/time/format";
 
 // "Doses de hoje" = a tela de AGIR: o que tomar agora, marcar como tomada e o
 // histórico recente (agenda fundida aqui). O cadastro, estoque, alarmes e
@@ -200,7 +201,7 @@ export default async function MedicacaoDosesPage() {
                       <p className="text-xs text-zinc-500">{log.medications?.dosage ?? "—"}</p>
                     </div>
                     <time className="font-mono text-xs text-zinc-400">
-                      {new Date(log.taken_at).toLocaleString("pt-BR")}
+                      {formatarDataHora(log.taken_at)}
                     </time>
                   </CardContent>
                 </Card>

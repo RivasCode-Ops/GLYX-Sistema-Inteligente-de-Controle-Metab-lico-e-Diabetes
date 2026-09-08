@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { parseLibreViewCsv } from "@/lib/cgm/normalize/libre-csv";
 import type { UnifiedCgmReading } from "@/lib/cgm/types";
+import { formatarData } from "@/lib/time/format";
 
 type Preview = {
   readings: UnifiedCgmReading[];
@@ -38,8 +39,8 @@ export function LibreCsvImport() {
     const sorted = [...readings].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
     setPreview({
       readings,
-      from: new Date(sorted[0].recordedAt).toLocaleDateString("pt-BR"),
-      to: new Date(sorted[sorted.length - 1].recordedAt).toLocaleDateString("pt-BR"),
+      from: formatarData(sorted[0].recordedAt),
+      to: formatarData(sorted[sorted.length - 1].recordedAt),
     });
     if (skipped > 0) setStatus(`${skipped} linha(s) sem valor foram ignoradas (normal).`);
   }

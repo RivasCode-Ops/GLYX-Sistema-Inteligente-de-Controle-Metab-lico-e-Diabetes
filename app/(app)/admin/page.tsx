@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SpendGauge } from "@/components/admin/spend-gauge";
 import { estimateCostUsd } from "@/lib/ai/cost";
 import { sinceLabel } from "@/lib/admin/other-accounts";
+import { formatarData } from "@/lib/time/format";
 
 const DAILY_BUDGET_USD = Number(process.env.AI_DAILY_BUDGET_USD ?? "1");
 const MONTHLY_BUDGET_USD = Number(process.env.AI_MONTHLY_BUDGET_USD ?? "20");
@@ -144,7 +145,7 @@ export default async function AdminPage() {
                     </p>
                   </td>
                   <td className="py-2.5 pr-3 text-xs text-zinc-500">
-                    {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                    {formatarData(u.created_at)}
                   </td>
                   <td className="py-2.5 pr-3 text-xs text-zinc-400">{ultimoUso(u)}</td>
                   <td className="py-2.5 pr-3 font-mono text-xs text-zinc-500">

@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import type { GlucosePoint } from "@/lib/queries/glucose-series";
+import { formatarDataHora } from "@/lib/time/format";
 
 type Props = {
   readings: GlucosePoint[];
@@ -17,7 +18,7 @@ type Props = {
 
 export function GlucoseTrendChart({ readings }: Props) {
   const data = readings.map((r) => ({
-    t: new Date(r.recorded_at).toLocaleString("pt-BR", {
+    t: formatarDataHora(r.recorded_at, null, {
       month: "short",
       day: "numeric",
       hour: "2-digit",

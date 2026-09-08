@@ -13,6 +13,7 @@ import { INTENSITY_LEVELS, activityTypeLabel } from "@/lib/data/activity-types";
 import { ACTIVITY_LABEL, GOAL_LABEL, type ActivityLevel, type BodyGoal } from "@/lib/health/energy";
 import { EXAM_TYPE_LABEL, parseExamType } from "@/lib/exams/types";
 import { PrintButton } from "@/components/relatorio/print-button";
+import { formatarData, formatarDataHora, formatarHora } from "@/lib/time/format";
 
 export const metadata = { title: "Diário completo — GLYX" };
 
@@ -33,11 +34,11 @@ export const metadata = { title: "Diário completo — GLYX" };
 /** Data já vinda como YYYY-MM-DD (dia local calculado no builder) — parseia em
  * UTC para não deslocar um dia ao renderizar. */
 function fmtDay(day: string): string {
-  return new Date(`${day}T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+  return formatarData(`${day}T12:00:00Z`, null, { timeZone: "UTC" });
 }
 
 function fmtDayShort(day: string): string {
-  return new Date(`${day}T12:00:00Z`).toLocaleDateString("pt-BR", {
+  return formatarData(`${day}T12:00:00Z`, null, {
     timeZone: "UTC",
     day: "2-digit",
     month: "2-digit",
@@ -45,7 +46,7 @@ function fmtDayShort(day: string): string {
 }
 
 function fmtDateTime(iso: string, tz: string): string {
-  return new Date(iso).toLocaleString("pt-BR", {
+  return formatarDataHora(iso, null, {
     timeZone: tz,
     day: "2-digit",
     month: "2-digit",
@@ -56,7 +57,7 @@ function fmtDateTime(iso: string, tz: string): string {
 }
 
 function fmtTime(iso: string, tz: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", {
+  return formatarHora(iso, null, {
     timeZone: tz,
     hour: "2-digit",
     minute: "2-digit",
@@ -303,7 +304,7 @@ export default async function RelatorioCompletoPage() {
           {p.diabetesType ? ` · ${p.diabetesType}` : ""} · Período de{" "}
           <strong>{fmtDay(report.firstDay)}</strong> a <strong>{fmtDay(report.lastDay)}</strong> (
           {report.totalDays} dias corridos) · Gerado em{" "}
-          {new Date(report.generatedAt).toLocaleString("pt-BR", { timeZone: tz })} pelo app GLYX
+          {formatarDataHora(report.generatedAt, null, { timeZone: tz })} pelo app GLYX
         </p>
 
         {g.demoCount > 0 ? (
@@ -962,7 +963,7 @@ export default async function RelatorioCompletoPage() {
           (calorias e macronutrientes de refeições fotografadas, por exemplo) são aproximações.
           <div className="mt-1.5 text-zinc-600">
             Documento gerado automaticamente em{" "}
-            {new Date(report.generatedAt).toLocaleString("pt-BR", { timeZone: tz })} · GLYX
+            {formatarDataHora(report.generatedAt, null, { timeZone: tz })} · GLYX
           </div>
         </div>
       </div>

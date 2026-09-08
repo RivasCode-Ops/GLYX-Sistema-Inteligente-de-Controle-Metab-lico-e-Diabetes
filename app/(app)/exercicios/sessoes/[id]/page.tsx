@@ -6,6 +6,7 @@ import { deleteExerciseSession } from "@/app/actions/exercise";
 import { Button } from "@/components/ui/button";
 import type { ExerciseSession } from "@/types/database";
 import { demoExercises } from "@/lib/demo/data";
+import { formatarDataHora } from "@/lib/time/format";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -50,7 +51,7 @@ export default async function ExercicioSessaoDetailPage({ params }: Props) {
       <div>
         <h2 className="text-lg font-semibold text-zinc-100">{session.label}</h2>
         <p className="text-sm text-zinc-500">
-          {new Date(session.started_at).toLocaleString("pt-BR")}
+          {formatarDataHora(session.started_at)}
         </p>
       </div>
 

@@ -4,6 +4,7 @@ import { computeInsightsIfEmpty, listInsightFindings } from "@/lib/queries/insig
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshInsightsButton } from "@/components/insights/refresh-insights-button";
 import { demoInsights } from "@/lib/demo/data";
+import { formatarDataHora } from "@/lib/time/format";
 
 export default async function AnaliseCorrelacoesPage() {
   let findings = isSupabaseConfigured()
@@ -55,7 +56,7 @@ export default async function AnaliseCorrelacoesPage() {
                     </div>
                     <CardDescription className="font-mono text-[11px] text-zinc-600">
                       {f.slug} ·{" "}
-                      {new Date(f.computed_at).toLocaleString("pt-BR")}
+                      {formatarDataHora(f.computed_at)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm leading-relaxed text-zinc-300">

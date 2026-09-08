@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { getTimeline } from "@/lib/queries/timeline";
 import { demoTimeline } from "@/lib/demo/data";
+import { formatarDataHora } from "@/lib/time/format";
 
 export default async function AnaliseLinhaDoTempoPage() {
   let items: Awaited<ReturnType<typeof getTimeline>> = [];
@@ -30,7 +31,7 @@ export default async function AnaliseLinhaDoTempoPage() {
                   {it.label} · {it.detail}
                 </span>
                 <span className="font-mono text-xs text-zinc-500">
-                  {new Date(it.at).toLocaleString("pt-BR")}
+                  {formatarDataHora(it.at)}
                 </span>
               </div>
             </li>

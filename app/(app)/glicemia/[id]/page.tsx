@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { deleteGlucoseReading } from "@/app/actions/glucose";
 import { demoGlucoseReadings } from "@/lib/demo/data";
 import { localDayRangeUTC } from "@/lib/time/local-day";
+import { formatarData, formatarHora } from "@/lib/time/format";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -26,7 +27,7 @@ export default async function GlicemiaDetailPage({ params }: Props) {
         <div>
           <h2 className="text-lg font-semibold text-zinc-100">
             {DATE_RE.test(id)
-              ? new Date(id + "T12:00:00").toLocaleDateString("pt-BR")
+              ? formatarData(id + "T12:00:00")
               : "Detalhe demo"}
           </h2>
           <p className="mt-1 text-sm text-zinc-500">Drill-down com leituras fictícias da prova pública.</p>
@@ -39,7 +40,7 @@ export default async function GlicemiaDetailPage({ params }: Props) {
               <li key={r.id} className="flex justify-between px-4 py-3 text-sm">
                 <span className="font-mono text-zinc-200">{r.value_mg_dl} mg/dL</span>
                 <span className="text-zinc-500">
-                  {new Date(r.recorded_at).toLocaleTimeString("pt-BR", {
+                  {formatarHora(r.recorded_at, null, {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
@@ -94,7 +95,7 @@ export default async function GlicemiaDetailPage({ params }: Props) {
       <div>
         <h2 className="text-lg font-semibold text-zinc-100">
           {DATE_RE.test(id)
-            ? new Date(id + "T12:00:00").toLocaleDateString("pt-BR")
+            ? formatarData(id + "T12:00:00")
             : "Detalhe"}
         </h2>
         {!DATE_RE.test(id) ? (
@@ -110,7 +111,7 @@ export default async function GlicemiaDetailPage({ params }: Props) {
             <li key={r.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <span className="font-mono text-zinc-200">{r.value_mg_dl} mg/dL</span>
               <span className="flex items-center gap-3 text-zinc-500">
-                {new Date(r.recorded_at).toLocaleTimeString("pt-BR", {
+                {formatarHora(r.recorded_at, null, {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}

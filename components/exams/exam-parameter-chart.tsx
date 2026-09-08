@@ -1,5 +1,6 @@
 import type { ExamParameterSeries } from "@/lib/exams/parameter-series";
 import { parseReferenceRange } from "@/lib/exams/parameter-series";
+import { formatarData } from "@/lib/time/format";
 
 const STATUS_COLOR: Record<string, string> = {
   normal: "#34d399",
@@ -44,7 +45,7 @@ export function ExamParameterChart({ series }: { series: ExamParameterSeries }) 
           {series.unit ? <span className="text-zinc-500"> ({series.unit})</span> : null}
         </span>
         <span className="text-zinc-500">
-          {new Date(first.date).toLocaleDateString("pt-BR")} → {new Date(last.date).toLocaleDateString("pt-BR")}
+          {formatarData(first.date)} → {formatarData(last.date)}
         </span>
       </div>
       <svg

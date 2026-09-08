@@ -15,6 +15,7 @@ import {
   type BodyGoalRow as GoalDefinition,
   type GoalProgress,
 } from "@/lib/body/goals";
+import { fetchAllRows } from "@/lib/queries/fetch-all";
 
 /**
  * Diário completo: tudo que o usuário registrou, do primeiro dia até hoje.
@@ -473,29 +474,24 @@ export type BodySection = {
  * um documento errado com aparência de completo, e a glicemia sozinha já passa
  * de 3000 linhas em um mês de CGM.
  */
-const PAGE_SIZE = 1000;
 
-async function fetchAll<T>(
+/**
+ * A paginação saiu daqui para `lib/queries/fetch-all.ts`.
+ *
+ * Ela vivia privada neste arquivo, e era por isso que o Relatório Completo era
+ * a ÚNICA superfície longitudinal correta do app: Histórico de glicemia,
+ * relatório médico e insights faziam a consulta direta e recebiam as mil linhas
+ * mais antigas da janela, caladas. Extrair foi o que deu à correção mais de um
+ * consumidor.
+ */
+function fetchAll<T>(
   supabase: SupabaseClient,
   table: string,
   columns: string,
   userId: string,
   orderColumn: string
 ): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .eq("user_id", userId)
-      .order(orderColumn, { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) break;
-    const page = (data ?? []) as unknown as T[];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-  }
-  return rows;
+  return fetchAllRows<T>(supabase, table, columns, userId, { orderColumn });
 }
 
 export type FullHistoryProfile = {

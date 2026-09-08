@@ -25,6 +25,7 @@ import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
 import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
+import { formatarHora } from "@/lib/time/format";
 
 // "Meus medicamentos" = a tela de GERIR: cadastro (foto ou manual), análise de
 // suplemento, alarmes, busca, estoque, foto e edição. A ação diária (o que
@@ -398,7 +399,7 @@ export default async function MeusMedicamentosPage({
                             return (
                               <p className="text-[11px] text-emerald-400/90">
                                 ✓ hoje: {taken}× · última às{" "}
-                                {new Date(lastAt).toLocaleTimeString("pt-BR", {
+                                {formatarHora(lastAt, null, {
                                   timeZone: timezone ?? "America/Sao_Paulo",
                                   hour: "2-digit",
                                   minute: "2-digit",

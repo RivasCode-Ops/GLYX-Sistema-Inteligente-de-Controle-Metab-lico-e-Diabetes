@@ -3,6 +3,8 @@
  * O cron pula conexões com circuito aberto; sync manual do usuário ainda tenta.
  */
 
+import { formatarDataHora } from "@/lib/time/format";
+
 export type CgmErrorKind =
   | "auth"
   | "rate_limit"
@@ -119,7 +121,7 @@ export function breakerAfterFailure(
 }
 
 export function circuitOpenUserMessage(openUntilIso: string, kind: CgmErrorKind | null): string {
-  const when = new Date(openUntilIso).toLocaleString("pt-BR");
+  const when = formatarDataHora(openUntilIso);
   if (kind === "auth" || kind === "crypto") {
     return `Sincronização automática pausada até ${when}. Reconecte com a senha correta do LibreLinkUp.`;
   }

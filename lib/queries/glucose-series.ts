@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { localDateKey } from "@/lib/time/local-day";
+import { fetchAllRows } from "@/lib/queries/fetch-all";
 
 export type GlucosePoint = {
   id: string;
@@ -19,14 +20,17 @@ export async function getGlucoseReadingsSince(days: number): Promise<GlucosePoin
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const { data } = await supabase
-    .from("glucose_readings")
-    .select("id, value_mg_dl, recorded_at")
-    .eq("user_id", user.id)
-    .gte("recorded_at", since.toISOString())
-    .order("recorded_at", { ascending: true });
-
-  return (data ?? []) as GlucosePoint[];
+  // Paginado, e não uma consulta só: com 120 dias de sensor são mais de 5 mil
+  // leituras, e o teto implícito de 1000 do PostgREST devolvia as MIL MAIS
+  // ANTIGAS — a tela mostrava julho em setembro, sem errar em nada do que fazia
+  // com o que recebeu.
+  return fetchAllRows<GlucosePoint>(
+    supabase,
+    "glucose_readings",
+    "id, value_mg_dl, recorded_at",
+    user.id,
+    { orderColumn: "recorded_at", since: since.toISOString() }
+  );
 }
 
 export type DailyAgg = { day: string; avg: number; count: number; min: number; max: number };

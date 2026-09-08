@@ -10,6 +10,7 @@ import {
   type CgmErrorKind,
 } from "@/lib/cgm/circuit-breaker";
 import { friendlyCgmError } from "@/lib/cgm/friendly-error";
+import { formatarDataHora } from "@/lib/time/format";
 
 type ConnectionInfo = {
   lastSyncAt: string | null;
@@ -78,7 +79,7 @@ export function DexcomConnect({
           <CardDescription>
             Conta autorizada via OAuth
             {connection.lastSyncAt
-              ? ` · última sincronização ${new Date(connection.lastSyncAt).toLocaleString("pt-BR")}`
+              ? ` · última sincronização ${formatarDataHora(connection.lastSyncAt)}`
               : " · ainda sem sincronização"}
           </CardDescription>
         </CardHeader>

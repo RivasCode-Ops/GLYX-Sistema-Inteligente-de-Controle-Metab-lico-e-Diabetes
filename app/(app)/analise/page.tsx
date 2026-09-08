@@ -5,6 +5,7 @@ import { listMetabolicAudits } from "@/lib/audit/run";
 import type { AuditFactor, AuditPlanItem, MetabolicAuditRow } from "@/lib/audit/types";
 import { GenerateAuditButton } from "@/components/audit/generate-audit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatarDataHora } from "@/lib/time/format";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ function AuditDetail({ audit }: { audit: MetabolicAuditRow }) {
           </div>
           <p className="mt-1 text-xs text-zinc-500">
             Janela {audit.window_days} dias · {audit.period_start} → {audit.period_end} ·{" "}
-            {new Date(audit.computed_at).toLocaleString("pt-BR")}
+            {formatarDataHora(audit.computed_at)}
           </p>
         </div>
       </div>
@@ -221,7 +222,7 @@ export default async function AnaliseResumoPage() {
                   </p>
                 </div>
                 <p className="text-xs text-zinc-600">
-                  {new Date(a.computed_at).toLocaleString("pt-BR")}
+                  {formatarDataHora(a.computed_at)}
                 </p>
               </li>
             ))}

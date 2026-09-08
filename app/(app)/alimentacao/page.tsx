@@ -11,6 +11,7 @@ import { getNutritionToday } from "@/lib/queries/nutrition-today";
 import { GOAL_LABEL, PROTEIN_G_PER_KG } from "@/lib/health/energy";
 import type { Meal } from "@/types/database";
 import { demoMeals } from "@/lib/demo/data";
+import { formatarDataHora } from "@/lib/time/format";
 
 // Visão geral + Refeições fundidas numa tela só: antes uma relistava o que a
 // outra mostrava, e cada uma tinha seu próprio formulário de adicionar com a
@@ -232,7 +233,7 @@ export default async function AlimentacaoPage() {
                     </span>
                     <span className="flex items-center gap-3">
                       <span className="font-mono text-xs text-zinc-500">
-                        {new Date(m.eaten_at).toLocaleString("pt-BR")}
+                        {formatarDataHora(m.eaten_at)}
                       </span>
                       {!demoMode ? (
                         <form action={deleteMealAction}>

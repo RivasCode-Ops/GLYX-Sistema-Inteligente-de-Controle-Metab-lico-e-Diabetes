@@ -186,7 +186,7 @@ export async function buildUserContext(
       .map((f) => `${sanitizeForPrompt(f.label ?? "fator", 60)}${f.severity ? ` (${f.severity})` : ""}`)
       .join(", ");
     linhas.push(
-      `Mapa de risco (auditoria longitudinal mais recente, ${new Date(audit.computed_at).toLocaleDateString("pt-BR")}): score ${audit.score}/100, classificação "${audit.label}"${topFactors ? `. Principais fatores: ${topFactors}` : ""}.`
+      `Mapa de risco (auditoria longitudinal mais recente, ${new Date(audit.computed_at).toLocaleDateString("pt-BR", { timeZone: tz })}): score ${audit.score}/100, classificação "${audit.label}"${topFactors ? `. Principais fatores: ${topFactors}` : ""}.`
     );
   }
 

@@ -18,6 +18,8 @@
  * prioridade e as travas testáveis sem banco.
  */
 
+import { formatarHora } from "@/lib/time/format";
+
 export type CardLevel = "critico" | "atencao" | "neutro";
 
 export type CardAction = {
@@ -68,6 +70,9 @@ export type GlucoseTrend = "up" | "down" | "flat" | null;
 
 export type CardContext = {
   now: Date;
+  /** Fuso do perfil. A consulta já o resolvia (`lib/queries/card-agora.ts`) e
+   *  não o entregava à regra — por isso as horas do card saíam em UTC. */
+  timezone?: string | null;
   lastGlucose: number | null;
   lastGlucoseAt: string | null;
   glucoseTrend: GlucoseTrend;
@@ -98,8 +103,10 @@ export type CardContext = {
 /** Abaixo disto o motor de insights não afirma padrão — mesma régua do MuscleMind. */
 export const MIN_OCORRENCIAS_PADRAO = 3;
 
-const HORA = (iso: string) =>
-  new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+/** Fuso explícito: sem ele o servidor formata em UTC e a dose das 19:00 vira
+ *  22:00 na tela — foi o que a auditoria de 08/09/2026 mediu no histórico. */
+const HORA = (iso: string, timezone?: string | null) =>
+  formatarHora(iso, timezone);
 
 // ---------------------------------------------------------------------------
 // Travas — guardas nomeadas, não posição na lista
@@ -149,7 +156,7 @@ function hipoCondicao(ctx: CardContext): boolean {
 export function elegerCard(ctx: CardContext): CardAgora {
   const evidenciaGlicemia = () => {
     const valor = `${ctx.lastGlucose} mg/dL`;
-    const hora = ctx.lastGlucoseAt ? ` às ${HORA(ctx.lastGlucoseAt)}` : "";
+    const hora = ctx.lastGlucoseAt ? ` às ${HORA(ctx.lastGlucoseAt, ctx.timezone)}` : "";
     const tend = ctx.glucoseTrend === "down" ? " · caindo" : "";
     return `${valor}${hora}${tend}`;
   };
@@ -201,7 +208,7 @@ export function elegerCard(ctx: CardContext): CardAgora {
         id: "hipo_recheck",
         level: "critico",
         title: "Hora de conferir de novo",
-        evidence: `você agiu às ${HORA(ctx.openHypoEvent.actedAt)} · ${minutos} min`,
+        evidence: `você agiu às ${HORA(ctx.openHypoEvent.actedAt, ctx.timezone)} · ${minutos} min`,
         body: null,
         why: `Você cadastrou reavaliação em ${ctx.hypoPlan.recheckMinutes} minutos após agir.`,
         actions: [{ label: "Registrar medição", kind: "primary", intent: "/api/hypo/recheck" }],
@@ -233,7 +240,7 @@ export function elegerCard(ctx: CardContext): CardAgora {
       id: "insulina_ativa_exercicio",
       level: "atencao",
       title: "Insulina rápida ativa",
-      evidence: `aplicada às ${HORA(ctx.rapidInsulin.appliedAt)} · há ${ctx.rapidInsulin.minutesAgo} min`,
+      evidence: `aplicada às ${HORA(ctx.rapidInsulin.appliedAt, ctx.timezone)} · há ${ctx.rapidInsulin.minutesAgo} min`,
       body: ctx.hypoPlan
         ? `Atividade física com insulina rápida em ação aumenta o risco de queda. Sua conduta cadastrada: ${ctx.hypoPlan.correctionText}`
         : "Atividade física com insulina rápida em ação aumenta o risco de queda. Você ainda não cadastrou sua conduta de hipoglicemia.",
@@ -255,8 +262,8 @@ export function elegerCard(ctx: CardContext): CardAgora {
       level: "atencao",
       title: varias ? `${ctx.lateMedications.length} medicamentos atrasados` : `${primeira.name} atrasado`,
       evidence: varias
-        ? ctx.lateMedications.map((m) => `${m.name} ${HORA(m.scheduledAt)}`).join(" · ")
-        : `previsto ${HORA(primeira.scheduledAt)} · atrasado ${primeira.minutesLate} min`,
+        ? ctx.lateMedications.map((m) => `${m.name} ${HORA(m.scheduledAt, ctx.timezone)}`).join(" · ")
+        : `previsto ${HORA(primeira.scheduledAt, ctx.timezone)} · atrasado ${primeira.minutesLate} min`,
       body: null,
       why: "O horário passou sem registro de dose e sem adiamento ativo.",
       actions: varias

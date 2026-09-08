@@ -3,6 +3,7 @@ import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-
 import { computePeriodAdherence } from "@/lib/medications/adherence";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import type { MetabolicAuditRow } from "@/lib/audit/types";
+import { fetchAllRows } from "@/lib/queries/fetch-all";
 
 export type ReportExtreme = { day: string; count: number; firstAt: string; peak: number };
 
@@ -61,16 +62,19 @@ export async function buildMedicalReportData(
   const { startISO } = localDayRangeUTC(audit.period_start, tz);
   const { endISO } = localDayRangeUTC(audit.period_end, tz);
 
-  const { data: readings } = await supabase
-    .from("glucose_readings")
-    .select("recorded_at, value_mg_dl")
-    .eq("user_id", userId)
-    .gte("recorded_at", startISO)
-    .lt("recorded_at", endISO);
+  // Paginado: uma auditoria de 14 dias com sensor passa de 1000 leituras, e o
+  // teto implícito do PostgREST cortaria o fim do período sem avisar.
+  const readings = await fetchAllRows<{ recorded_at: string; value_mg_dl: number }>(
+    supabase,
+    "glucose_readings",
+    "recorded_at, value_mg_dl",
+    userId,
+    { orderColumn: "recorded_at", since: startISO, before: endISO }
+  );
 
   const hyperByDay = new Map<string, { count: number; firstAt: string; peak: number }>();
   const hypoByDay = new Map<string, { count: number; firstAt: string; peak: number }>();
-  for (const r of readings ?? []) {
+  for (const r of readings) {
     const value = Number(r.value_mg_dl);
     const recordedAt = r.recorded_at as string;
     const day = localDateKey(recordedAt, tz);

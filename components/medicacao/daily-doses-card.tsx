@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { localDateKey } from "@/lib/time/local-day";
 import { computeDoseStatus, doseWindows } from "@/lib/medications/adherence";
 import type { Medication } from "@/types/database";
+import { formatarHora } from "@/lib/time/format";
 
 // Painel do dia: uma linha por dose agendada, com estado visível — era a
 // peça que faltava: o "Registrar dose" funcionava, mas nada na tela mostrava
@@ -19,7 +20,7 @@ export type TodaySnooze = {
 export { computeDoseStatus } from "@/lib/medications/adherence";
 
 function hora(iso: string, tz: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", {
+  return formatarHora(iso, null, {
     timeZone: tz,
     hour: "2-digit",
     minute: "2-digit",

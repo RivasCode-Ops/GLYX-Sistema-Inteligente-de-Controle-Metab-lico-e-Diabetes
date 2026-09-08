@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ExerciseSession } from "@/types/database";
 import { demoExercises } from "@/lib/demo/data";
 import { activityTypeLabel } from "@/lib/data/activity-types";
+import { formatarData } from "@/lib/time/format";
 
 export default async function ExerciciosSessoesPage() {
   let sessions: ExerciseSession[] = [];
@@ -49,7 +50,7 @@ export default async function ExerciciosSessoesPage() {
                     </span>
                   ) : null}
                   <p className="text-xs text-zinc-500">
-                    {new Date(s.started_at).toLocaleDateString("pt-BR", {
+                    {formatarData(s.started_at, null, {
                       day: "2-digit",
                       month: "2-digit",
                       year: "numeric",

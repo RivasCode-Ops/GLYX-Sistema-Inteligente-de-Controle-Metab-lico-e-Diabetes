@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import type { StrengthLog } from "@/lib/queries/strength";
 import { groupByCategory, type CatalogExercise } from "@/lib/exercicios/catalog";
 import { MUSCLE_GROUP_BY_ID } from "@/lib/data/muscle-groups";
+import { formatarData } from "@/lib/time/format";
 
 /** Valor da opção que revela o campo de texto — o catálogo tem 42 exercícios e
  * a academia tem mais, então a lista nunca pode ser a única saída. */
@@ -160,7 +161,7 @@ export function StrengthLogForm({
           <p className="text-[11px] text-zinc-500">
             Última vez: {lastForExercise.weight_kg != null ? `${lastForExercise.weight_kg} kg × ` : ""}
             {lastForExercise.reps} reps × {lastForExercise.sets} séries (
-            {new Date(lastForExercise.logged_at).toLocaleDateString("pt-BR")})
+            {formatarData(lastForExercise.logged_at)})
           </p>
         ) : null}
         <div className="grid grid-cols-3 gap-2">
@@ -217,7 +218,7 @@ export function StrengthLogForm({
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="font-mono text-zinc-500">
-                    {new Date(l.logged_at).toLocaleDateString("pt-BR")}
+                    {formatarData(l.logged_at)}
                   </span>
                   <button
                     type="button"

@@ -1,3 +1,4 @@
+import { formatarData } from "@/lib/time/format";
 import type { ExamType } from "@/lib/exams/types";
 
 const RULES = `REGRAS OBRIGATÓRIAS:
@@ -95,7 +96,7 @@ export function visionTemperatureFor(examType: ExamType): number {
 }
 
 export function defaultTitleFor(examType: ExamType): string {
-  const date = new Date().toLocaleDateString("pt-BR");
+  const date = formatarData(new Date());
   if (examType === "ecg") return `ECG ${date}`;
   if (examType === "rx") return `Raio-X ${date}`;
   return `Exame por foto ${date}`;

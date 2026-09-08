@@ -1,3 +1,4 @@
+import { formatarDataHora } from "@/lib/time/format";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isOpenAIConfigured } from "@/lib/env";
 
@@ -125,7 +126,7 @@ export async function runSystemChecks(
       id: "sensor",
       title: "Sensor de glicose (LibreLinkUp)",
       status: "warn",
-      detail: `Sync automático em pausa (proteção) até ${new Date(conn.circuit_open_until).toLocaleString("pt-BR")}${
+      detail: `Sync automático em pausa (proteção) até ${formatarDataHora(conn.circuit_open_until)}${
         conn.last_error ? ` — último erro: "${conn.last_error}"` : ""
       }.`,
       action: { label: "Ver sensor", href: "/integracoes" },

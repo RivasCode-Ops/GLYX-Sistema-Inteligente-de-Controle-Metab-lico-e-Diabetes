@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MetabolicAlert } from "@/types/database";
 import { demoAlerts } from "@/lib/demo/data";
+import { formatarDataHora } from "@/lib/time/format";
 
 export default async function AnaliseAlertasPage() {
   let alerts: MetabolicAlert[] = [];
@@ -55,7 +56,7 @@ export default async function AnaliseAlertasPage() {
                     </span>
                   </div>
                   <CardDescription>
-                    {new Date(a.created_at).toLocaleString("pt-BR")}
+                    {formatarDataHora(a.created_at)}
                   </CardDescription>
                 </CardHeader>
                 {a.body ? (

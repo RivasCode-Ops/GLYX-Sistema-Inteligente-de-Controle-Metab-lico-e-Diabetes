@@ -13,6 +13,7 @@ import type { ExerciseSession } from "@/types/database";
 import type { BodyGoal } from "@/lib/health/energy";
 import { demoExercises } from "@/lib/demo/data";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
+import { formatarData } from "@/lib/time/format";
 
 /**
  * A janela é de 8 semanas porque a tela pergunta três coisas de horizontes
@@ -86,7 +87,7 @@ export default async function ExerciciosOverviewPage() {
       <TodayWorkoutCard
         day={getTrainingDay(agora)}
         sessoesHoje={sessoesHoje}
-        dataLabel={agora.toLocaleDateString("pt-BR", {
+        dataLabel={formatarData(agora, null, {
           weekday: "long",
           day: "2-digit",
           month: "short",

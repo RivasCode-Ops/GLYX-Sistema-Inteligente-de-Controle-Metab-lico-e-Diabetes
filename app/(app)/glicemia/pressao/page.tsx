@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { classifyBloodPressure, BLOOD_PRESSURE_TIER_LABEL } from "@/lib/health/blood-pressure";
 import type { BloodPressureLog } from "@/types/database";
+import { formatarDataHora } from "@/lib/time/format";
 
 const TIER_STYLE: Record<string, string> = {
   normal: "bg-emerald-500/15 text-emerald-300",
@@ -99,7 +100,7 @@ export default async function PressaoArterialPage() {
               </p>
               <p className="text-xs text-zinc-500">
                 {latest.pulse ? `${latest.pulse} bpm · ` : ""}
-                {new Date(latest.recorded_at).toLocaleString("pt-BR")}
+                {formatarDataHora(latest.recorded_at)}
               </p>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-medium ${TIER_STYLE[latestTier]}`}>
@@ -128,7 +129,7 @@ export default async function PressaoArterialPage() {
                         {log.pulse ? ` · ${log.pulse} bpm` : ""}
                       </p>
                       <p className="text-xs text-zinc-500">
-                        {new Date(log.recorded_at).toLocaleString("pt-BR")}
+                        {formatarDataHora(log.recorded_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
