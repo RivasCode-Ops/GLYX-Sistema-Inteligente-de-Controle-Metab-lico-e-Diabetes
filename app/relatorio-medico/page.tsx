@@ -57,6 +57,15 @@ export default async function RelatorioMedicoPage() {
   const hasMedGaps = report.medications.some(
     (med) => med.expectedDoses > 0 && med.loggedDoses / med.expectedDoses < 0.5
   );
+  // O KPI vinha de `audit.metrics` (número salvo quando a auditoria rodou) e a
+  // tabela de extremos logo abaixo é RECALCULADA das leituras do período. Duas
+  // fontes para a mesma grandeza, na mesma página: o cabeçalho dizia "—" e a
+  // tabela listava dois dias hiper, com 5 e 27 leituras e pico de 348. Passa a
+  // sair da mesma conta que a tabela mostra; a métrica salva só cobre quando o
+  // recálculo não tem base.
+  const severeHyperRecalculado = report.hyperDays.reduce((soma, d) => soma + d.count, 0);
+  const severeHyper =
+    report.hyperDays.length > 0 ? severeHyperRecalculado : (m.severeHyperCount ?? null);
   const idade = reportAge(report.audit.computed_at, report.audit.window_days);
   const coverageGap = m.daysWithGlucose < report.audit.window_days;
 
@@ -116,7 +125,7 @@ export default async function RelatorioMedicoPage() {
             </div>
           </div>
           <div className="min-w-[110px]">
-            <div className="text-xl font-bold">{m.severeHyperCount ?? "—"}</div>
+            <div className="text-xl font-bold">{severeHyper ?? "—"}</div>
             <div className="text-[11px] uppercase tracking-wide text-zinc-600">
               Leituras ≥{SEVERE_HYPER_MG_DL} mg/dL
             </div>

@@ -26,6 +26,7 @@ import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
 import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
 import { formatarHora } from "@/lib/time/format";
+import { stockLabel, stockState } from "@/lib/medications/stock";
 
 // "Meus medicamentos" = a tela de GERIR: cadastro (foto ou manual), análise de
 // suplemento, alarmes, busca, estoque, foto e edição. A ação diária (o que
@@ -88,16 +89,6 @@ export default async function MeusMedicamentosPage({
   }
 
   /** Dias de estoque restantes: consome doses/dia (nº de alarmes, mínimo 1) desde a última atualização. */
-  function stockDaysLeft(m: Medication): number | null {
-    if (m.stock_units == null || !m.stock_updated_on) return null;
-    const dpd = Math.max(m.reminder_times?.length ?? 1, 1);
-    const elapsed = Math.max(
-      0,
-      Math.floor((Date.now() - new Date(m.stock_updated_on).getTime()) / 86_400_000)
-    );
-    return Math.floor((m.stock_units - elapsed * dpd) / dpd);
-  }
-
   const labelUrls = new Map<string, string>();
 
   if (demoMode) {
@@ -330,7 +321,7 @@ export default async function MeusMedicamentosPage({
         ) : (
           <ul className="space-y-3">
             {items.map((m) => {
-              const daysLeft = stockDaysLeft(m);
+              const estoque = stockState(m);
               return (
                 <li key={m.id}>
                   <Card>
@@ -347,26 +338,35 @@ export default async function MeusMedicamentosPage({
                           ) : null}
                           <div>
                           <p className="font-medium text-zinc-100">{m.name}</p>
+                          {/* `schedule_hint` é a DICA de contexto ("café da
+                              manhã", "estômago vazio"), não o horário — e o
+                              fallback "sem horário" aparecia ao lado do ⏰ com o
+                              horário, contradizendo a linha inteira. Sem dica,
+                              o campo some. */}
                           <p className="text-sm text-zinc-500">
-                            {m.dosage ?? "—"} · {m.schedule_hint ?? "sem horário"}
-                            {m.reminder_times?.length ? ` · ⏰ ${m.reminder_times.join(", ")}` : ""}
+                            {[
+                              m.dosage,
+                              m.schedule_hint,
+                              m.reminder_times?.length ? `⏰ ${m.reminder_times.join(", ")}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "sem dosagem ou horário cadastrado"}
                           </p>
-                          {daysLeft != null ? (
+                          {estoque.kind !== "sem_dado" ? (
                             <p
                               className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] ${
-                                daysLeft <= 0
-                                  ? "border-red-500/40 bg-red-500/10 text-red-300"
-                                  : daysLeft <= 7
+                                estoque.kind === "informacao_vencida"
+                                  ? // Cinza, não vermelho: informação vencida é
+                                    // pedido de atualização, não emergência —
+                                    // sete itens em vermelho ao mesmo tempo
+                                    // transformavam o aviso em ruído.
+                                    "border-zinc-700 bg-zinc-900 text-zinc-400"
+                                  : estoque.low
                                     ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
                                     : "border-zinc-700 bg-zinc-900 text-zinc-400"
                               }`}
                             >
-                              {(() => {
-                                const icon = m.kind === "supplement" ? "🥄" : "💊";
-                                return daysLeft <= 0
-                                  ? `${icon} Estoque pode ter acabado — reponha e atualize`
-                                  : `${icon} Estoque para ~${daysLeft} dia(s)`;
-                              })()}
+                              {stockLabel(estoque, m.kind === "supplement")}
                             </p>
                           ) : null}
                           </div>
