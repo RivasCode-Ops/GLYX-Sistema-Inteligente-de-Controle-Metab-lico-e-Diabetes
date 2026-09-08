@@ -87,10 +87,20 @@
    *
    * rose é RESERVADA para severidade crítica. Nenhum módulo a usa.
    * ------------------------------------------------------------------------- */
-  --module-glicemia: 0.78 0.11 180; /* = primary-400 */
-  --module-alimentacao: 0.76 0.13 150;
-  --module-exercicio: 0.76 0.13 55;
-  --module-medicacao: 0.8 0.12 85;
+  /* Uma matiz por módulo, medidas: todas dentro do gamut sRGB e todas acima de
+   * 6.6:1 sobre a superfície mais clara (`contrast.test.ts` afere as duas
+   * coisas). Os hexadecimais correspondentes são #f77684, #e28f2e, #bd87f6 e
+   * #4dacf6.
+   *
+   * Glicemia é ROSA, e isso reabre a colisão com `severity-critico`. Ela é
+   * resolvida do jeito que o próprio sistema previu: severidade é TRATAMENTO,
+   * não matiz — módulo pinta ponto (ícone e valor), severidade pinta bloco
+   * (borda esquerda e superfície). E o token existe justamente para o rose
+   * bruto do Tailwind continuar barrado pelo lint. */
+  --module-glicemia: 0.72 0.159 15;
+  --module-alimentacao: 0.72 0.145 65;
+  --module-medicacao: 0.72 0.164 305;
+  --module-exercicio: 0.72 0.14 245;
   --module-neutro: 0.66 0.008 85; /* = background-700 — exames, análise, integrações */
 
   --severity-critico: 0.7 0.16 20;

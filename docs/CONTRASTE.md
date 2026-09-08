@@ -48,18 +48,18 @@ Superfícies medidas: `background-50`, `background-100`, `background-200`.
 | `accent-400` | acento | `background-50` | 8.88:1 | 3:1 | ✅ |
 | `accent-400` | acento | `background-100` | 8.53:1 | 3:1 | ✅ |
 | `accent-400` | acento | `background-200` | 7.90:1 | 3:1 | ✅ |
-| `module-glicemia` | módulo Glicemia | `background-50` | 10.43:1 | 3:1 | ✅ |
-| `module-glicemia` | módulo Glicemia | `background-100` | 10.02:1 | 3:1 | ✅ |
-| `module-glicemia` | módulo Glicemia | `background-200` | 9.29:1 | 3:1 | ✅ |
-| `module-alimentacao` | módulo Alimentação | `background-50` | 9.75:1 | 3:1 | ✅ |
-| `module-alimentacao` | módulo Alimentação | `background-100` | 9.37:1 | 3:1 | ✅ |
-| `module-alimentacao` | módulo Alimentação | `background-200` | 8.68:1 | 3:1 | ✅ |
-| `module-exercicio` | módulo Exercício | `background-50` | 8.95:1 | 3:1 | ✅ |
-| `module-exercicio` | módulo Exercício | `background-100` | 8.60:1 | 3:1 | ✅ |
-| `module-exercicio` | módulo Exercício | `background-200` | 7.96:1 | 3:1 | ✅ |
-| `module-medicacao` | módulo Medicação | `background-50` | 10.59:1 | 3:1 | ✅ |
-| `module-medicacao` | módulo Medicação | `background-100` | 10.17:1 | 3:1 | ✅ |
-| `module-medicacao` | módulo Medicação | `background-200` | 9.43:1 | 3:1 | ✅ |
+| `module-glicemia` | módulo Glicemia | `background-50` | 7.46:1 | 3:1 | ✅ |
+| `module-glicemia` | módulo Glicemia | `background-100` | 7.16:1 | 3:1 | ✅ |
+| `module-glicemia` | módulo Glicemia | `background-200` | 6.64:1 | 3:1 | ✅ |
+| `module-alimentacao` | módulo Alimentação | `background-50` | 7.77:1 | 3:1 | ✅ |
+| `module-alimentacao` | módulo Alimentação | `background-100` | 7.46:1 | 3:1 | ✅ |
+| `module-alimentacao` | módulo Alimentação | `background-200` | 6.91:1 | 3:1 | ✅ |
+| `module-exercicio` | módulo Exercício | `background-50` | 8.11:1 | 3:1 | ✅ |
+| `module-exercicio` | módulo Exercício | `background-100` | 7.79:1 | 3:1 | ✅ |
+| `module-exercicio` | módulo Exercício | `background-200` | 7.22:1 | 3:1 | ✅ |
+| `module-medicacao` | módulo Medicação | `background-50` | 7.54:1 | 3:1 | ✅ |
+| `module-medicacao` | módulo Medicação | `background-100` | 7.24:1 | 3:1 | ✅ |
+| `module-medicacao` | módulo Medicação | `background-200` | 6.71:1 | 3:1 | ✅ |
 | `severity-critico` | severidade crítica | `background-50` | 6.93:1 | 3:1 | ✅ |
 | `severity-critico` | severidade crítica | `background-100` | 6.65:1 | 3:1 | ✅ |
 | `severity-critico` | severidade crítica | `background-200` | 6.16:1 | 3:1 | ✅ |
@@ -102,10 +102,10 @@ Equivalente sRGB de cada token, para conferência em ferramenta externa.
 | `--accent-400` | `0.76 0.11 30` | `#ef9687` |
 | `--accent-500` | `0.68 0.13 30` | `#dd7767` |
 | `--accent-600` | `0.6 0.14 30` | `#c65b4c` |
-| `--module-glicemia` | `0.78 0.11 180` | `#59ceba` |
-| `--module-alimentacao` | `0.76 0.13 150` | `#6fc884` |
-| `--module-exercicio` | `0.76 0.13 55` | `#f0995b` |
-| `--module-medicacao` | `0.8 0.12 85` | `#e1b75c` |
+| `--module-glicemia` | `0.72 0.159 15` | `#f77684` |
+| `--module-alimentacao` | `0.72 0.145 65` | `#e28f2e` |
+| `--module-medicacao` | `0.72 0.164 305` | `#bd87f6` |
+| `--module-exercicio` | `0.72 0.14 245` | `#4dacf6` |
 | `--module-neutro` | `0.66 0.008 85` | `#94928d` |
 | `--severity-critico` | `0.7 0.16 20` | `#f17074` |
 | `--severity-atencao` | `0.8 0.12 85` | `#e1b75c` |

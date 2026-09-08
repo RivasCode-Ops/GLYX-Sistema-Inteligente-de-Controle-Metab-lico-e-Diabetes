@@ -111,11 +111,12 @@ export function DashboardShell({
         </div>
         <Card>
           <CardContent className="p-4">
-            <ModuleRow title="Glicemia" href="/glicemia" icon={Droplets} metric={glucoseLabel} />
+            <ModuleRow title="Glicemia" href="/glicemia" icon={Droplets} accent="glicemia" metric={glucoseLabel} />
             <ModuleRow
               title="Alimentação"
               href="/alimentacao"
               icon={UtensilsCrossed}
+              accent="alimentacao"
               metric={`${carbsToday} g carb · hoje`}
             />
             <ModuleRow
@@ -125,6 +126,7 @@ export function DashboardShell({
               // deixava a recomendação sem continuidade.
               href="/exercicios/plano"
               icon={Dumbbell}
+              accent="exercicio"
               // O `??` escondia uma troca de GRANDEZA: `muscleFocusLabel` é o
               // treino PLANEJADO do dia ("Inferior A"), e `activeMinutes` é o
               // que foi medido. Com plano cadastrado, a coluna deixava de
@@ -141,7 +143,7 @@ export function DashboardShell({
                   : `${activeMinutes} min · hoje`
               }
             />
-            <ModuleRow title="Medicação" href="/medicacao" icon={Pill} metric="Ver agenda" />
+            <ModuleRow title="Medicação" href="/medicacao" icon={Pill} accent="medicacao" metric="Ver agenda" />
             <ModuleRow title="Exames" href="/exames" icon={FileText} metric="Lab · ECG · Raio-X" />
             <ModuleRow title="Análise" href="/analise" icon={LineChart} metric="Risco · correlações" />
             <ModuleRow

@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, User } from "lucide-react";
 import { mainNav } from "@/lib/navigation";
 import { ModuleSubnav } from "@/components/shell/module-subnav";
 import { MobileMoreMenu } from "@/components/shell/mobile-more-menu";
@@ -30,7 +31,7 @@ function titleForPath(pathname: string): { title: string; crumbs: string[] } {
   };
 }
 
-export function AppHeader() {
+export function AppHeader({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
   const pathname = usePathname();
   const { title, crumbs } = titleForPath(pathname);
 
@@ -52,6 +53,34 @@ export function AppHeader() {
             {/* A lupa fica nas duas larguras: "onde acho isso" é pergunta de
                 quem não conhece o app, e não muda de natureza no desktop. */}
             <FeatureSearch />
+
+            {/* Sino e avatar, das referências. O sino só existe porque tem o
+                que dizer: o ponto acende a partir de alerta metabólico não lido
+                das últimas 48h, e leva para a lista. Sino que nunca muda é
+                ícone decorativo, e o sistema visual proíbe ícone sem função. */}
+            <Link
+              href="/analise/alertas"
+              aria-label={
+                unreadAlerts > 0
+                  ? `${unreadAlerts} alerta(s) recente(s)`
+                  : "Alertas — nenhum recente"
+              }
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
+              <Bell className="h-4 w-4" aria-hidden />
+              {unreadAlerts > 0 ? (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-severity-atencao ring-2 ring-zinc-950" />
+              ) : null}
+            </Link>
+
+            <Link
+              href="/perfil"
+              aria-label="Perfil e conta"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
+              <User className="h-4 w-4" aria-hidden />
+            </Link>
+
             {/* No desktop o "Sair" fica na sidebar; no mobile ela não existe. */}
             <span className="flex items-center gap-2 md:hidden">
               <MobileMoreMenu />
