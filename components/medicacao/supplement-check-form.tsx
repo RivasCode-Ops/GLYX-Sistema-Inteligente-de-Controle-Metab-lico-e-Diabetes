@@ -7,6 +7,7 @@ import { PhotoCaptureButtons } from "@/components/ui/photo-capture-buttons";
 import { InteractionAlert } from "@/components/medicacao/interaction-alert";
 import { usePhotoSelection } from "@/lib/hooks/use-photo-selection";
 import type { SafetyPayload } from "@/lib/safety/present";
+import { Input } from "@/components/ui/input";
 
 /**
  * O alerta desta tela vem de `result.safety`, que o servidor monta a partir do
@@ -38,24 +39,33 @@ export function SupplementCheckForm() {
   const { files: pages, previews, status, setStatus, loading, setLoading, selectSingle, reset } =
     usePhotoSelection({ allowPdf: true });
   const [result, setResult] = useState<Result | null>(null);
+  // O caminho por texto é o mais direto e faltava por inteiro: a pergunta de
+  // quem está na farmácia — "posso tomar berberina?" — não tinha onde ser feita.
+  const [texto, setTexto] = useState("");
 
   async function onFileChange(file: File | undefined) {
     setResult(null);
     await selectSingle(file);
   }
 
+  const podeEnviar = pages.length > 0 || texto.trim().length > 0;
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!pages.length) {
-      setStatus("Selecione a foto do rótulo (ingredientes e tabela nutricional).");
+    if (!podeEnviar) {
+      setStatus("Digite o nome da substância ou selecione a foto do rótulo.");
       return;
     }
     setLoading(true);
-    setStatus("Lendo o rótulo e cruzando com seus dados…");
+    setStatus(
+      pages.length ? "Lendo o rótulo e cruzando com seus dados…" : "Cruzando com seus dados…"
+    );
     setResult(null);
     try {
       const fd = new FormData();
       for (const p of pages) fd.append("images", p);
+      // Foto vence: havendo rótulo, ele traz os ingredientes que o nome não tem.
+      if (!pages.length && texto.trim()) fd.append("substances", texto.trim());
       const res = await fetch("/api/ai/supplement-check", { method: "POST", body: fd });
       const data = (await res.json()) as Result & { error?: string };
       if (!res.ok) {
@@ -65,6 +75,7 @@ export function SupplementCheckForm() {
       setResult(data);
       setStatus(null);
       reset();
+      setTexto("");
     } catch {
       setStatus("Erro de rede.");
     } finally {
@@ -76,6 +87,32 @@ export function SupplementCheckForm() {
     <div className="space-y-4">
       <div>
         <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <label htmlFor="substancia" className="text-xs font-medium text-zinc-300">
+              Nome da substância ou do produto
+            </label>
+            <Input
+              id="substancia"
+              value={texto}
+              onChange={(e) => {
+                setTexto(e.target.value);
+                setResult(null);
+              }}
+              placeholder="ex.: berberina · vitamina D · cromo, gymnema"
+              maxLength={300}
+            />
+            <p className="text-[11px] leading-4 text-zinc-600">
+              Vírgula separa mais de uma. Digitado, o app cruza direto com seus medicamentos — sem
+              ler nenhum rótulo, e sem que nenhum modelo opine antes.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-600">
+            <span className="h-px flex-1 bg-zinc-800" />
+            ou fotografe o rótulo
+            <span className="h-px flex-1 bg-zinc-800" />
+          </div>
+
           <PhotoCaptureButtons
             accept="image/jpeg,image/png,image/webp,application/pdf"
             onFile={(f) => void onFileChange(f)}
@@ -93,8 +130,8 @@ export function SupplementCheckForm() {
               ))}
             </div>
           ) : null}
-          <Button type="submit" disabled={loading}>
-            {loading ? "Analisando…" : "Analisar rótulo"}
+          <Button type="submit" disabled={loading || !podeEnviar}>
+            {loading ? "Analisando…" : pages.length ? "Analisar rótulo" : "Checar substância"}
           </Button>
           {status ? <p className="text-xs text-amber-300">{status}</p> : null}
           <p className="text-[11px] leading-4 text-zinc-600">

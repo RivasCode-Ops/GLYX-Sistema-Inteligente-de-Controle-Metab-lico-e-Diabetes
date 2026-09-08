@@ -125,10 +125,33 @@ export async function POST(req: Request) {
     .getAll("images")
     .filter((f): f is File => f instanceof File && f.size > 0);
 
-  if (!files.length) {
-    return NextResponse.json({ error: "Envie ao menos uma foto do rótulo." }, { status: 400 });
+  // ---------------------------------------------------------------------------
+  // Dois caminhos de entrada: rótulo fotografado e nome digitado
+  // ---------------------------------------------------------------------------
+  // O caminho por texto faltava, e a ausência era pior do que parecia: a
+  // pergunta mais comum de quem está na farmácia — "posso tomar berberina?" —
+  // não tinha onde ser feita. A auditoria de 08/09/2026 mediu 1 chamada de
+  // análise de suplemento em 30 dias, contra 176 de sugestão de refeição.
+  //
+  // Digitado é o caminho MAIS seguro dos dois, e não menos: com o nome em mãos
+  // não há extração, ou seja, nenhum modelo entra antes do motor. A foto existe
+  // porque nem sempre se sabe o que está escrito no rótulo.
+  const textoDigitado = String(formData.get("substances") ?? "").trim();
+  const modoTexto = files.length === 0 && textoDigitado.length > 0;
+
+  if (!files.length && !textoDigitado) {
+    return NextResponse.json(
+      { error: "Digite o nome da substância ou envie uma foto do rótulo." },
+      { status: 400 }
+    );
   }
-  if (files.length > MAX_PAGES) {
+  if (modoTexto && textoDigitado.length > 300) {
+    return NextResponse.json(
+      { error: "Nome muito longo. Digite só o nome da substância ou do produto." },
+      { status: 400 }
+    );
+  }
+  if (!modoTexto && files.length > MAX_PAGES) {
     return NextResponse.json({ error: `Máximo de ${MAX_PAGES} fotos.` }, { status: 400 });
   }
   const total = files.reduce((s, f) => s + f.size, 0);
@@ -139,7 +162,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Todos os arquivos precisam ser imagens." }, { status: 415 });
   }
 
-  if (!isOpenAIConfigured()) {
+  // Sem chave de IA o caminho por FOTO não existe (é preciso ler a imagem), mas
+  // o por texto continua: o veredito é do motor determinístico, e só a redação
+  // final depende de modelo. Recusar aqui esconderia um alerta grave por falta
+  // de uma chave que o alerta não usa.
+  if (!modoTexto && !isOpenAIConfigured()) {
     return NextResponse.json({ error: "Chave de IA não configurada.", demo: true }, { status: 503 });
   }
 
@@ -149,6 +176,28 @@ export async function POST(req: Request) {
   }
 
   const openai = createAiClient();
+
+  // No caminho por texto não há passo 1: o nome digitado JÁ é o candidato, e
+  // nenhum modelo é chamado antes do motor decidir.
+  let productName = "";
+  let ingredients: string[] = [];
+  let limitations = "";
+  // Só o consumo atravessa o bloco: o completion inteiro é usado apenas dentro
+  // do caminho por foto, e tipá-lo aqui fora colide com a união de streaming do
+  // SDK. No caminho por texto não há extração, logo não há token a registrar.
+  let extractionUsage: Parameters<typeof recordAiTokens>[2] = undefined;
+
+  if (modoTexto) {
+    // Vírgula e ponto-e-vírgula separam itens: "berberina, cromo" é uma
+    // pergunta legítima e vira dois candidatos.
+    ingredients = textoDigitado
+      .split(/[;,]/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    productName = ingredients.length === 1 ? ingredients[0] : textoDigitado;
+    limitations =
+      "Checagem feita a partir do nome digitado — o app não viu o rótulo, então não conhece dose nem os demais ingredientes do produto.";
+  } else {
 
   const imageParts = await Promise.all(
     files.map(async (f) => {
@@ -181,20 +230,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: providerErrorMessage(e) }, { status: 502 });
   }
 
+  extractionUsage = extractionCompletion.usage;
   const extracted = extractionSchema.safeParse(
     parseModelJson(extractionCompletion.choices[0]?.message?.content)
   );
   if (!extracted.success) {
-    await recordAiTokens(supabase, rate.usageId, extractionCompletion.usage, aiModel());
+    await recordAiTokens(supabase, rate.usageId, extractionUsage, aiModel());
     return NextResponse.json(
       { error: "Formato inesperado do modelo ao ler o rótulo. Tente novamente." },
       { status: 502 }
     );
   }
 
-  const { productName, ingredients, limitations } = extracted.data;
+  productName = extracted.data.productName;
+  ingredients = extracted.data.ingredients;
+  limitations = extracted.data.limitations;
+  }
+
   if (!productName.trim() && !ingredients.length) {
-    await recordAiTokens(supabase, rate.usageId, extractionCompletion.usage, aiModel());
+    await recordAiTokens(supabase, rate.usageId, extractionUsage, aiModel());
     return NextResponse.json(
       {
         error:
@@ -221,7 +275,7 @@ export async function POST(req: Request) {
   // Passo 3 — redação, só quando não há achado grave.
   // -------------------------------------------------------------------------
   if (verdict.blocked) {
-    await recordAiTokens(supabase, rate.usageId, extractionCompletion.usage, aiModel());
+    await recordAiTokens(supabase, rate.usageId, extractionUsage, aiModel());
     return NextResponse.json({
       productName,
       safety,
@@ -257,7 +311,7 @@ export async function POST(req: Request) {
   } catch (e) {
     // O veredito já existe e não depende do modelo: entrega o alerta mesmo com
     // o provedor fora do ar, em vez de devolver 502 e esconder o achado.
-    await recordAiTokens(supabase, rate.usageId, extractionCompletion.usage, aiModel());
+    await recordAiTokens(supabase, rate.usageId, extractionUsage, aiModel());
     return NextResponse.json({
       productName,
       safety,
@@ -273,7 +327,7 @@ export async function POST(req: Request) {
   await recordAiTokens(
     supabase,
     rate.usageId,
-    somaUso(extractionCompletion.usage, proseCompletion.usage),
+    somaUso(extractionUsage, proseCompletion.usage),
     aiModel()
   );
 

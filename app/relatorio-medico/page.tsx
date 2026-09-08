@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { buildMedicalReportData } from "@/lib/audit/medical-report";
 import { SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { PrintButton } from "@/components/relatorio/print-button";
+import { reportAge } from "@/lib/health/report-freshness";
 
 export const metadata = { title: "Relatório para o médico — GLYX" };
 
@@ -56,6 +57,7 @@ export default async function RelatorioMedicoPage() {
   const hasMedGaps = report.medications.some(
     (med) => med.expectedDoses > 0 && med.loggedDoses / med.expectedDoses < 0.5
   );
+  const idade = reportAge(report.audit.computed_at, report.audit.window_days);
   const coverageGap = m.daysWithGlucose < report.audit.window_days;
 
   const questions: string[] = [];
@@ -120,8 +122,17 @@ export default async function RelatorioMedicoPage() {
             </div>
           </div>
         </div>
+        {/* A régua de idade que a tela de Glicemia já aplicava na leitura, e que
+            faltava justamente no papel que vai ao consultório: um retrato de
+            sete semanas atrás, sem etiqueta, é lido como retrato de hoje. Fica
+            ACIMA do período e em destaque, porque no rodapé chegaria tarde. */}
+        {idade.warning ? (
+          <p className="mt-3 border-2 border-zinc-900 px-3 py-2 text-xs font-medium leading-relaxed text-zinc-900">
+            ⚠ {idade.warning}
+          </p>
+        ) : null}
         <p className="mt-2 text-xs text-zinc-600">
-          Período de referência: {fmtDate(report.audit.period_start)} a {fmtDate(report.audit.period_end)} (
+          Gerado {idade.label}. Período de referência: {fmtDate(report.audit.period_start)} a {fmtDate(report.audit.period_end)} (
           {report.audit.window_days} dias corridos).{" "}
           {coverageGap ? (
             <strong>

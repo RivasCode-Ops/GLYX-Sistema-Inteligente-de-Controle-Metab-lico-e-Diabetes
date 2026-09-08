@@ -6,6 +6,7 @@ import type { AuditFactor, AuditPlanItem, MetabolicAuditRow } from "@/lib/audit/
 import { GenerateAuditButton } from "@/components/audit/generate-audit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatarDataHora } from "@/lib/time/format";
+import { reportAge } from "@/lib/health/report-freshness";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ function MetricCell({ label, value }: { label: string; value: string }) {
 function AuditDetail({ audit }: { audit: MetabolicAuditRow }) {
   const factors = (audit.factors ?? []) as AuditFactor[];
   const plan = (audit.plan ?? []) as AuditPlanItem[];
+  const idade = reportAge(audit.computed_at, audit.window_days);
   const m = audit.metrics;
 
   return (
@@ -51,8 +53,16 @@ function AuditDetail({ audit }: { audit: MetabolicAuditRow }) {
           </div>
           <p className="mt-1 text-xs text-zinc-500">
             Janela {audit.window_days} dias · {audit.period_start} → {audit.period_end} ·{" "}
-            {formatarDataHora(audit.computed_at)}
+            {formatarDataHora(audit.computed_at)} · {idade.label}
           </p>
+          {/* A mesma régua que a tela de Glicemia aplica na leitura: número
+              velho em destaque, sem dizer a idade, é lido como número de agora.
+              Aqui faltava — o score de 14 dias aparecia com 49 de idade. */}
+          {idade.warning ? (
+            <p className="mt-2 rounded-lg border border-severity-atencao/30 bg-severity-atencao/10 px-3 py-2 text-xs leading-relaxed text-zinc-200">
+              {idade.warning}
+            </p>
+          ) : null}
         </div>
       </div>
 
