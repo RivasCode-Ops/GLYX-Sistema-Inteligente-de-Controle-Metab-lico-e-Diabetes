@@ -120,6 +120,34 @@ export const moduleSubNav: Record<string, SubNavItem[]> = {
   ],
 };
 
+/**
+ * Cor de identidade de cada módulo — a chave SEMÂNTICA, não a classe.
+ *
+ * Fonte única. Antes cada tela escolhia a sua, e o dashboard escolhia de novo:
+ * bastava uma linha esquecida para o mesmo módulo aparecer azul numa tela e
+ * cinza na outra. A classe fica nos componentes porque o Tailwind só enxerga
+ * literal — o que atravessa é a chave.
+ *
+ * Quem não está aqui usa `neutro` de propósito: Exames, Análise e Perfil são
+ * transversais, e dar cor própria a eles esvaziaria o código de cor, que só
+ * funciona enquanto significa "este é o módulo tal".
+ */
+export type ModuleAccent = "glicemia" | "alimentacao" | "exercicio" | "medicacao" | "neutro";
+
+export const moduleAccent: Record<string, ModuleAccent> = {
+  "/glicemia": "glicemia",
+  "/alimentacao": "alimentacao",
+  "/exercicios": "exercicio",
+  "/medicacao": "medicacao",
+};
+
+/** Acento do módulo a que a rota pertence — `neutro` fora dos quatro módulos. */
+export function getModuleAccent(pathname: string): ModuleAccent {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return "neutro";
+  return moduleAccent[`/${segments[0]}`] ?? "neutro";
+}
+
 export function getModuleKeyFromPath(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return null;

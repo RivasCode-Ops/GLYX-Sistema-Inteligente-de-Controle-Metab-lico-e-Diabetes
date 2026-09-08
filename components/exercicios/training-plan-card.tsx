@@ -30,7 +30,7 @@ export function TrainingPlanCard({ statuses, minutes = 60, today = new Date() }:
   const highlighted = week.find((w) => w.day.id === plan.suggested.id)?.weekday ?? today.getDay();
 
   return (
-    <Card className="border-emerald-500/20">
+    <Card className="border-module-exercicio/20">
       <CardHeader>
         <CardTitle className="text-base">Hoje: {day.label}</CardTitle>
         <CardDescription>{day.focus}</CardDescription>
@@ -69,19 +69,19 @@ export function TrainingPlanCard({ statuses, minutes = 60, today = new Date() }:
 
             <ul className="space-y-2 text-sm text-zinc-300">
               <li className="flex items-start gap-2.5">
-                <Dumbbell className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+                <Dumbbell className="mt-0.5 h-4 w-4 shrink-0 text-module-exercicio" aria-hidden />
                 <span>
                   {LOAD_PATTERN.intensity} · {LOAD_PATTERN.effort}
                 </span>
               </li>
               <li className="flex items-start gap-2.5">
-                <Timer className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+                <Timer className="mt-0.5 h-4 w-4 shrink-0 text-module-exercicio" aria-hidden />
                 <span>
                   {LOAD_PATTERN.rest} · sessão de {LOAD_PATTERN.sessionMinutes} min
                 </span>
               </li>
               <li className="flex items-start gap-2.5">
-                <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+                <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-module-exercicio" aria-hidden />
                 <span>{LOAD_PATTERN.progression}</span>
               </li>
             </ul>
@@ -111,12 +111,12 @@ export function TrainingPlanCard({ statuses, minutes = 60, today = new Date() }:
               <li
                 key={wd}
                 className={`flex items-center justify-between px-3 py-2 text-sm ${
-                  wd === highlighted ? "bg-emerald-500/5" : ""
+                  wd === highlighted ? "bg-module-exercicio/[0.07]" : ""
                 }`}
               >
                 <span className="flex items-center gap-2">
                   <span className="w-8 font-mono text-xs text-zinc-500">{WEEKDAY_LABEL[wd]}</span>
-                  <span className={wd === highlighted ? "text-emerald-300" : "text-zinc-300"}>
+                  <span className={wd === highlighted ? "text-module-exercicio" : "text-zinc-300"}>
                     {d.label}
                   </span>
                 </span>
