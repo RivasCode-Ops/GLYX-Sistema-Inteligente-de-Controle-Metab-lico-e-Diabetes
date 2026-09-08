@@ -1,6 +1,7 @@
 # GLYX — roteiro de teste
 
-**Versão no ar:** merge de 08/09/2026 · 51 telas · 40 rotas de API · 51 ações de servidor
+**Versão no ar:** 08/09/2026, revisto após a auditoria de tela do mesmo dia
+**Original:** merge de 08/09/2026 · 51 telas · 40 rotas de API · 51 ações de servidor
 **Endereço:** https://glyx-sistema-inteligente-de-control.vercel.app
 
 ---
@@ -44,6 +45,12 @@ redige o que já foi decidido.
 ### 1.1 Checagem de suplemento
 
 **Onde:** Medicação → **Meus medicamentos** (`/medicacao/medicamentos`) — a checagem fica nessa aba, não na tela de doses
+
+> **Correção de 08/09:** a primeira versão deste roteiro mandava digitar quatro
+> substâncias, e **não havia campo de texto** — só foto. Os quatro testes-âncora
+> eram inexecutáveis. Eu tinha descrito a interface a partir do motor, sem abrir
+> a tela. O campo existe agora, e é o caminho mais direto: digitado, nenhum
+> modelo entra antes do motor decidir.
 
 | teste | o que deve acontecer |
 |---|---|
@@ -149,8 +156,11 @@ Boa parte desta seção vai aparecer vazia — e vazio aqui é o comportamento c
 | Análise → Correlações | o que anda junto com o quê |
 | Análise → Linha do tempo | eventos em ordem |
 | Análise → Alertas | você tem 19 |
+| **Medicação → Interações** (nova) | as 5 interações do seu conjunto ativo, com os nomes de cada lado — e a lista do que a base **não** reconhece |
+| Análise → score de risco | agora traz a idade ao lado, e um aviso quando o relatório passou da janela que cobre |
+| Relatório para o médico | idem, com o aviso emoldurado **acima** dos números |
 | Exames | ⚠️ **você tem 0**. Só dá para testar cadastrando um: cole o texto ou fotografe |
-| Perfil → Hipoglicemia | ⚠️ **plano ainda não cadastrado.** Enquanto não estiver, o card de hipoglicemia dirá "plano não configurado" — o app nunca inventa a conduta |
+| Perfil → Hipoglicemia | ⚠️ **plano ainda não cadastrado.** Enquanto não estiver, o card dirá "plano não configurado" — o app nunca inventa a conduta. A aba estava órfã até 08/09 (só por URL); agora está no menu do Perfil e na busca |
 | Perfil → Conta | exportar seus dados em JSON, apagar tudo |
 | Status (`/status`) | sensor, push, IA e erros |
 
@@ -174,7 +184,7 @@ Boa parte desta seção vai aparecer vazia — e vazio aqui é o comportamento c
 | Deltoide anterior/lateral/posterior separados | o vocabulário só tem "ombros" |
 | Prontidão sistêmica (nota única) | é score composto — mesma decisão pendente abaixo |
 | "Potencial de hipertrofia 78/100" | **decisão sua.** Média de sete componentes com três sem dado é número plausível e errado. Posso fazer com a regra "só aparece quando todos têm base" |
-| Sono | o app lê de integração de saúde, e o Google Fit não está conectado |
+| ~~Sono~~ | **corrigido:** existe registro manual de sono em `/integracoes`, com prioridade sobre qualquer outra fonte do mesmo dia. O §8 original errava aqui |
 
 ## 9. Coisas que eu quebrei ou errei nesta leva — teste com atenção redobrada
 
@@ -185,6 +195,14 @@ Boa parte desta seção vai aparecer vazia — e vazio aqui é o comportamento c
 3. **Anel de recuperação muscular.** Mostrava grupo pausado como "recuperado".
 4. **Contagem de mecanismos.** Contava 4 onde eram 5, por ignorar a insulina
    basal do dia anterior — que dura 24 h.
+5. **Fuso horário (corrigido em 08/09).** Eram 42 formatações sem fuso: a linha
+   do tempo mostrava +3 h, a dose das 19:00 aparecia como 22:00, e o dia em
+   `/glicemia/<data>` começava às 03:04. Confira as horas em qualquer tela.
+6. **Histórico preso em julho (corrigido em 08/09).** O Histórico de glicemia e
+   os insights recebiam as **mil leituras mais antigas** da janela, em silêncio.
+   Confira se o histórico agora chega a setembro.
+7. **Estoque (corrigido em 08/09).** Sete itens diziam "pode ter acabado"; o que
+   estava velho era a informação, não necessariamente o estoque.
 
 ---
 
