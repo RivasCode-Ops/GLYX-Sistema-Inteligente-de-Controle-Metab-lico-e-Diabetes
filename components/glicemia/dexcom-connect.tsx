@@ -130,12 +130,12 @@ export function DexcomConnect({
       </CardHeader>
       <CardContent className="space-y-3">
         {!oauthConfigured ? (
+          // Nome de variável de ambiente é instrução de DEPLOY, e esta é a
+          // tela de quem usa o app. Ela diz o estado; o passo a passo mora em
+          // docs/PRODUCAO.md, que é onde quem opera vai olhar.
           <p className="text-xs text-zinc-500">
-            Configure <code className="font-mono">DEXCOM_CLIENT_ID</code>,{" "}
-            <code className="font-mono">DEXCOM_CLIENT_SECRET</code> e{" "}
-            <code className="font-mono">DEXCOM_REDIRECT_URI</code> (ou{" "}
-            <code className="font-mono">NEXT_PUBLIC_SITE_URL</code>) no servidor. Use{" "}
-            <code className="font-mono">DEXCOM_USE_SANDBOX=true</code> no ambiente de teste.
+            Integração com Dexcom ainda não está configurada neste servidor. Enquanto isso, dá para
+            registrar a glicemia manualmente ou usar o LibreLinkUp.
           </p>
         ) : (
           <Button asChild disabled={loading}>

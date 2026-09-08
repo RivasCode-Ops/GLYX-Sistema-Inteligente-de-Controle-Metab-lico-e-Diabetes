@@ -146,12 +146,21 @@ export default async function ExerciciosOverviewPage() {
               <li key={s.id}>
                 <Link
                   href={`/exercicios/sessoes/${s.id}`}
-                  className="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-800/40"
+                  className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-zinc-800/40"
                 >
-                  <span className="text-zinc-200">{s.label}</span>
-                  <span className="font-mono text-xs text-zinc-500">
-                    {s.duration_min != null ? `${s.duration_min} min` : "—"} →
+                  {/* Sem a data, oito linhas "Treino de força" ficam idênticas e
+                      a lista não informa nada — a mesma lista em /sessoes já
+                      mostrava a data. E duração ausente vira "sem duração", não
+                      um travessão que se confunde com valor zero. */}
+                  <span className="min-w-0">
+                    <span className="block truncate text-zinc-200">{s.label}</span>
+                    <span className="block font-mono text-[11px] text-zinc-500">
+                      {formatarData(s.started_at, null, { day: "2-digit", month: "short" })}
+                      {" · "}
+                      {s.duration_min != null ? `${s.duration_min} min` : "sem duração"}
+                    </span>
                   </span>
+                  <span className="shrink-0 text-xs text-zinc-600">→</span>
                 </Link>
               </li>
             ))}

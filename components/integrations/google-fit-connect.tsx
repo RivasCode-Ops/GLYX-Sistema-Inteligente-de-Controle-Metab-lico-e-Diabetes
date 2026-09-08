@@ -132,12 +132,11 @@ export function GoogleFitConnect({
       </CardHeader>
       <CardContent className="space-y-3">
         {!oauthConfigured ? (
+          // Idem: estado, não instrução de deploy. E aponta a saída que já
+          // existe — o registro manual de sono, logo abaixo nesta mesma tela.
           <p className="text-xs text-zinc-500">
-            Configure <code className="font-mono">GOOGLE_FIT_CLIENT_ID</code>,{" "}
-            <code className="font-mono">GOOGLE_FIT_CLIENT_SECRET</code> e{" "}
-            <code className="font-mono">GOOGLE_FIT_REDIRECT_URI</code> (ou{" "}
-            <code className="font-mono">NEXT_PUBLIC_SITE_URL</code>) no servidor — veja
-            docs/PRODUCAO.md.
+            Integração com Google Fit ainda não está configurada neste servidor. O sono e os passos
+            podem ser registrados à mão aqui mesmo.
           </p>
         ) : (
           <Button asChild disabled={loading}>
