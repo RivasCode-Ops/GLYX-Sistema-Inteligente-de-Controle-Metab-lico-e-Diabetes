@@ -6,7 +6,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import { reportCronOutcome, reportException } from "@/lib/observability";
 import { sendToSubscription } from "@/lib/push/send";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Quantas sugestões processamos ao mesmo tempo. Sequencial (1 por vez)
 // arrisca estourar o timeout de 60s da function quando muitos usuários
@@ -60,7 +60,10 @@ export async function POST(req: Request) {
   }
 
   const openai = createAiClient();
-  const supabase = await createClient();
+  // Service role: a rota roda via pg_cron, sem sessão. Com o cliente anon o
+  // RPC falhava calado desde que `anon` perdeu o EXECUTE de
+  // record_system_ai_usage (migration revoke_anon_admin_rpcs).
+  const supabase = createAdminClient();
 
   async function processItem(item: SuggestItem): Promise<boolean> {
     const mealLabel = MEAL_LABEL[item.mealType];
@@ -109,7 +112,7 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
     );
 
     if (supabase && completion.usage) {
-      await supabase.rpc("record_system_ai_usage", {
+      const { error: usageError } = await supabase.rpc("record_system_ai_usage", {
         p_user_id: item.userId,
         p_kind: "meal_suggest",
         p_prompt_tokens: completion.usage.prompt_tokens ?? null,
@@ -117,6 +120,13 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
         p_model: aiModel(),
         p_secret: secret,
       });
+      if (usageError) {
+        reportException(usageError, {
+          tags: { job: "meal-suggest", surface: "cron" },
+          extra: { userIdPrefix: item.userId.slice(0, 8), step: "record_ai_usage" },
+          level: "warning",
+        });
+      }
     }
 
     return alive;
