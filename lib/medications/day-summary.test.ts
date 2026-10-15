@@ -16,6 +16,41 @@ const CREATINA: MedicationLike = { id: "cre", name: "Creatina", reminder_times: 
 /** Sem horário: não entra em dose do dia nenhuma. */
 const WHEY: MedicationLike = { id: "whey", name: "Whey", reminder_times: [] };
 
+/** 07/09/2026 é segunda-feira. Semanal de quarta: não é dia de dose. */
+const SEMANAL_QUARTA: MedicationLike = {
+  id: "glp1",
+  name: "GLP-1 semanal",
+  reminder_times: ["09:00"],
+  cadence: "semanal",
+  cadence_weekday: 3,
+};
+const SEMANAL_SEGUNDA: MedicationLike = { ...SEMANAL_QUARTA, id: "glp1-seg", cadence_weekday: 1 };
+
+describe("resumo das doses do dia respeita a cadência", () => {
+  it("semanal fora do dia não vira dose nem atraso", () => {
+    const r = resumirDosesDoDia([SEMANAL_QUARTA, CREATINA], [], [], TZ, local(23));
+    expect(r.doses.map((d) => d.medicationId)).toEqual(["cre"]);
+    expect(r.atrasadas).toBe(1);
+  });
+
+  it("dia sem dose não entra no denominador da adesão", () => {
+    const logs = [{ medication_id: "cre", taken_at: new Date(local(8, 5)).toISOString() }];
+    const r = resumirDosesDoDia([SEMANAL_QUARTA, CREATINA], logs, [], TZ, local(23));
+    expect(r.adesaoPct).toBe(100);
+  });
+
+  it("semanal no dia declarado aparece normalmente", () => {
+    const r = resumirDosesDoDia([SEMANAL_SEGUNDA], [], [], TZ, local(23));
+    expect(r.total).toBe(1);
+    expect(r.atrasadas).toBe(1);
+  });
+
+  it("cadência não declarada continua diária", () => {
+    const r = resumirDosesDoDia([{ ...SEMANAL_QUARTA, cadence: null }], [], [], TZ, local(23));
+    expect(r.total).toBe(1);
+  });
+});
+
 describe("resumo das doses do dia", () => {
   it("conta uma dose por horário de cada item agendado", () => {
     const r = resumirDosesDoDia([LANTUS, CREATINA, WHEY], [], [], TZ, local(23));

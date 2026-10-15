@@ -6,7 +6,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import { reportCronOutcome, reportException } from "@/lib/observability";
 import { sendToSubscription } from "@/lib/push/send";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Quantas sugestões processamos ao mesmo tempo. Sequencial (1 por vez)
 // arrisca estourar o timeout de 60s da function quando muitos usuários
@@ -60,7 +60,10 @@ export async function POST(req: Request) {
   }
 
   const openai = createAiClient();
-  const supabase = await createClient();
+  // Service role: o cron chega sem sessão, e com o cliente anon a RPC de custo
+  // passou a ser recusada depois de 20260908180000 (EXECUTE revogado de anon)
+  // — e o erro era ignorado, então o gasto sumia do painel sem aviso.
+  const supabase = createAdminClient();
 
   async function processItem(item: SuggestItem): Promise<boolean> {
     const mealLabel = MEAL_LABEL[item.mealType];
@@ -108,8 +111,13 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
       }
     );
 
-    if (supabase && completion.usage) {
-      await supabase.rpc("record_system_ai_usage", {
+    if (!supabase) {
+      reportException(new Error("meal-suggest sem service role: custo de IA não registrado"), {
+        tags: { job: "meal-suggest", surface: "cron" },
+        level: "error",
+      });
+    } else if (completion.usage) {
+      const { error: usoErro } = await supabase.rpc("record_system_ai_usage", {
         p_user_id: item.userId,
         p_kind: "meal_suggest",
         p_prompt_tokens: completion.usage.prompt_tokens ?? null,
@@ -117,6 +125,13 @@ Seja prático e direto (ex.: "Prefira proteína magra com salada e pouco arroz")
         p_model: aiModel(),
         p_secret: secret,
       });
+      if (usoErro) {
+        reportException(new Error("meal-suggest: falha ao registrar custo de IA"), {
+          tags: { job: "meal-suggest", surface: "cron" },
+          extra: { codigo: usoErro.code ?? null },
+          level: "error",
+        });
+      }
     }
 
     return alive;

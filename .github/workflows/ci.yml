@@ -9,7 +9,10 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      # Porta morta na própria máquina: nada responde e nada sai do runner. Antes era
+      # https://example.supabase.co, um host EXTERNO de verdade. A guarda de destino
+      # (GLYX-46, lib/testes/guarda-destino.ts) recusa qualquer host fora da máquina.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
       NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
       SIGNUP_INVITE_CODE: e2e-invite-gate
       # Opcional: secrets E2E_USER_EMAIL / E2E_USER_PASSWORD habilitam clinical-path.spec.ts

@@ -1,0 +1,149 @@
+{
+  "_leia": "Casos do contrato do alarme de medicação. Usados por lib/medications/cadence.test.ts (TypeScript, roda local) e reproduzidos em supabase/tests/med_alarms_due.sql (SQL, roda em banco de teste). Um teste garante que todo id daqui aparece no arquivo SQL. 2026-10-14 é quarta-feira (dow 3). Fuso padrão America/Sao_Paulo = UTC-3.",
+  "casos": [
+    {
+      "id": "semanal-no-dia",
+      "descricao": "Semanal de quarta, às 08:00, conferido quarta 08:02",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-14T11:02:00Z",
+      "med": { "cadence": "semanal", "cadence_weekday": 3, "reminder_times": ["08:00"] },
+      "esperado": [{ "horario": "08:00", "dataDaDose": "2026-10-14" }]
+    },
+    {
+      "id": "semanal-fora-do-dia",
+      "descricao": "Semanal de quarta, conferido quinta 08:02 — o defeito: hoje o alarme toca",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:02:00Z",
+      "med": { "cadence": "semanal", "cadence_weekday": 3, "reminder_times": ["08:00"] },
+      "esperado": []
+    },
+    {
+      "id": "intervalo-na-ancora",
+      "descricao": "A cada 3 dias desde 01/10, no próprio dia 01/10",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-01T11:02:00Z",
+      "med": { "cadence": "intervalo", "cadence_interval_days": 3, "cadence_anchor_on": "2026-10-01", "reminder_times": ["08:00"] },
+      "esperado": [{ "horario": "08:00", "dataDaDose": "2026-10-01" }]
+    },
+    {
+      "id": "intervalo-multiplo",
+      "descricao": "A cada 3 dias desde 01/10, em 13/10 (12 dias depois)",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-13T11:02:00Z",
+      "med": { "cadence": "intervalo", "cadence_interval_days": 3, "cadence_anchor_on": "2026-10-01", "reminder_times": ["08:00"] },
+      "esperado": [{ "horario": "08:00", "dataDaDose": "2026-10-13" }]
+    },
+    {
+      "id": "intervalo-fora",
+      "descricao": "A cada 3 dias desde 01/10, em 14/10 (13 dias depois)",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-14T11:02:00Z",
+      "med": { "cadence": "intervalo", "cadence_interval_days": 3, "cadence_anchor_on": "2026-10-01", "reminder_times": ["08:00"] },
+      "esperado": []
+    },
+    {
+      "id": "intervalo-antes-da-ancora",
+      "descricao": "A cada 3 dias desde 20/10, conferido 14/10 (6 dias antes, múltiplo de 3) — D2: não dispara",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-14T11:02:00Z",
+      "med": { "cadence": "intervalo", "cadence_interval_days": 3, "cadence_anchor_on": "2026-10-20", "reminder_times": ["08:00"] },
+      "esperado": []
+    },
+    {
+      "id": "diaria",
+      "descricao": "Diária às 08:00",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:02:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["08:00"] },
+      "esperado": [{ "horario": "08:00", "dataDaDose": "2026-10-15" }]
+    },
+    {
+      "id": "nula-com-horario",
+      "descricao": "Cadência não declarada com horário — D1: continua diária",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:02:00Z",
+      "med": { "cadence": null, "reminder_times": ["08:00"] },
+      "esperado": [{ "horario": "08:00", "dataDaDose": "2026-10-15" }]
+    },
+    {
+      "id": "livre-sem-alarme",
+      "descricao": "Rigidez livre — D3: sem alarme",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:02:00Z",
+      "med": { "cadence": "diaria", "timing_strictness": "livre", "reminder_times": ["08:00"] },
+      "esperado": []
+    },
+    {
+      "id": "virada-meia-noite",
+      "descricao": "Diária às 23:55, conferida 00:02 do dia seguinte — o defeito: hoje nunca dispara",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T03:02:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["23:55"] },
+      "esperado": [{ "horario": "23:55", "dataDaDose": "2026-10-14" }]
+    },
+    {
+      "id": "virada-meia-noite-semanal-dia-da-dose",
+      "descricao": "Semanal de quarta às 23:55, conferido quinta 00:02 — vale o dia da dose (quarta)",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T03:02:00Z",
+      "med": { "cadence": "semanal", "cadence_weekday": 3, "reminder_times": ["23:55"] },
+      "esperado": [{ "horario": "23:55", "dataDaDose": "2026-10-14" }]
+    },
+    {
+      "id": "virada-meia-noite-semanal-outro-dia",
+      "descricao": "Semanal de quinta às 23:55, conferido quinta 00:02 — a dose vencida é de quarta, não dispara",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T03:02:00Z",
+      "med": { "cadence": "semanal", "cadence_weekday": 4, "reminder_times": ["23:55"] },
+      "esperado": []
+    },
+    {
+      "id": "fim-da-janela",
+      "descricao": "Diária às 08:00, conferida 08:10 — janela é [08:00, 08:10)",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:10:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["08:00"] },
+      "esperado": []
+    },
+    {
+      "id": "antes-do-horario",
+      "descricao": "Diária às 08:00, conferida 07:59",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T10:59:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["08:00"] },
+      "esperado": []
+    },
+    {
+      "id": "fuso-manaus",
+      "descricao": "Diária às 23:55 em Manaus (UTC-4), instante 03:57Z — em Manaus são 23:57 de 14/10",
+      "timezone": "America/Manaus",
+      "agoraUTC": "2026-10-15T03:57:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["23:55"] },
+      "esperado": [{ "horario": "23:55", "dataDaDose": "2026-10-14" }]
+    },
+    {
+      "id": "fuso-sao-paulo-mesmo-instante",
+      "descricao": "Mesmo instante 03:57Z em São Paulo: 00:57 de 15/10, fora da janela",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T03:57:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["23:55"] },
+      "esperado": []
+    },
+    {
+      "id": "horario-malformado",
+      "descricao": "Um horário inválido ao lado de um válido: o inválido é ignorado, não derruba o envio",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:02:00Z",
+      "med": { "cadence": "diaria", "reminder_times": ["8h", "08:00", "25:00"] },
+      "esperado": [{ "horario": "08:00", "dataDaDose": "2026-10-15" }]
+    },
+    {
+      "id": "inativo",
+      "descricao": "Medicamento inativo",
+      "timezone": "America/Sao_Paulo",
+      "agoraUTC": "2026-10-15T11:02:00Z",
+      "med": { "cadence": "diaria", "active": false, "reminder_times": ["08:00"] },
+      "esperado": []
+    }
+  ]
+}

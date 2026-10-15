@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { exigirDestinosLocais } from "./lib/testes/guarda-destino";
 
 /**
  * Porta do servidor de teste. Configurável porque `reuseExistingServer` reusa
@@ -12,6 +13,20 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const PORT = process.env.E2E_PORT || "3000";
 const BASE_URL = `http://127.0.0.1:${PORT}`;
+
+/**
+ * Ambiente entregue ao servidor de teste. A guarda (GLYX-46) confere ESTE objeto
+ * antes de qualquer teste: o `npm run dev` lê o `.env.local`, então todo nome dele
+ * precisa estar definido aqui com valor de teste, e nenhum destino pode sair da
+ * máquina. Vale também com `reuseExistingServer`, porque roda ao carregar a config.
+ * Sem configuração de teste completa, a suíte não roda — de propósito.
+ */
+const ENV_SERVIDOR: Record<string, string | undefined> = {
+  ...process.env,
+  // Garante fail-closed do convite nos testes de API mesmo sem .env.local
+  SIGNUP_INVITE_CODE: process.env.SIGNUP_INVITE_CODE || "e2e-invite-gate",
+};
+exigirDestinosLocais({ env: ENV_SERVIDOR, pasta: __dirname, exigirCobertura: true });
 
 export default defineConfig({
   testDir: "e2e",
@@ -34,10 +49,6 @@ export default defineConfig({
     timeout: 360_000,
     stdout: "pipe",
     stderr: "pipe",
-    env: {
-      ...process.env,
-      // Garante fail-closed do convite nos testes de API mesmo sem .env.local
-      SIGNUP_INVITE_CODE: process.env.SIGNUP_INVITE_CODE || "e2e-invite-gate",
-    },
+    env: ENV_SERVIDOR as Record<string, string>,
   },
 });

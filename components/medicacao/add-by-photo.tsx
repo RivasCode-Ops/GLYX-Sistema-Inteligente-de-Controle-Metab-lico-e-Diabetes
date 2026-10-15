@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ReminderTimesField } from "@/components/medicacao/reminder-times-field";
+import { CampoFrequencia } from "@/components/medicacao/campo-frequencia";
 import { InteractionAlert } from "@/components/medicacao/interaction-alert";
 import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
 import type { SafetyPayload } from "@/lib/safety/present";
@@ -26,6 +27,11 @@ type Draft = {
   schedule_hint: string;
   stock_units: string;
   reminder_times: string;
+  /** D1: frequência escolhida explicitamente (obrigatória quando há horário). */
+  cadence: string;
+  cadence_weekday: string;
+  cadence_interval_days: string;
+  cadence_anchor_on: string;
 };
 
 const SELECT_CLASS =
@@ -84,6 +90,10 @@ export function AddMedicationByPhoto() {
         schedule_hint: r.schedule_hint,
         stock_units: r.stock_units != null ? String(r.stock_units) : "",
         reminder_times: "",
+        cadence: "",
+        cadence_weekday: "",
+        cadence_interval_days: "",
+        cadence_anchor_on: "",
       });
       setLimitations(r.limitations || null);
       setSafety(data.safety ?? null);
@@ -112,6 +122,10 @@ export function AddMedicationByPhoto() {
       fd.set("dosage", draft.dosage_text);
       fd.set("schedule_hint", draft.schedule_hint);
       fd.set("reminder_times", draft.reminder_times);
+      fd.set("cadence", draft.cadence);
+      fd.set("cadence_weekday", draft.cadence_weekday);
+      fd.set("cadence_interval_days", draft.cadence_interval_days);
+      fd.set("cadence_anchor_on", draft.cadence_anchor_on);
       fd.set("stock_units", draft.stock_units);
       if (file) fd.set("label_photo", file);
       const res = await addMedication(fd);
@@ -219,6 +233,11 @@ export function AddMedicationByPhoto() {
               <Label>Alarmes de dose</Label>
               <ReminderTimesField onChange={(v) => set("reminder_times", v)} />
             </div>
+            <CampoFrequencia
+              rotuloVazio="Escolha…"
+              ajuda="Obrigatória quando há horário de alarme."
+              onChange={(campo, valor) => set(campo, valor)}
+            />
             <div className="grid gap-1">
               <Label>Estoque (opcional)</Label>
               <Input

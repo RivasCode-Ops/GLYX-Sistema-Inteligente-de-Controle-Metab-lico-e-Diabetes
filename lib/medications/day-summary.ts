@@ -1,4 +1,5 @@
 import { computeDoseStatus, doseWindows, type DoseLog, type DoseSnooze } from "./adherence";
+import { ehDiaDeDose, type CamposDeCadencia } from "./cadence";
 import { localDateKey } from "@/lib/time/local-day";
 
 /**
@@ -13,7 +14,7 @@ import { localDateKey } from "@/lib/time/local-day";
  * Aqui só se agrupa o resultado.
  */
 
-export type MedicationLike = {
+export type MedicationLike = CamposDeCadencia & {
   id: string;
   name: string;
   dosage?: string | null;
@@ -27,7 +28,7 @@ export type DoseDoDia = {
   /** HH:MM do horário previsto */
   time: string;
   scheduledUTC: Date;
-  state: "tomada" | "adiada" | "agendada" | "pendente";
+  state: "tomada" | "pulada" | "adiada" | "agendada" | "pendente";
   takenAt?: string;
   snoozedUntil?: string;
 };
@@ -36,6 +37,8 @@ export type ResumoDoDia = {
   doses: DoseDoDia[];
   total: number;
   tomadas: number;
+  /** marcadas "Pulei hoje" (D16): não são tomadas, e contam como vencidas na adesão */
+  puladas: number;
   /** vencidas e sem registro — `pendente` no vocabulário da regra */
   atrasadas: number;
   agendadas: number;
@@ -59,13 +62,17 @@ export function resumirDosesDoDia(
   now: number = Date.now()
 ): ResumoDoDia {
   const tz = timezone || "America/Sao_Paulo";
-  const [y, mo, d] = localDateKey(new Date(now).toISOString(), tz).split("-").map(Number);
+  const hoje = localDateKey(new Date(now).toISOString(), tz);
+  const [y, mo, d] = hoje.split("-").map(Number);
 
   const doses: DoseDoDia[] = [];
 
   for (const m of meds) {
     const horarios = (m.reminder_times ?? []).filter((t) => /^\d{1,2}:\d{2}$/.test(t));
     if (!horarios.length) continue;
+    // Dia sem dose pela cadência não gera dose: nem atraso, nem denominador de
+    // adesão. Um semanal apareceria "atrasado" seis dias por semana.
+    if (!ehDiaDeDose(m, hoje)) continue;
 
     const medLogs = logs.filter((l) => l.medication_id === m.id);
     const medSnoozes = snoozes.filter((s) => s.medication_id === m.id);
@@ -96,19 +103,22 @@ export function resumirDosesDoDia(
   doses.sort((a, b) => a.time.localeCompare(b.time) || a.name.localeCompare(b.name));
 
   const tomadas = doses.filter((x) => x.state === "tomada").length;
+  const puladas = doses.filter((x) => x.state === "pulada").length;
   const atrasadas = doses.filter((x) => x.state === "pendente").length;
   const agendadas = doses.filter((x) => x.state === "agendada").length;
 
   // A próxima é a mais cedo que ainda não foi registrada — inclui a atrasada,
   // porque "próxima" para quem usa é "a que eu ainda preciso tomar", não a
   // próxima no relógio.
-  const proxima = doses.find((x) => x.state !== "tomada") ?? null;
+  // Pulada já foi resolvida por quem usa: não é "a próxima a tomar".
+  const proxima = doses.find((x) => x.state !== "tomada" && x.state !== "pulada") ?? null;
 
   const vencidas = doses.length - agendadas;
   return {
     doses,
     total: doses.length,
     tomadas,
+    puladas,
     atrasadas,
     agendadas,
     proxima,

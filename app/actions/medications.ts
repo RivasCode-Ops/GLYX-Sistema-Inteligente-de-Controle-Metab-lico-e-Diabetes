@@ -8,10 +8,18 @@ import { namesLookSimilar } from "@/lib/medications/similar";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localDateKey, wallClockToUTC } from "@/lib/time/local-day";
 import {
-  resolveAdherenceStatus,
-  type AdherenceStatus,
-  type TimingStrictness,
-} from "@/lib/medications/adherence-status";
+  MENSAGENS_CADENCIA,
+  cadenciaDoFormulario,
+  configuracaoInconsistente,
+  programacaoDoFormulario,
+} from "@/lib/medications/cadence";
+import {
+  colunaInexistente,
+  pedidoValido,
+  registrarDose,
+  type ErroBanco,
+  type Intencao,
+} from "@/lib/medications/register-dose";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const LABEL_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
@@ -61,6 +69,40 @@ function parseReminderTimes(input: string): string[] {
 
 export type ActionResult = { ok?: true; error?: string };
 
+function cadenciaDoFormularioData(formData: FormData, temHorario: boolean, modo: "cadastro" | "edicao") {
+  return cadenciaDoFormulario(
+    {
+      cadence: formData.get("cadence") as string | null,
+      cadence_weekday: formData.get("cadence_weekday") as string | null,
+      cadence_interval_days: formData.get("cadence_interval_days") as string | null,
+      cadence_anchor_on: formData.get("cadence_anchor_on") as string | null,
+    },
+    temHorario,
+    modo
+  );
+}
+
+const CONFIRMADA = "cadence_confirmed_at";
+
+/**
+ * Grava em `medications`; se o banco ainda não tem `cadence_confirmed_at`
+ * (antes da migration 20261015103000), grava de novo sem ela. A frequência
+ * escolhida é salva do mesmo jeito; só a marca de confirmação fica para
+ * depois — e, sem a coluna, o aviso "a confirmar" também não aparece.
+ */
+async function gravarMedicamento(
+  linha: Record<string, unknown>,
+  gravar: (l: Record<string, unknown>) => PromiseLike<{ error: ErroBanco | null }>
+): Promise<{ error: ErroBanco | null }> {
+  const r = await gravar(linha);
+  if (CONFIRMADA in linha && colunaInexistente(r.error, CONFIRMADA)) {
+    const semConfirmacao = { ...linha };
+    delete semConfirmacao[CONFIRMADA];
+    return gravar(semConfirmacao);
+  }
+  return r;
+}
+
 export async function addMedication(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   if (!supabase) return { error: "Configure o Supabase (.env.local)." };
@@ -82,6 +124,11 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
   });
   if (!parsed.success) return { error: "Nome do medicamento é obrigatório." };
 
+  // D1: com horário, a frequência é escolha explícita — o app não presume mais
+  // "todo dia" (até 15/10 gravava 'diaria' quando o campo vinha vazio).
+  const cadencia = cadenciaDoFormularioData(formData, reminderTimes.length > 0, "cadastro");
+  if (!cadencia.ok) return { error: cadencia.erro };
+
   const stockRaw = Number.parseInt(String(formData.get("stock_units") ?? ""), 10);
   const stock =
     Number.isFinite(stockRaw) && stockRaw > 0 && stockRaw <= 100000
@@ -93,14 +140,19 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
 
   const labelPhotoPath = await uploadLabelPhoto(supabase, user.id, formData.get("label_photo"));
 
-  const { error } = await supabase.from("medications").insert({
-    user_id: user.id,
-    ...parsed.data,
-    ...stock,
-    ...(labelPhotoPath ? { label_photo_path: labelPhotoPath } : {}),
-  });
+  const { error } = await gravarMedicamento(
+    {
+      user_id: user.id,
+      ...parsed.data,
+      ...(cadencia.colunas ?? {}),
+      ...(cadencia.explicita ? { [CONFIRMADA]: new Date().toISOString() } : {}),
+      ...stock,
+      ...(labelPhotoPath ? { label_photo_path: labelPhotoPath } : {}),
+    },
+    (l) => supabase.from("medications").insert(l)
+  );
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message ?? "Falha ao salvar." };
 
   revalidatePath("/medicacao");
   return { ok: true };
@@ -234,19 +286,73 @@ export async function updateMedication(formData: FormData): Promise<ActionResult
   });
   if (!parsed.success) return { error: "Nome do medicamento é obrigatório." };
 
-  const { error } = await supabase
-    .from("medications")
-    .update({
+  // D1: vazio na edição não mexe na frequência nem conta como confirmação.
+  const cadencia = cadenciaDoFormularioData(formData, reminderTimes.length > 0, "edicao");
+  if (!cadencia.ok) return { error: cadencia.erro };
+
+  // D3: item "livre" com horário só ganha alarme com programação E frequência
+  // escolhidas explicitamente no mesmo envio.
+  const programacao = programacaoDoFormulario(formData.get("timing_strictness") as string | null);
+  if (!programacao.ok) return { error: programacao.erro };
+  if (programacao.rigidez && !cadencia.explicita) {
+    return { error: MENSAGENS_CADENCIA.programacao_sem_frequencia };
+  }
+
+  const { error } = await gravarMedicamento(
+    {
       name: parsed.data.name,
       dosage: parsed.data.dosage ?? null,
       schedule_hint: parsed.data.schedule_hint ?? null,
       reminder_times: reminderTimes.length ? reminderTimes : null,
       kind: parsed.data.kind,
-    })
+      ...(cadencia.colunas ?? {}),
+      ...(cadencia.explicita ? { [CONFIRMADA]: new Date().toISOString() } : {}),
+      ...(programacao.rigidez ? { timing_strictness: programacao.rigidez } : {}),
+    },
+    (l) => supabase.from("medications").update(l).eq("id", medicationId).eq("user_id", user.id)
+  );
+
+  if (error) return { error: error.message ?? "Falha ao salvar." };
+
+  revalidatePath("/medicacao");
+  return { ok: true };
+}
+
+/**
+ * D1: confirmação EXPLÍCITA da frequência atual de um item antigo ("Está certo:
+ * todo dia"). Não muda horário nem frequência — só registra que a pessoa
+ * confirmou. Frequência nunca declarada, confirmada como "todo dia", passa a
+ * constar como 'diaria', que é o que o alarme já fazia. Item "livre" com
+ * horário (D3) não se confirma por aqui: precisa escolher a programação.
+ */
+export async function confirmarFrequencia(formData: FormData): Promise<ActionResult> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const medicationId = formData.get("medication_id") as string | null;
+  if (!medicationId) return { error: "Medicamento inválido." };
+
+  const { data: med } = await supabase
+    .from("medications")
+    .select("*")
+    .eq("id", medicationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!med) return { error: "Medicamento inválido." };
+  if (!(CONFIRMADA in med)) return { error: MENSAGENS_CADENCIA.confirmacao_indisponivel };
+  if (configuracaoInconsistente(med)) return { error: MENSAGENS_CADENCIA.programacao_sem_frequencia };
+
+  const { error } = await supabase
+    .from("medications")
+    .update({ [CONFIRMADA]: new Date().toISOString(), ...(med.cadence ? {} : { cadence: "diaria" }) })
     .eq("id", medicationId)
     .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  if (error) return { error: "Falha ao salvar." };
 
   revalidatePath("/medicacao");
   return { ok: true };
@@ -319,6 +425,17 @@ export async function deactivateMedication(formData: FormData): Promise<ActionRe
  * não impede a gravação: o registro entra como avulso, porque perder o dado
  * seria pior que perder a classificação dele.
  */
+/**
+ * Resultado do registro pela tela. `conflito` NÃO é erro: já existe tomada na
+ * mesma dose prevista e a pessoa precisa dizer se está corrigindo aquela ou
+ * registrando outra (D14/P45). A página leva para a pergunta em /medicacao.
+ */
+export type ResultadoRegistroTela = ActionResult & {
+  conflito?: { medicationId: string; scheduledFor: string; takenAtPedido: string; pedido: string | null };
+};
+
+type OpcoesRegistro = { pedido?: string | null; intencao?: Intencao | null; alvoId?: string | null };
+
 async function inserirRegistroDeDose(
   medicationId: string,
   confirmed: boolean,
@@ -334,8 +451,9 @@ async function inserirRegistroDeDose(
    * Nulo mantém o comportamento antigo: registrar rápido continua sendo um
    * toque só, e o app não passa a exigir precisão que ninguém tem sempre.
    */
-  takenAtInformado?: Date | null
-): Promise<ActionResult> {
+  takenAtInformado?: Date | null,
+  opcoes: OpcoesRegistro = {}
+): Promise<ResultadoRegistroTela> {
   const supabase = await createClient();
   if (!supabase) return { error: "Configure o Supabase (.env.local)." };
 
@@ -344,54 +462,49 @@ async function inserirRegistroDeDose(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
 
-  const takenAt = takenAtInformado ?? new Date();
-  let status: AdherenceStatus = "avulso";
-  let scheduledFor: Date | null = null;
-
-  try {
-    const [{ data: med }, { data: profile }] = await Promise.all([
-      supabase
-        .from("medications")
-        .select("reminder_times, timing_strictness, grace_minutes")
-        .eq("id", medicationId)
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
-    ]);
-
-    if (med) {
-      const derivado = resolveAdherenceStatus({
-        reminderTimes: (med.reminder_times as string[] | null) ?? null,
-        strictness: (med.timing_strictness as TimingStrictness | null) ?? "flexivel",
-        graceMinutes: (med.grace_minutes as number | null) ?? null,
-        takenAt,
-        timeZone: profile?.timezone || "America/Sao_Paulo",
-      });
-      status = derivado.status;
-      scheduledFor = derivado.scheduledFor;
-    }
-  } catch {
-    /* segue como avulso: o registro importa mais que o rótulo dele */
-  }
-
-  // "Pulei hoje" é sempre fora_janela: preserva a diferença entre "não tomei" e
-  // "não registrei", que é o que o SYSTEM do copiloto já manda não confundir.
-  if (!confirmed) status = "fora_janela";
-
-  const { error } = await supabase.from("medication_logs").insert({
-    user_id: user.id,
-    medication_id: medicationId,
+  // Regra única com a notificação (`lib/medications/register-dose.ts`):
+  // rótulo de adesão, dose prevista e idempotência da mesma dose.
+  const r = await registrarDose(supabase, user.id, {
+    medicationId,
     confirmed,
-    taken_at: takenAt.toISOString(),
-    scheduled_for: scheduledFor?.toISOString() ?? null,
-    adherence_status: status,
+    takenAt: takenAtInformado ?? null,
+    pedido: opcoes.pedido ?? null,
+    intencao: opcoes.intencao ?? null,
+    alvoId: opcoes.alvoId ?? null,
   });
-
-  if (error) return { error: error.message };
+  if (!r.ok && "conflito" in r) {
+    return {
+      conflito: {
+        medicationId,
+        scheduledFor: r.conflito.scheduledFor,
+        takenAtPedido: r.conflito.takenAtPedido,
+        pedido: opcoes.pedido ?? null,
+      },
+    };
+  }
+  if (!r.ok) return { error: r.erro };
 
   revalidatePath("/medicacao");
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+/** Instante ISO vindo da pergunta de conflito: só passado, nunca futuro. */
+function instanteInformado(valor: FormDataEntryValue | null): Date | null {
+  if (typeof valor !== "string" || !valor) return null;
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime()) || d.getTime() > Date.now() + 60_000) return null;
+  return d;
+}
+
+function opcoesDoFormulario(formData: FormData): OpcoesRegistro {
+  const intencao = formData.get("intencao");
+  const alvo = formData.get("alvo_id");
+  return {
+    pedido: pedidoValido(formData.get("pedido")) ? (formData.get("pedido") as string) : null,
+    intencao: intencao === "corrigir" || intencao === "outra" ? intencao : null,
+    alvoId: typeof alvo === "string" && alvo ? alvo : null,
+  };
 }
 
 /**
@@ -429,15 +542,18 @@ async function horaInformadaParaUTC(valor: FormDataEntryValue | null): Promise<D
   return quando.getTime() > agora.getTime() ? null : quando;
 }
 
-export async function logMedicationTaken(formData: FormData): Promise<ActionResult> {
+export async function logMedicationTaken(formData: FormData): Promise<ResultadoRegistroTela> {
   const medicationId = formData.get("medication_id") as string | null;
   if (!medicationId) return { error: "Medicamento inválido." };
 
   // Campo opcional "tomei às", em HH:MM do dia local. Ausente ou inválido, o
   // registro segue com a hora do clique — o app NUNCA recusa um registro por
-  // causa do formato de um campo acessório.
-  const informado = await horaInformadaParaUTC(formData.get("taken_at_local"));
-  return inserirRegistroDeDose(medicationId, true, informado);
+  // causa do formato de um campo acessório. Na resposta a um conflito, vem o
+  // instante exato do pedido original (`taken_at_iso`).
+  const informado =
+    instanteInformado(formData.get("taken_at_iso")) ??
+    (await horaInformadaParaUTC(formData.get("taken_at_local")));
+  return inserirRegistroDeDose(medicationId, true, informado, opcoesDoFormulario(formData));
 }
 
 /**
@@ -450,5 +566,5 @@ export async function logMedicationTaken(formData: FormData): Promise<ActionResu
 export async function logMedicationSkipped(formData: FormData): Promise<ActionResult> {
   const medicationId = formData.get("medication_id") as string | null;
   if (!medicationId) return { error: "Medicamento inválido." };
-  return inserirRegistroDeDose(medicationId, false);
+  return inserirRegistroDeDose(medicationId, false, null, { pedido: opcoesDoFormulario(formData).pedido });
 }

@@ -51,7 +51,28 @@ export type Meal = Tables<"meals">;
 
 export type WaterLog = Tables<"water_logs">;
 
-export type Medication = Narrow<Tables<"medications">, { kind: MedicationKind }>;
+/**
+ * Colunas de `medications` criadas em 07/09/2026 (cadência e rigidez) que o
+ * arquivo gerado ainda não tem — ele é de 30/07 e regenerá-lo exige acesso ao
+ * projeto (`types:gen`, tarefa GLYX-36). Opcionais de propósito: quem consulta
+ * com select parcial não as recebe, e a regra de cadência trata ausência como
+ * "não declarada". Ao regenerar os tipos, este acréscimo deve sair.
+ */
+export type MedicationCadenceColumns = {
+  cadence?: "diaria" | "semanal" | "intervalo" | null;
+  cadence_weekday?: number | null;
+  cadence_interval_days?: number | null;
+  cadence_anchor_on?: string | null;
+  timing_strictness?: "rigido" | "flexivel" | "livre" | null;
+  grace_minutes?: number | null;
+  /** D1 (15/10/2026): quando a frequência foi escolhida ou confirmada
+   *  explicitamente. Nulo = "a confirmar"; ausente = banco anterior à migration
+   *  20261015103000. */
+  cadence_confirmed_at?: string | null;
+};
+
+export type Medication = Narrow<Tables<"medications">, { kind: MedicationKind }> &
+  MedicationCadenceColumns;
 
 export type ExerciseSession = Tables<"exercise_sessions">;
 

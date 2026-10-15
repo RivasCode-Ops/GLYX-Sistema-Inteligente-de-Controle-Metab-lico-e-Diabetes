@@ -16,6 +16,7 @@ import { computeAuditMetrics, type AuditRawInputs } from "@/lib/audit/metrics";
 import { buildWeeklySummary, type WeeklySummary } from "@/lib/audit/weekly-summary";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
+import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
 
 export const WEEK_DAYS = 7;
 
@@ -37,13 +38,29 @@ async function loadWindow(
   const { startISO } = localDayRangeUTC(startDay, timezone);
   const { endISO } = localDayRangeUTC(endDay, timezone);
 
-  const [gRes, mRes, eRes, wRes, medRes, sleepRes] = await Promise.all([
-    supabase
-      .from("glucose_readings")
-      .select("value_mg_dl, recorded_at")
-      .eq("user_id", userId)
-      .gte("recorded_at", startISO)
-      .lt("recorded_at", endISO),
+  // Uma semana de CGM são ~1.300 leituras. Sem paginar, o PostgREST devolvia
+  // mil, sem ordem definida, e o TIR da semana saía de um subconjunto
+  // arbitrário. Leitura incompleta não vira número: vira erro.
+  const janela = { since: startISO, before: endISO };
+  const [gPag, wPag, medPag] = await Promise.all([
+    fetchAllRowsDetalhado<{ value_mg_dl: number; recorded_at: string }>(
+      supabase, "glucose_readings", "value_mg_dl, recorded_at", userId,
+      { orderColumn: "recorded_at", ...janela }
+    ),
+    fetchAllRowsDetalhado<{ amount_ml: number | null; logged_at: string }>(
+      supabase, "water_logs", "amount_ml, logged_at", userId,
+      { orderColumn: "logged_at", ...janela }
+    ),
+    fetchAllRowsDetalhado<{ taken_at: string; confirmed: boolean | null }>(
+      supabase, "medication_logs", "taken_at, confirmed", userId,
+      { orderColumn: "taken_at", ...janela }
+    ),
+  ]);
+  if (!gPag.completo || !wPag.completo || !medPag.completo) {
+    throw new Error("Resumo semanal: leitura incompleta dos registros; o resumo não foi calculado.");
+  }
+
+  const [mRes, eRes, sleepRes] = await Promise.all([
     supabase
       .from("meals")
       .select("carbs_g, glucose_spike, eaten_at")
@@ -57,18 +74,6 @@ async function loadWindow(
       .gte("started_at", startISO)
       .lt("started_at", endISO),
     supabase
-      .from("water_logs")
-      .select("amount_ml, logged_at")
-      .eq("user_id", userId)
-      .gte("logged_at", startISO)
-      .lt("logged_at", endISO),
-    supabase
-      .from("medication_logs")
-      .select("taken_at")
-      .eq("user_id", userId)
-      .gte("taken_at", startISO)
-      .lt("taken_at", endISO),
-    supabase
       .from("health_snapshots")
       .select("snapshot_date, sleep_hours")
       .eq("user_id", userId)
@@ -78,7 +83,7 @@ async function loadWindow(
   ]);
 
   const waterByDay = new Map<string, number>();
-  for (const w of wRes.data ?? []) {
+  for (const w of wPag.rows) {
     const day = localDateKey(w.logged_at as string, timezone);
     waterByDay.set(day, (waterByDay.get(day) ?? 0) + Number(w.amount_ml ?? 0));
   }
@@ -87,7 +92,7 @@ async function loadWindow(
     windowDays: WEEK_DAYS,
     targetMin: targets.targetMin,
     targetMax: targets.targetMax,
-    glucose: (gRes.data ?? []).map((r) => ({
+    glucose: gPag.rows.map((r) => ({
       value_mg_dl: Number(r.value_mg_dl),
       recorded_at: r.recorded_at as string,
       day: localDateKey(r.recorded_at as string, timezone),
@@ -108,7 +113,8 @@ async function loadWindow(
       hours: r.sleep_hours != null ? Number(r.sleep_hours) : null,
     })),
     waterDays: [...waterByDay.entries()].map(([day, ml]) => ({ day, ml })),
-    medLogs: (medRes.data ?? []).map((r) => ({
+    // "Pulei hoje" não é dose tomada (D16).
+    medLogs: medPag.rows.filter((r) => r.confirmed !== false).map((r) => ({
       taken_at: r.taken_at as string,
       day: localDateKey(r.taken_at as string, timezone),
     })),

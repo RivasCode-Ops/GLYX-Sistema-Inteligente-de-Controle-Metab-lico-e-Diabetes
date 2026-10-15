@@ -4,6 +4,7 @@ import { countAlteredSignals } from "@/lib/exams/types";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import type { HealthSnapshotSource } from "@/lib/health/types";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
+import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
 
 const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit", "mock"];
 
@@ -25,6 +26,8 @@ export async function loadAuditDayGrid(
   periodStart: string;
   periodEnd: string;
   timezone: string | null;
+  /** Tabelas que não puderam ser lidas inteiras. Vazio = dados completos. */
+  incompletas: string[];
 }> {
   const { data: profile } = await supabase
     .from("profiles")
@@ -51,13 +54,30 @@ export async function loadAuditDayGrid(
   ].join("-");
   const { startISO: sinceIso } = localDayRangeUTC(dayStart, timezone);
 
-  const [gRes, mRes, eRes, hRes, wRes, medRes, insRes, weightRes, examRes] = await Promise.all([
-    supabase
-      .from("glucose_readings")
-      .select("value_mg_dl, recorded_at")
-      .eq("user_id", userId)
-      .gte("recorded_at", sinceIso)
-      .order("recorded_at", { ascending: true }),
+  // Glicemia, água e doses podem passar de 1000 linhas na janela (14 dias de
+  // CGM são ~2.700 leituras). Sem paginar, o PostgREST devolvia as mil mais
+  // ANTIGAS em silêncio, e o score gravado cobria ~5 dias de 14.
+  const [gPag, wPag, medPag] = await Promise.all([
+    fetchAllRowsDetalhado<{ value_mg_dl: number; recorded_at: string }>(
+      supabase, "glucose_readings", "value_mg_dl, recorded_at", userId,
+      { orderColumn: "recorded_at", since: sinceIso }
+    ),
+    fetchAllRowsDetalhado<{ amount_ml: number | null; kind: string | null; logged_at: string }>(
+      supabase, "water_logs", "amount_ml, kind, logged_at", userId,
+      { orderColumn: "logged_at", since: sinceIso }
+    ),
+    fetchAllRowsDetalhado<{ taken_at: string; confirmed: boolean | null }>(
+      supabase, "medication_logs", "taken_at, confirmed", userId,
+      { orderColumn: "taken_at", since: sinceIso }
+    ),
+  ]);
+  const incompletas = [
+    gPag.completo ? null : "glucose_readings",
+    wPag.completo ? null : "water_logs",
+    medPag.completo ? null : "medication_logs",
+  ].filter((t): t is string => t !== null);
+
+  const [mRes, eRes, hRes, insRes, weightRes, examRes] = await Promise.all([
     supabase
       .from("meals")
       .select("carbs_g, glucose_spike, eaten_at")
@@ -73,16 +93,6 @@ export async function loadAuditDayGrid(
       .select("snapshot_date, source, sleep_hours")
       .eq("user_id", userId)
       .gte("snapshot_date", dayStart),
-    supabase
-      .from("water_logs")
-      .select("amount_ml, kind, logged_at")
-      .eq("user_id", userId)
-      .gte("logged_at", sinceIso),
-    supabase
-      .from("medication_logs")
-      .select("taken_at")
-      .eq("user_id", userId)
-      .gte("taken_at", sinceIso),
     supabase
       .from("insulin_logs")
       .select("units, applied_at")
@@ -103,7 +113,7 @@ export async function loadAuditDayGrid(
       .limit(10),
   ]);
 
-  const glucose = (gRes.data ?? []).map((r) => ({
+  const glucose = gPag.rows.map((r) => ({
     value_mg_dl: Number(r.value_mg_dl),
     recorded_at: r.recorded_at as string,
     day: localDateKey(r.recorded_at as string, timezone),
@@ -144,7 +154,7 @@ export async function loadAuditDayGrid(
   const sleepDays = [...sleepByDate.entries()].map(([day, hours]) => ({ day, hours }));
 
   const waterByDay = new Map<string, number>();
-  for (const w of wRes.data ?? []) {
+  for (const w of wPag.rows) {
     const kind = (w.kind as string | null) ?? "agua";
     if (kind !== "agua" && kind !== "agua_com_gas" && kind !== "cha") continue;
     const day = localDateKey(w.logged_at as string, timezone);
@@ -152,7 +162,8 @@ export async function loadAuditDayGrid(
   }
   const waterDays = [...waterByDay.entries()].map(([day, ml]) => ({ day, ml }));
 
-  const medLogs = (medRes.data ?? []).map((r) => ({
+  // "Pulei hoje" não é dose tomada (D16).
+  const medLogs = medPag.rows.filter((r) => r.confirmed !== false).map((r) => ({
     taken_at: r.taken_at as string,
     day: localDateKey(r.taken_at as string, timezone),
   }));
@@ -177,6 +188,7 @@ export async function loadAuditDayGrid(
     timezone,
     periodStart: dayStart,
     periodEnd,
+    incompletas,
     inputs: {
       windowDays,
       targetMin,

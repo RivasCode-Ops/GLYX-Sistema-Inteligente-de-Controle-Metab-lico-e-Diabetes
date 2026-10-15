@@ -1,7 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FormularioDeAcao, type ResultadoDeAcao } from "@/components/medicacao/formulario-de-acao";
 import { localDateKey } from "@/lib/time/local-day";
 import { computeDoseStatus, doseWindows } from "@/lib/medications/adherence";
+import { ehDiaDeDose } from "@/lib/medications/cadence";
 import type { Medication } from "@/types/database";
 import { formatarHora } from "@/lib/time/format";
 
@@ -9,7 +11,8 @@ import { formatarHora } from "@/lib/time/format";
 // peça que faltava: o "Registrar dose" funcionava, mas nada na tela mostrava
 // o que já foi tomado, então parecia que o registro não pegava.
 
-export type TodayLog = { medication_id: string | null; taken_at: string };
+/** `confirmed === false` é "Pulei hoje" (D16): aparece como pulada, nunca como tomada. */
+export type TodayLog = { medication_id: string | null; taken_at: string; confirmed?: boolean | null };
 export type TodaySnooze = {
   medication_id: string;
   snoozed_until: string;
@@ -42,14 +45,17 @@ export function computeMedicationDoseSummary(
   timezone: string | null | undefined,
   now: number = Date.now()
 ): { taken: number; lastAt: string | null } {
-  const times = med.reminder_times ?? [];
+  const tz = timezone || "America/Sao_Paulo";
+  const hoje = localDateKey(new Date(now).toISOString(), tz);
+  // Dia sem dose pela cadência é tratado como item sem horário: não há janela
+  // para casar, e cada registro do dia conta direto.
+  const times = ehDiaDeDose(med, hoje) ? (med.reminder_times ?? []) : [];
   if (!times.length) {
-    const sorted = medLogs.map((l) => l.taken_at).sort();
+    const sorted = medLogs.filter((l) => l.confirmed !== false).map((l) => l.taken_at).sort();
     return { taken: sorted.length, lastAt: sorted.at(-1) ?? null };
   }
 
-  const tz = timezone || "America/Sao_Paulo";
-  const [y, mo, d] = localDateKey(new Date(now).toISOString(), tz).split("-").map(Number);
+  const [y, mo, d] = hoje.split("-").map(Number);
   const usedLogs = new Set<string>();
   let taken = 0;
   let lastAt: string | null = null;
@@ -74,14 +80,17 @@ export function DailyDosesCard({
   logs: TodayLog[];
   snoozes: TodaySnooze[];
   timezone: string | null | undefined;
-  markTakenAction: (formData: FormData) => Promise<void>;
+  markTakenAction: (anterior: ResultadoDeAcao, formData: FormData) => Promise<ResultadoDeAcao>;
 }) {
   const tz = timezone || "America/Sao_Paulo";
-  const scheduled = meds.filter((m) => (m.reminder_times?.length ?? 0) > 0);
+  const hoje = localDateKey(new Date().toISOString(), tz);
+  const scheduled = meds.filter(
+    (m) => (m.reminder_times?.length ?? 0) > 0 && ehDiaDeDose(m, hoje)
+  );
   if (!scheduled.length) return null;
 
   const now = Date.now();
-  const [y, mo, d] = localDateKey(new Date().toISOString(), tz).split("-").map(Number);
+  const [y, mo, d] = hoje.split("-").map(Number);
 
   const rows = scheduled
     .flatMap((m) => {
@@ -125,7 +134,11 @@ export function DailyDosesCard({
                 </span>
               ) : (
                 <>
-                  {status.state === "adiada" ? (
+                  {status.state === "pulada" ? (
+                    <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-400">
+                      pulada
+                    </span>
+                  ) : status.state === "adiada" ? (
                     <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
                       ⏰ adiada até {hora(status.until, tz)}
                     </span>
@@ -148,8 +161,10 @@ export function DailyDosesCard({
                       pode ser deixado como está: registrar segue sendo um
                       toque. Sem ele, o cruzamento dose × glicemia lê rajadas de
                       registro em vez das doses. */}
-                  <form action={markTakenAction} className="flex shrink-0 items-center gap-1.5">
+                  <FormularioDeAcao acao={markTakenAction} className="flex shrink-0 items-center gap-1.5">
                     <input type="hidden" name="medication_id" value={med.id} />
+                    {/* Identidade da ação: reenviar este formulário não cria outra tomada. */}
+                    <input type="hidden" name="pedido" value={crypto.randomUUID()} />
                     <label className="sr-only" htmlFor={`hora-${med.id}-${time}`}>
                       Hora em que tomou {med.name}
                     </label>
@@ -163,7 +178,7 @@ export function DailyDosesCard({
                     <Button type="submit" variant="outline" size="sm">
                       Registrar
                     </Button>
-                  </form>
+                  </FormularioDeAcao>
                 </>
               )}
             </li>

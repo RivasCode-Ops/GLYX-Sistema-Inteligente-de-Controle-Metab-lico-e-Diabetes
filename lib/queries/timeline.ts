@@ -38,7 +38,7 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       .limit(25),
     supabase
       .from("medication_logs")
-      .select("id, taken_at, medications(name)")
+      .select("id, taken_at, confirmed, adherence_status, medications(name)")
       .eq("user_id", user.id)
       .order("taken_at", { ascending: false })
       .limit(25),
@@ -84,7 +84,13 @@ export async function getTimeline(): Promise<TimelineItem[]> {
       type: "medicação",
       id: d.id,
       at: d.taken_at,
-      label: "Dose tomada",
+      // "Pulei hoje" não é dose tomada (D16); a adicional se diz adicional.
+      label:
+        d.confirmed === false
+          ? "Dose pulada"
+          : d.adherence_status === "adicional"
+            ? "Tomada adicional"
+            : "Dose tomada",
       detail: medName ?? "—",
     });
   }

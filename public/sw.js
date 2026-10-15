@@ -11,7 +11,15 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "GLYX", body: "", url: "/dashboard", critical: false, medId: null };
+  let data = {
+    title: "GLYX",
+    body: "",
+    url: "/dashboard",
+    critical: false,
+    medId: null,
+    scheduledFor: null,
+    tag: null,
+  };
   try {
     data = { ...data, ...event.data.json() };
   } catch (e) {
@@ -22,7 +30,11 @@ self.addEventListener("push", (event) => {
     body: data.body,
     icon: "/icon-192",
     badge: "/icon",
-    tag: data.critical ? "glyx-critical" : undefined,
+    // Tag POR DOSE, vinda do servidor. Com uma tag só para todo crítico, dois
+    // remédios às 08:00 viravam uma notificação: a segunda substituía a
+    // primeira, e o "Já tomei" registrava só um. A mesma tag também funde o
+    // reenvio de um alarme cuja entrega o servidor não conseguiu confirmar.
+    tag: data.tag || (data.critical ? "glyx-critical" : undefined),
     renotify: Boolean(data.critical),
     requireInteraction: Boolean(data.critical),
     // Vibração longa e entrecortada no crítico: em celular no silencioso, a
@@ -31,7 +43,14 @@ self.addEventListener("push", (event) => {
     // Explícito de propósito: `silent: true` em qualquer lugar da cadeia mataria
     // o som do sistema sem deixar rastro.
     silent: false,
-    data: { url: data.url, medId: data.medId },
+    // `pedido`: identidade da AÇÃO desta notificação. Tocar "Já tomei" duas vezes,
+    // ou o navegador repetir o envio, manda o mesmo pedido e não cria outra tomada.
+    data: {
+      url: data.url,
+      medId: data.medId,
+      scheduledFor: data.scheduledFor,
+      pedido: self.crypto && self.crypto.randomUUID ? self.crypto.randomUUID() : null,
+    },
   };
 
   if (data.medId) {
@@ -74,14 +93,32 @@ self.addEventListener("notificationclick", (event) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ medication_id: info.medId }),
+        // Qual dose a notificação anunciou: tocar às 21:00 no alarme das 08:00
+        // registra a das 08:00, não a das 20:00. Dois toques = uma dose.
+        body: JSON.stringify({
+          medication_id: info.medId,
+          scheduled_for: info.scheduledFor || undefined,
+          pedido: info.pedido || undefined,
+        }),
       })
-        .then((res) => {
+        .then((res) => res.json().catch(() => ({})).then((body) => ({ res, body })))
+        .then(({ res, body }) => {
           if (res.ok) {
-            return self.registration.showNotification("✅ Dose registrada", {
-              body: "Anotado no seu histórico. Até a próxima!",
+            return self.registration.showNotification(
+              body.resultado === "reenvio" ? "✅ Já estava registrada" : "✅ Dose registrada",
+              { body: "Anotado no seu histórico. Até a próxima!", icon: "/icon-192", vibrate: [100] }
+            );
+          }
+          // Já existe OUTRA tomada nessa dose: nada foi gravado, e a notificação não
+          // decide por ninguém. Toque abre o app na pergunta "corrigir ou outra tomada".
+          if (res.status === 409 && body.conflito) {
+            const horas = (body.registradaAs || []).join(", ");
+            return self.registration.showNotification("⚠️ Já existe uma tomada registrada", {
+              body:
+                "Esta dose já tem tomada registrada" + (horas ? " às " + horas : "") +
+                ". Nada foi gravado agora. Toque para dizer se é correção ou outra tomada.",
               icon: "/icon-192",
-              vibrate: [100],
+              data: { url: body.url || "/medicacao" },
             });
           }
           // sessão expirada neste aparelho: abre o app para registrar

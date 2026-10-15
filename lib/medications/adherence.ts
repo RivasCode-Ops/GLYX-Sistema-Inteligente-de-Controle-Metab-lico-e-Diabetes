@@ -22,7 +22,13 @@
 
 import { localDayRangeUTC, wallClockToUTC } from "@/lib/time/local-day";
 
-export type DoseLog = { taken_at: string };
+/**
+ * Registro de dose como as regras de adesão o enxergam. `confirmed === false` é
+ * "Pulei hoje" (D16): informação, mas NÃO é tomada. Ausente = linha antiga
+ * selecionada sem a coluna, tratada como tomada (o comportamento de antes).
+ */
+export type DoseLog = { taken_at: string; confirmed?: boolean | null };
+const tomada = (l: DoseLog) => l.confirmed !== false;
 export type DoseSnooze = {
   snoozed_until: string;
   /**
@@ -34,6 +40,7 @@ export type DoseSnooze = {
 
 export type DoseStatus =
   | { state: "tomada"; at: string }
+  | { state: "pulada"; at: string }
   | { state: "adiada"; until: string }
   | { state: "agendada" }
   | { state: "pendente" };
@@ -73,14 +80,21 @@ export function computeDoseStatus(
 ): DoseStatus {
   const t = scheduledUTC.getTime();
   const end = windowEndUTC.getTime();
-  const match = medLogs.find((l) => {
+  const naJanela = (l: DoseLog) => {
     if (usedLogs.has(l.taken_at)) return false;
     const lt = new Date(l.taken_at).getTime();
     return lt >= t - MATCH_BEFORE_MS && lt <= end;
-  });
+  };
+  // Tomada vence pulada: quem pulou e depois tomou, tomou (D16).
+  const match = medLogs.find((l) => tomada(l) && naJanela(l));
   if (match) {
     usedLogs.add(match.taken_at);
     return { state: "tomada", at: match.taken_at };
+  }
+  const pulou = medLogs.find((l) => !tomada(l) && naJanela(l));
+  if (pulou) {
+    usedLogs.add(pulou.taken_at);
+    return { state: "pulada", at: pulou.taken_at };
   }
   // O adiamento é DESTA dose, não do remédio.
   //
@@ -131,6 +145,8 @@ export type PeriodAdherence = {
   takenDoses: number;
   /** Registros que não casaram com nenhuma dose agendada (dose extra, duplicidade). */
   unmatchedLogs: number;
+  /** Doses previstas marcadas como "Pulei hoje" e sem tomada (D16). Não entram em `takenDoses`. */
+  skippedDoses: number;
 };
 
 /**
@@ -146,31 +162,53 @@ export function computePeriodAdherence(
   logs: DoseLog[],
   tz: string,
   startDay: string,
-  endDay: string
+  endDay: string,
+  /**
+   * Quais dias têm dose, pela cadência (`lib/medications/cadence.ts`). Ausente,
+   * todo dia tem — o comportamento anterior. Dia sem dose não entra no
+   * denominador: um semanal não pode "esperar" sete doses por semana.
+   */
+  ehDiaDeDose: (dataLocal: string) => boolean = () => true
 ): PeriodAdherence {
-  const days = localDaysBetween(startDay, endDay);
+  const days = localDaysBetween(startDay, endDay).filter((d) => ehDiaDeDose(d));
+  // Repetição IDÊNTICA (mesmo instante) é a mesma afirmação enviada de novo —
+  // existe no histórico anterior a 15/10 (D14). Conta uma vez; instantes
+  // diferentes continuam contando, inclusive como "a mais".
+  // "Pulei hoje" não é tomada (D16): separado aqui e contado à parte.
+  const tomadas = logs.filter(tomada);
+  const puladas = logs.filter((l) => !tomada(l));
+  const instantesDistintos = new Set(tomadas.map((l) => l.taken_at)).size;
   if (!times.length) {
     // Remédio sem horário agendado (uso conforme necessidade) não tem dose
     // esperada — cada registro conta como tomada, sem inventar adesão.
-    return { expectedDoses: 0, takenDoses: logs.length, unmatchedLogs: 0 };
+    return {
+      expectedDoses: 0,
+      takenDoses: instantesDistintos,
+      unmatchedLogs: 0,
+      skippedDoses: new Set(puladas.map((l) => l.taken_at)).size,
+    };
   }
 
   const usedLogs = new Set<string>();
   let taken = 0;
+  let skipped = 0;
 
   for (const day of days) {
     const [y, mo, d] = day.split("-").map(Number);
     for (const { scheduledUTC, windowEndUTC } of doseWindows(times, y, mo, d, tz)) {
       const t = scheduledUTC.getTime();
       const end = windowEndUTC.getTime();
-      const match = logs.find((l) => {
+      const naJanela = (l: DoseLog) => {
         if (usedLogs.has(l.taken_at)) return false;
         const lt = new Date(l.taken_at).getTime();
         return lt >= t - MATCH_BEFORE_MS && lt <= end;
-      });
+      };
+      const match = tomadas.find(naJanela);
       if (match) {
         usedLogs.add(match.taken_at);
         taken += 1;
+      } else if (puladas.some(naJanela)) {
+        skipped += 1;
       }
     }
   }
@@ -178,6 +216,7 @@ export function computePeriodAdherence(
   return {
     expectedDoses: times.length * days.length,
     takenDoses: taken,
-    unmatchedLogs: logs.length - usedLogs.size,
+    unmatchedLogs: instantesDistintos - usedLogs.size,
+    skippedDoses: skipped,
   };
 }

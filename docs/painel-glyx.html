@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel GLYX</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --surface: #fff; --surface-2: #eef1f5; --text: #18202c; --muted: #5b6577;
+    --border: #d7dce4; --accent: #2059b8; --bar-bg: #e2e6ed; --ghost: #b9c1cd;
+    --ok: #17703f; --ok-bg: #e2f3e8; --info: #2059b8; --info-bg: #e4ecfa;
+    --warn: #8a5800; --warn-bg: #fcefd4; --bad: #b3261e; --bad-bg: #fbe5e3;
+    --block: #6a3d9e; --block-bg: #eee5f8; --none: #5b6577; --none-bg: #eceff3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1117; --surface: #161a22; --surface-2: #1e232d; --text: #e5e8ee; --muted: #a0a9b8;
+      --border: #2e3542; --accent: #82b1ff; --bar-bg: #283040; --ghost: #4a5466;
+      --ok: #72d69c; --ok-bg: #15301f; --info: #92b9ff; --info-bg: #1a2943;
+      --warn: #f0c36a; --warn-bg: #382b10; --bad: #ff8f86; --bad-bg: #3c1916;
+      --block: #c8a5f4; --block-bg: #2b203f; --none: #a0a9b8; --none-bg: #252b37;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1117; --surface: #161a22; --surface-2: #1e232d; --text: #e5e8ee; --muted: #a0a9b8;
+    --border: #2e3542; --accent: #82b1ff; --bar-bg: #283040; --ghost: #4a5466;
+    --ok: #72d69c; --ok-bg: #15301f; --info: #92b9ff; --info-bg: #1a2943;
+    --warn: #f0c36a; --warn-bg: #382b10; --bad: #ff8f86; --bad-bg: #3c1916;
+    --block: #c8a5f4; --block-bg: #2b203f; --none: #a0a9b8; --none-bg: #252b37;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 90px; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 16px 64px; }
+  a { color: var(--accent); } a:hover { text-decoration: underline; }
+  .topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 1.75rem; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 2px 0 0; font-size: .93rem; }
+  .aviso { margin: 16px 0 0; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--warn);
+    border-left-width: 5px; background: var(--warn-bg); font-size: .94rem; }
+  .aviso p { margin: 0; } .aviso p + p { margin-top: 6px; }
+  .fraco { color: var(--muted); font-size: .86rem; }
+  .btn { font: inherit; font-size: .9rem; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.indice { margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .88rem; }
+  nav.indice a { text-decoration: none; }
+
+  .filtros { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 0; margin-top: 12px;
+    border-bottom: 1px solid var(--border); display: grid; gap: 8px;
+    grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto; }
+  .filtros label { display: block; font-size: .74rem; color: var(--muted); margin-bottom: 2px; }
+  .filtros input, .filtros select { width: 100%; font: inherit; font-size: .88rem; padding: 7px 8px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  .filtros .acao { align-self: end; }
+  @media (max-width: 860px) { .filtros { grid-template-columns: 1fr 1fr; position: static; } .filtros .busca { grid-column: 1 / -1; } }
+
+  section { margin-top: 40px; }
+  h2 { font-size: 1.32rem; margin: 0 0 4px; }
+  h2 .n { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  h2 + .sub { margin-bottom: 14px; }
+  h3 { font-size: .98rem; margin: 18px 0 6px; }
+
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card-k { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card-k .rot { font-size: .76rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .card-k .val { font-size: 1.9rem; font-weight: 700; line-height: 1.15; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+  .card-k .val small { font-size: .9rem; font-weight: 600; color: var(--muted); }
+  .card-k ul { margin: 0; padding-left: 18px; font-size: .86rem; color: var(--muted); }
+  .zero { color: var(--bad); font-weight: 600; }
+  .painel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+
+  .barras { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px 16px; }
+  .linha-barra { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr) 150px; gap: 4px 12px;
+    align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+  .linha-barra:last-child { border-bottom: 0; }
+  .linha-barra .num { text-align: right; font-variant-numeric: tabular-nums; font-size: .84rem; color: var(--muted); }
+  .linha-barra .num b { color: var(--text); font-size: .95rem; }
+  .trilhos { display: grid; gap: 3px; }
+  .trilho { height: 9px; background: var(--bar-bg); border-radius: 99px; overflow: hidden; display: flex; }
+  .trilho.main { height: 5px; }
+  .trilho i { display: block; height: 100%; }
+  .seg-validado { background: var(--ok); } .seg-implementado { background: var(--info); }
+  .seg-parcial { background: var(--warn); } .seg-main { background: var(--ghost); }
+  @media (max-width: 640px) {
+    .linha-barra { grid-template-columns: minmax(0, 1fr) 120px; }
+    .linha-barra .trilhos { grid-column: 1 / -1; grid-row: 2; }
+  }
+  .legenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: .8rem; color: var(--muted); margin: 8px 0 0; }
+  .legenda span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .l-v::before { background: var(--ok); } .l-i::before { background: var(--info); } .l-p::before { background: var(--warn); } .l-m::before { background: var(--ghost); }
+
+  .tabela-rola { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; background: var(--surface-2); }
+  td ul { margin: 0; padding-left: 16px; }
+  table.larga { min-width: 860px; }
+
+  .chip { display: inline-block; font-size: .7rem; font-weight: 600; padding: 1px 8px; border-radius: 99px;
+    border: 1px solid currentColor; white-space: nowrap; line-height: 1.6; }
+  .c-ok { color: var(--ok); background: var(--ok-bg); } .c-info { color: var(--info); background: var(--info-bg); }
+  .c-warn { color: var(--warn); background: var(--warn-bg); } .c-bad { color: var(--bad); background: var(--bad-bg); }
+  .c-block { color: var(--block); background: var(--block-bg); }
+  .c-none { color: var(--none); background: var(--none-bg); border-style: dashed; }
+  .idt { font-family: ui-monospace, Consolas, monospace; font-size: .82rem; white-space: nowrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: .79rem; word-break: break-word; color: var(--muted); }
+  .ordem { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .vazio { color: var(--muted); font-style: italic; }
+  .lista { margin: 6px 0 0; padding-left: 20px; } .lista li { margin: 4px 0; }
+
+  details.tarefa { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
+  details.tarefa > summary { cursor: pointer; padding: 9px 14px; display: flex; gap: 6px 10px; align-items: center; flex-wrap: wrap; list-style: none; }
+  details.tarefa > summary::-webkit-details-marker { display: none; }
+  details.tarefa > summary::before { content: "▸"; color: var(--muted); width: 1ch; }
+  details.tarefa[open] > summary::before { content: "▾"; }
+  details.tarefa .tit { font-weight: 600; flex: 1 1 240px; }
+  details.tarefa .corpo { padding: 2px 14px 14px; border-top: 1px solid var(--border); }
+  dl.campos { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 5px 14px; margin: 10px 0 0; font-size: .9rem; }
+  dl.campos dt { color: var(--muted); font-weight: 600; } dl.campos dd { margin: 0; }
+  dl.campos ul { margin: 0; padding-left: 18px; }
+  @media (max-width: 600px) { dl.campos { grid-template-columns: 1fr; } dl.campos dt { margin-top: 6px; } }
+
+  .lotes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .lote { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
+  .lote h3 { margin: 0 0 6px; } .lote .dep { color: var(--muted); font-size: .84rem; margin: 6px 0 0; }
+  .lote.atual { border-color: var(--accent); border-width: 2px; }
+
+  .modulo { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .modulo header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; }
+  .modulo header h3 { margin: 0; font-size: 1.08rem; }
+  .modulo header .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .modulo .trilhos { grid-column: 1 / -1; margin-top: 4px; }
+  .modulo .grade { display: grid; gap: 4px 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top: 6px; }
+  .modulo table { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; }
+  .nota { margin-top: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 8px; font-size: .88rem; }
+
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); font-size: .86rem; color: var(--muted); }
+  footer strong { color: var(--text); }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --surface-2: #f2f2f2; --text: #000; --muted: #444; --border: #bbb; }
+    body { font-size: 9.5pt; }
+    .wrap { max-width: none; padding: 0; }
+    .filtros, .btn, nav.indice, .so-tela { display: none !important; }
+    details.tarefa > summary::before { content: ""; width: 0; }
+    a { color: inherit; text-decoration: none; }
+    section { margin-top: 18px; }
+    h2, h3 { break-after: avoid; page-break-after: avoid; }
+    .card-k, .lote, .linha-barra, details.tarefa, tr, .nota, .aviso { break-inside: avoid; page-break-inside: avoid; }
+    .modulo { break-inside: auto; }
+    .modulo header, .modulo table { break-inside: avoid; }
+    .tabela-rola { overflow: visible; border: 0; } table.larga { min-width: 0; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="topo">
+  <div>
+    <h1>Painel GLYX</h1>
+    <p class="sub" id="sub-topo"></p>
+  </div>
+  <button class="btn" type="button" id="btn-imprimir">Imprimir / salvar em PDF</button>
+</div>
+
+<div class="aviso" role="note" id="aviso"></div>
+
+<nav class="indice" aria-label="Seções">
+  <a href="#resumo">1. Resumo e riscos</a><a href="#decisoes">2. Decisões</a><a href="#lotes">3. Lotes</a>
+  <a href="#lista">4. Lista mestra</a><a href="#modulos">5. Módulos</a><a href="#problemas">6. Problemas</a>
+  <a href="#validacao">7. Validação e método</a>
+</nav>
+
+<div class="filtros" role="search">
+  <div class="busca">
+    <label for="f-busca">Buscar módulo, tarefa, problema ou decisão</label>
+    <input id="f-busca" type="search" autocomplete="off" placeholder="ex.: alarme, LGPD, GLYX-12, D5">
+  </div>
+  <div><label for="f-bloco">Bloco</label><select id="f-bloco"></select></div>
+  <div><label for="f-prio">Prioridade</label><select id="f-prio"></select></div>
+  <div><label for="f-status">Status da tarefa</label><select id="f-status"></select></div>
+  <div><label for="f-grav">Gravidade do problema</label><select id="f-grav"></select></div>
+  <div class="acao"><button class="btn" type="button" id="btn-limpar">Limpar</button></div>
+</div>
+
+<section id="resumo">
+  <h2><span class="n">1.</span>Resumo e principais riscos</h2>
+  <p class="sub">Tudo calculado a partir do objeto DADOS. "Implementado" não quer dizer concluído e validado.</p>
+  <div class="cards" id="cards"></div>
+  <h3>Principais riscos</h3>
+  <div class="painel" id="riscos"></div>
+  <h3>Progresso por módulo</h3>
+  <div class="barras" id="barras"></div>
+  <div class="legenda"><span class="l-m">main</span><span class="l-v">validado (histórico)</span><span class="l-i">implementado, não validado</span><span class="l-p">parcial</span></div>
+  <p class="fraco">Barra fina: <code>main</code>. Barra larga: árvore local (não commitada, não implantada). <span class="so-tela">O nome do módulo leva ao card dele.</span></p>
+</section>
+
+<section id="decisoes">
+  <h2><span class="n">2.</span>Decisões pendentes</h2>
+  <p class="sub">Seção única. As tarefas bloqueadas vêm das próprias tarefas, não de uma cópia.</p>
+  <div class="tabela-rola"><table class="larga">
+    <thead><tr><th>#</th><th>Decisão</th><th>Responsável</th><th>Impacto</th><th>Tarefas bloqueadas</th><th>Prazo</th></tr></thead>
+    <tbody id="tbody-dec"></tbody>
+  </table></div>
+  <h3>Premissas de escopo ainda não confirmadas</h3>
+  <div class="painel" id="premissas"></div>
+</section>
+
+<section id="lotes">
+  <h2><span class="n">3.</span>Próximo lote executável e lotes seguintes</h2>
+  <p class="sub">A composição de cada lote é derivada do campo <code>lote</code> das tarefas. A lista não amplia nenhuma autorização.</p>
+  <div class="lotes" id="lista-lotes"></div>
+  <h3>O que pode avançar em paralelo</h3>
+  <div class="painel" id="paralelo"></div>
+</section>
+
+<section id="lista">
+  <h2><span class="n">4.</span>Lista mestra de implementação</h2>
+  <p class="sub" id="sub-lista"></p>
+  <div id="lista-tarefas"></div>
+</section>
+
+<section id="modulos">
+  <h2><span class="n">5.</span>Cards dos módulos</h2>
+  <p class="sub">Um card por módulo, com o diagnóstico completo. As outras seções só apontam para cá.</p>
+  <div id="cards-modulos"></div>
+</section>
+
+<section id="problemas">
+  <h2><span class="n">6.</span>Registro de problemas</h2>
+  <p class="sub" id="sub-problemas"></p>
+  <div class="tabela-rola"><table class="larga">
+    <thead><tr><th>ID</th><th>Gravidade</th><th>Problema</th><th>Módulo</th><th>Tarefa ou classificação</th><th>Correção</th></tr></thead>
+    <tbody id="tbody-prob"></tbody>
+  </table></div>
+</section>
+
+<section id="validacao">
+  <h2><span class="n">7.</span>Validação e método dos percentuais</h2>
+  <div id="painel-validacao"></div>
+</section>
+
+<footer>
+  <p id="rodape"></p>
+  <p><strong>Riva's Alexandre</strong> © 2026<br>Todos os direitos reservados. Painel técnico provisório. Não é validação clínica nem jurídica.</p>
+</footer>
+
+</div>
+
+<script>
+/* =====================================================================
+   DADOS — FONTE ÚNICA. Resumos, gráficos, cards e tabelas são derivados
+   daqui; nenhum percentual ou contagem é escrito à mão.
+   Vínculos: problema.tarefa → tarefa.mods → módulo; tarefa.decisoes → decisão.
+   Mantido consistente com docs/lista-implementacao-glyx.md.
+   Sem segredos, dados pessoais ou dados clínicos reais.
+   ===================================================================== */
+const DADOS = {
+  meta: {
+    dataAnalise: "2026-10-15",
+    commitMain: "535e2bc",
+    estadoLocal: "árvore local das sessões de 14 e 15/10/2026 — não commitada, não implantada; A2 não autorizada",
+    executado: [
+      "npm run lint — 0 avisos",
+      "tsc --noEmit — sem erro",
+      "npm run test — 98 arquivos, 1177 testes aprovados (partida: 88 arquivos, 952 testes)",
+      "npm run build — aprovado",
+      "0 ocorrências do projeto de produção no build"
+    ],
+    comoExecutado: "com variáveis de ambiente falsas para todo nome do .env.local, telemetria desligada, sem acesso à produção",
+    naoExecutado: [
+      "E2E do repositório (Playwright): sobe next dev com o .env.local de produção — os fluxos de tela foram exercitados por scripts próprios contra o ambiente descartável",
+      "qualquer leitura ou verificação em produção",
+      "integração com o provedor de IA e com o serviço de push reais (foram simulados)",
+      "toque em 'Já tomei' na notificação do sistema e alarme num aparelho"
+    ],
+    validacaoIntegrada: {
+      data: "14/10/2026",
+      ambiente: "Supabase local descartável (CLI, fora do repositório, sem vínculo com o projeto remoto), usuários sintéticos, IA e push simulados por servidores locais",
+      executado: [
+        "4 testes SQL aprovados (18 casos de cadência, 7 cenários de despacho, 3 de dono do medicamento, conta ativa e cota)",
+        "defeito do alarme reproduzido no banco antigo; controles negativos falharam como esperado",
+        "concorrência da cota: 5 de 20 aceitos (caminho antigo: 20 de 20)",
+        "fluxos no navegador: formulário de frequência, service worker, conta desativada, chat com queda, exportar e apagar",
+        "ensaio de implantação (A, B, C e a combinação incompatível X) e da reversão"
+      ]
+    },
+    migrationsNaoAplicadas: 4,
+    escopo: "Sem PRD aprovado. Escopo = README (Funcionalidades) + ROADMAP (Já entregue e P1) + roteiro de teste §1–§6; o rascunho docs/PRD.md organiza esse mesmo escopo e aguarda revisão.",
+    mudancasMetodo: [
+      "Correção de status (não de método): 'Cadência na contagem de mecanismos' passou de implementada para em implementação — o relatório de sobreposição não tem chamador em produção. Base do main: 75,5% → valor atual mostrado acima.",
+      "Dois estados lado a lado: main (repositório remoto) e local (código desta sessão). Não compare o local com o 75,5% anterior.",
+      "Pontos, pesos, fórmula e denominador não mudaram. Documentação não altera percentual.",
+      "Revisão de estrutura (14/10): problemas agora apontam para tarefa ou classificação; decisões ganharam IDs D10–D12 para tarefas que diziam só 'exige decisão'; P36 incluído (estava na auditoria e faltava no registro).",
+      "Fechamento (15/10): rótulos de validação passam a ser três — validado localmente (unitário ou integrado), simulado (IA ou push falsos) e pendente em produção. Nada mudou de pontos. Entraram GLYX-45 e GLYX-46 (ordem 19 e 20, antes da produção), D13, I1, I2, P41 e P42.",
+      "Validação integrada (14/10): novo tipo 'teste local integrado' (banco descartável + serviços simulados), mostrado à parte. NÃO promove entrega a 'validado' (1,0): validado continua exigindo registro de uso real. Única mudança de status: 'Teste de RLS e bloqueio em banco real' passou de bloqueado (0,5) para implementado (0,9) — os testes rodaram, mas ainda não estão no CI. P37–P40 incluídos."
+    ]
+  },
+
+  pontos: { validado: 1.0, implementado: 0.9, em_implementacao: 0.5, bloqueado: "0,5 com parte pronta; 0 sem", nao_iniciado: 0, nao_verificado: null },
+  pesos: { 3: "Risco clínico ou legal", 2: "Núcleo do uso diário", 1: "Complementar" },
+  statusEntrega: {
+    validado: "Validado (histórico)", implementado: "Implementado, sem validação de uso real", em_implementacao: "Em implementação",
+    bloqueado: "Bloqueado", nao_iniciado: "Não iniciado", nao_verificado: "Não verificado"
+  },
+
+  // Incidentes do ambiente de teste: abertos até a decisão correspondente (docs/INCIDENTES-AMBIENTE-14-10-2026.md).
+  incidentes: [
+    { id: "INC-1", titulo: "Chave de serviço de produção carregada num servidor de teste local (≈3,5 min)", evidencia: "destino configurado só local; uma operação no log, recusada pelo Auth local; valor ausente em 1.683 arquivos", aberto: "logs dos contêineres locais destruídos antes de conferir; decidir troca da chave", decisao: "I1", tarefa: "GLYX-45" },
+    { id: "INC-2", titulo: "25 contêineres de outros projetos ligados junto com o Docker (≈1 min)", evidencia: "todos parados até 22:29:15; migrations do LX_MED e RADAR-POLITICO sem cron nem chamada externa", aberto: "n8n, Evolution API e central-email: conferir efeitos externos sem religar", decisao: "I2", tarefa: "GLYX-45" }
+  ],
+
+  // status = árvore local; main = status no commit, quando difere.
+  // validadaLocal = teste unitário ou estático aprovado nesta execução (parcial, sem banco).
+  // testeIntegrado = exercitada em 14/10 no banco local descartável (não conta como validado em uso real).
+  // simulado = parte externa que era servidor falso nesse teste ("IA", "push").
+  // motivoNV = por que a entrega ficou fora do cálculo.
+  modulos: [
+    { id: "M1", nome: "Glicemia e CGM", peso: 3, objetivo: "Registrar e acompanhar a glicose, manual ou por sensor.",
+      entregas: [
+        { nome: "Registro manual de glicemia", status: "implementado", evid: "app/actions/glucose.ts" },
+        { nome: "Histórico e tendências com paginação", status: "implementado", evid: "lib/queries/fetch-all.ts" },
+        { nome: "Sincronização automática Libre", status: "validado", fonte: "ROADMAP.md:117 — sync estável ≥ 7 dias (13/08/2026)", evid: "lib/cgm/sync.ts" },
+        { nome: "Importação de CSV do LibreView", status: "implementado", evid: "components/glicemia/libre-csv-import.tsx" },
+        { nome: "Dexcom", status: "bloqueado", pontos: 0.5, evid: "app/api/cgm/dexcom/" },
+        { nome: "Pressão arterial", status: "implementado", evid: "migration 20260714010000" }
+      ],
+      bloqueios: [{ ref: "D8", texto: "Dexcom depende de app aprovado" }], proxima: "GLYX-19" },
+    { id: "M2", nome: "Medicação e alarmes", peso: 3, objetivo: "Tomar o remédio certo, na hora e no dia certos, e registrar.",
+      entregas: [
+        { nome: "Cadastro manual e por foto", status: "implementado", evid: "app/actions/medications.ts" },
+        { nome: "Registro de dose e adesão (idempotente)", status: "implementado", testeIntegrado: true, validadaLocal: true, evid: "lib/medications/register-dose.ts + teste" },
+        { nome: "Adiar dose", status: "implementado", evid: "app/api/medications/snooze/route.ts" },
+        { nome: "Alarme push respeitando a cadência", simulado: "push", status: "implementado", testeIntegrado: true, main: "em_implementacao", validadaLocal: true, evid: "lib/medications/cadence.ts; migration 20261014120000 (não aplicada)" },
+        { nome: "Estoque e aviso de reposição", status: "implementado", evid: "dispatch_med_alarms (refill)" },
+        { nome: "Cadência na contagem de mecanismos", status: "em_implementacao", corrigida: true, evid: "lib/safety/overlap.ts — sem chamador em produção" },
+        { nome: "Calculadora de bolus (educativa)", status: "bloqueado", pontos: 0.5, evid: "lib/medications/bolus-calculator.ts" }
+      ],
+      bloqueios: [{ ref: "D7", texto: "teto de dose da calculadora" }, { ref: "A2", texto: "migration do alarme não aplicada" }], proxima: "GLYX-39" },
+    { id: "M3", nome: "Segurança clínica", peso: 3, objetivo: "Interação e hipoglicemia decididas por regra fixa, nunca pela IA.",
+      entregas: [
+        { nome: "Motor determinístico e base curada", status: "validado", fonte: "roteiro §1.2 conferido no banco (08/09/2026)", evid: "lib/safety/" },
+        { nome: "Checagem por texto", status: "implementado", evid: "app/api/ai/supplement-check/route.ts" },
+        { nome: "Checagem por foto do rótulo", status: "em_implementacao", evid: "app/api/ai/med-label/route.ts:142" },
+        { nome: "Tela de interações", status: "implementado", evid: "/medicacao/interacoes" },
+        { nome: "Cobertura da base para as substâncias do usuário", status: "bloqueado", pontos: 0.5, evid: "roteiro §7" },
+        { nome: "Plano de hipoglicemia", status: "implementado", evid: "app/actions/hypo-plan.ts" },
+        { nome: "Guarda de exercício", status: "implementado", evid: "lib/painel/card-agora.ts" },
+        { nome: "Apelidos de marca aplicados em produção", status: "nao_verificado", motivoNV: "o arquivo existe; se foi aplicado só se sabe lendo o banco, que não foi acessado", evid: "migration 20260908120000" }
+      ],
+      bloqueios: [{ ref: "D7", texto: "curadoria das substâncias fora da base" }], proxima: "GLYX-27" },
+    { id: "M4", nome: "Alimentação e água", peso: 2, objetivo: "Refeições e bebidas, com estimativa por foto revisada.",
+      entregas: [
+        { nome: "Refeição manual e por texto", status: "implementado", evid: "app/actions/meals.ts" },
+        { nome: "Refeição por foto com revisão", status: "implementado", evid: "app/api/ai/meal-photo/route.ts" },
+        { nome: "Montar prato", status: "implementado", evid: "app/api/ai/plate-builder/route.ts" },
+        { nome: "Água e bebidas", status: "implementado", evid: "app/actions/water.ts" },
+        { nome: "Sugestão de refeição por push", simulado: "IA e push", status: "em_implementacao", testeIntegrado: true, evid: "app/api/meals/suggest-dispatch — custo registrado em teste local; envio de glicemia sem ação do titular (P06, confirmado)" }
+      ],
+      bloqueios: [{ ref: "D5", texto: "envio automático de glicemia ao provedor" }], proxima: "GLYX-27" },
+    { id: "M5", nome: "Exames", peso: 2, objetivo: "Guardar laudos e acompanhar valores no tempo.",
+      entregas: [
+        { nome: "Cadastro e interpretação", status: "implementado", evid: "app/api/ai/exam-photo/route.ts" },
+        { nome: "Extração de valores", status: "implementado", evid: "lib/exams/parse-values.ts" },
+        { nome: "Séries por analito", status: "implementado", evid: "migration 20260908160000" }
+      ],
+      bloqueios: [{ ref: null, texto: "validação da série depende de uma segunda coleta" }], proxima: "GLYX-20" },
+    { id: "M6", nome: "Exercício e treino", peso: 1, objetivo: "Planejar, registrar e acompanhar o treino.",
+      entregas: [
+        { nome: "Sessões", status: "implementado", evid: "migration 20260908141000" },
+        { nome: "Plano semanal", status: "implementado", evid: "lib/exercicios/" },
+        { nome: "Catálogo e registro de carga", status: "implementado", evid: "ROADMAP (Módulo Treino)" },
+        { nome: "Recuperação", status: "implementado", evid: "components/exercicios/muscle-recovery-panel.tsx" },
+        { nome: "Evolução e checklist de platô", status: "implementado", evid: "lib/exercicios/" },
+        { nome: "RIR/RPE, execução, dor/energia, camada anatômica", status: "nao_iniciado", evid: "roteiro §8" },
+        { nome: "Score composto", status: "bloqueado", pontos: 0, evid: "roteiro §8" }
+      ],
+      nota: "Componentes pouco lidos: ausência de problema registrado não é ausência de defeito.",
+      bloqueios: [{ ref: "D9", texto: "score composto e pontos do briefing" }], proxima: "GLYX-41" },
+    { id: "M7", nome: "Composição corporal", peso: 1, objetivo: "Medidas, fotos de progresso e metas.",
+      entregas: [
+        { nome: "Medidas", status: "implementado", evid: "app/actions/body.ts" },
+        { nome: "Fotos e comparação por IA sob pedido", status: "implementado", evid: "app/api/ai/body-photo-compare" },
+        { nome: "Metas com projeção", status: "implementado", evid: "migration 20260726000000" },
+        { nome: "Veredito com força", status: "implementado", evid: "ROADMAP" }
+      ],
+      nota: "Componentes pouco lidos: ausência de problema registrado não é ausência de defeito.",
+      bloqueios: [{ ref: null, texto: "pouco histórico para validar o veredito" }], proxima: "GLYX-06" },
+    { id: "M8", nome: "Análise e relatórios", peso: 2, objetivo: "Leitura do período para o usuário e para o médico.",
+      entregas: [
+        { nome: "Auditoria e score metabólico", status: "implementado", main: "em_implementacao", validadaLocal: true, evid: "lib/audit/day-grid.ts paginado; não grava sobre dado incompleto" },
+        { nome: "Resumo semanal", status: "implementado", main: "em_implementacao", validadaLocal: true, evid: "lib/queries/weekly-summary.ts paginado" },
+        { nome: "Insights e correlações", status: "implementado", evid: "lib/insights/" },
+        { nome: "Relatório para o médico", status: "implementado", evid: "lib/audit/medical-report.ts" },
+        { nome: "Relatório completo", status: "implementado", evid: "lib/reports/full-history.ts" },
+        { nome: "Marcador de evento", status: "em_implementacao", evid: "tabela health_events sem tela" }
+      ],
+      bloqueios: [], proxima: "GLYX-37" },
+    { id: "M9", nome: "Copiloto de IA", peso: 2, objetivo: "Conversa sobre os próprios dados, com limites claros.",
+      entregas: [
+        { nome: "Chat com contexto (payload validado)", simulado: "IA", status: "implementado", testeIntegrado: true, validadaLocal: true, evid: "lib/ai/chat-payload.ts + teste" },
+        { nome: "Histórico de conversas", status: "implementado", evid: "lib/queries/ai-threads.ts" },
+        { nome: "Recibo de contexto", status: "implementado", evid: "lib/ai/context-receipt.ts" },
+        { nome: "Redação por IA nos cards do painel", status: "nao_verificado", motivoNV: "não confirmei se o passo 5 da fatia 4 (texto da IA nos cards) entrou; o código do painel não foi lido por inteiro", evid: "lib/painel/card-agora.ts" }
+      ],
+      bloqueios: [], proxima: "GLYX-27" },
+    { id: "M10", nome: "Integrações de saúde", peso: 1, objetivo: "Sono, passos e frequência cardíaca de outras fontes.",
+      entregas: [
+        { nome: "Google Fit", status: "bloqueado", pontos: 0.5, evid: "lib/health/google-fit-oauth.ts" },
+        { nome: "Sono manual", status: "implementado", evid: "/integracoes" }
+      ],
+      bloqueios: [{ ref: "D8", texto: "Google Cloud e risco de descontinuação da API" }], proxima: "GLYX-21" },
+    { id: "M11", nome: "Notificações push", peso: 2, objetivo: "Assinatura, envio e agendamento dos lembretes.",
+      entregas: [
+        { nome: "Assinatura, envio e service worker", status: "implementado", evid: "app/api/push/, public/sw.js" },
+        { nome: "Água e dica diária", status: "implementado", evid: "migration 20260713200000" },
+        { nome: "Confiabilidade (estado, reenvio, confirmação)", simulado: "push", status: "implementado", testeIntegrado: true, main: "em_implementacao", validadaLocal: true, evid: "lib/push/dispatch-outcome.ts; migration 20261014120000 (não aplicada)" }
+      ],
+      bloqueios: [{ ref: "A2", texto: "push real e aparelho só se provam depois da implantação" }], proxima: "GLYX-31" },
+    { id: "M12", nome: "Conta, acesso e admin", peso: 2, objetivo: "Convite, login, perfil e administração.",
+      entregas: [
+        { nome: "Convite e cadastro fechado", status: "validado", fonte: "ROADMAP.md:114 (14/08/2026)", evid: "app/api/auth/register" },
+        { nome: "Login e recuperação de senha", status: "implementado", evid: "app/auth/callback/route.ts" },
+        { nome: "Perfil e onboarding", status: "implementado", evid: "app/actions/profile.ts" },
+        { nome: "Desativar conta (middleware, banco e Auth)", status: "implementado", testeIntegrado: true, main: "em_implementacao", validadaLocal: true, evid: "lib/auth/account-gate.ts; migration 20261014123000 (não aplicada)" },
+        { nome: "Painel de gastos de IA", simulado: "IA", status: "implementado", testeIntegrado: true, main: "em_implementacao", validadaLocal: true, evid: "lib/ai/rate-limit.ts; suggest-dispatch com service role" }
+      ],
+      bloqueios: [{ ref: "A2", texto: "migration de conta ativa não aplicada em produção" }, { ref: "D4", texto: "retenção do uso de IA na exclusão" }], proxima: "GLYX-39" },
+    { id: "M13", nome: "LGPD e privacidade", peso: 3, objetivo: "Consentimento, transparência, portabilidade e exclusão.",
+      entregas: [
+        { nome: "Consentimento e política", status: "em_implementacao", evid: "app/privacidade/page.tsx" },
+        { nome: "Exportar meus dados", status: "implementado", testeIntegrado: true, main: "em_implementacao", validadaLocal: true, evid: "lib/privacy/export.ts + teste com 2500 registros" },
+        { nome: "Apagar meus dados", status: "implementado", testeIntegrado: true, main: "em_implementacao", validadaLocal: true, evid: "inventário derivado do schema; Storage paginado" },
+        { nome: "DPIA alinhado ao código", status: "em_implementacao", evid: "docs/DPIA.md §11 registra as divergências" },
+        { nome: "Storage privado", status: "implementado", evid: "migration 20260711160000" }
+      ],
+      bloqueios: [{ ref: "D4", texto: "texto da tela de exclusão" }, { ref: "D5", texto: "cron de sugestão" }, { ref: "D6", texto: "texto da política" }], proxima: "GLYX-17" },
+    { id: "M14", nome: "Segurança e operação", peso: 3, objetivo: "Isolamento, cabeçalhos, segredos e monitoramento.",
+      entregas: [
+        { nome: "RLS e isolamento", status: "validado", fonte: "docs/PENTEST-08-09-2026.md", evid: "supabase/migrations/" },
+        { nome: "CSP e cabeçalhos", status: "validado", fonte: "caderno de método, 08/09/2026", evid: "lib/security/csp.ts" },
+        { nome: "Segredos no Vault", status: "implementado", evid: "migration 20260718010000" },
+        { nome: "Sentry dos crons", status: "em_implementacao", evid: "sentry.server.config.ts" },
+        { nome: "Active scan", status: "nao_iniciado", evid: "docs/PENTEST-08-09-2026.md" },
+        { nome: "check:prod verde", status: "nao_verificado", motivoNV: "o script lê o .env.local de produção; não foi executado", evid: "scripts/check-prod-ready.ps1" },
+        { nome: "Migrations e segredos em produção", status: "nao_verificado", motivoNV: "exige ler o banco e a Vercel, não acessados", evid: "docs/PRODUCAO.md" }
+      ],
+      bloqueios: [{ ref: "A3", texto: "conferências em produção" }], proxima: "GLYX-34" },
+    { id: "M15", nome: "Qualidade e testes", peso: 2, objetivo: "Garantir por teste automatizado o que é crítico.",
+      entregas: [
+        { nome: "Testes unitários", status: "implementado", evid: "1177 testes em 14/10" },
+        { nome: "E2E dos portões", status: "implementado", evid: "e2e/" },
+        { nome: "E2E clínico no CI", status: "em_implementacao", evid: ".github/workflows/ci.yml:12" },
+        { nome: "Teste de RLS e bloqueio em banco real", status: "implementado", testeIntegrado: true, main: "nao_iniciado", evid: "supabase/tests/*.sql executados em banco descartável (14/10); fora do CI" }
+      ],
+      bloqueios: [{ ref: "A1", texto: "ambiente de teste persistente para o CI" }], proxima: "GLYX-04" }
+  ],
+
+  // classe: tarefa | aguardando_decisao | adiado | fora_escopo. correcao: corrigido_local | aberto | registrado.
+  problemas: [
+    { id: "P01", grav: "alto", mod: "M13", tarefa: "GLYX-15", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Exclusão e exportação deixavam tabelas de fora" },
+    { id: "P02", grav: "alto", mod: "M13", tarefa: "GLYX-16", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Exportação cortava cada tabela em mil linhas" },
+    { id: "P03", grav: "alto", mod: "M8", tarefa: "GLYX-16", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Auditoria, resumo semanal e contexto da IA sobre dados cortados" },
+    { id: "P04", grav: "alto", mod: "M2", tarefa: "GLYX-07", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Alarme ignorava cadência, rigidez 'livre' e a virada da meia-noite" },
+    { id: "P05", grav: "alto", mod: "M12", tarefa: "GLYX-23", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Conta desativada com acesso ao banco; middleware liberava em erro" },
+    { id: "P06", grav: "alto", mod: "M13", tarefa: "GLYX-17", classe: "aguardando_decisao", decisoes: ["D5", "D6"], correcao: "registrado", titulo: "Política sem provedor/país; cron envia glicemia sem ação do usuário", justificativa: "divergência registrada no DPIA §11; confirmada em teste local (o prompt do cron levou a glicemia); mudar consentimento ou envio automático depende de decisão" },
+    { id: "P07", grav: "medio", mod: "M12", tarefa: "GLYX-24", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Usuário apagava o próprio contador de IA" },
+    { id: "P08", grav: "medio", mod: "M12", tarefa: "GLYX-25", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Custo de IA do cron não registrado (confirmado em produção pela A3: 39 sugestões, 0 registros)" },
+    { id: "P09", grav: "medio", mod: "M9", tarefa: "GLYX-26", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Chat aceitava papel 'system' do navegador" },
+    { id: "P10", grav: "medio", mod: "M11", tarefa: "GLYX-12", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Alarme perdido sem reenvio quando a rota falhava" },
+    { id: "P11", grav: "medio", mod: "M2", tarefa: "GLYX-10", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Adiamento com medicamento de outra conta" },
+    { id: "P12", grav: "medio", mod: "M4", tarefa: "GLYX-27", classe: "tarefa", correcao: "aberto", titulo: "Valores da IA sem faixa; JSON inválido vira zero" },
+    { id: "P13", grav: "medio", mod: "M3", tarefa: "GLYX-27", classe: "tarefa", correcao: "aberto", titulo: "Erro na base de interações vira 'sem alerta'" },
+    { id: "P14", grav: "medio", mod: "M3", tarefa: "GLYX-27", classe: "tarefa", correcao: "aberto", titulo: "Checagem por foto só para 'suplemento'" },
+    { id: "P15", grav: "medio", mod: "M2", tarefa: "GLYX-28", classe: "tarefa", correcao: "aberto", titulo: "Calculadora mostra leitura sem idade" },
+    { id: "P16", grav: "medio", mod: "M3", tarefa: "GLYX-27", classe: "tarefa", correcao: "aberto", titulo: "Texto da IA sem filtro de linguagem em execução" },
+    { id: "P17", grav: "medio", mod: "M9", tarefa: "GLYX-26", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Queda do stream gravada como resposta completa" },
+    { id: "P18", grav: "medio", mod: "M15", tarefa: "GLYX-04", classe: "tarefa", correcao: "aberto", titulo: "E2E clínico não roda no CI" },
+    { id: "P19", grav: "medio", mod: "M10", tarefa: "GLYX-21", classe: "tarefa", correcao: "aberto", titulo: "/api/health/ingest aceita 'mock'" },
+    { id: "P20", grav: "medio", mod: "M1", tarefa: "GLYX-19", classe: "tarefa", correcao: "aberto", titulo: "Ingestão de CGM perde dado em silêncio" },
+    { id: "P21", grav: "medio", mod: "M5", tarefa: "GLYX-20", classe: "tarefa", correcao: "aberto", titulo: "Reextração de exame não atômica" },
+    { id: "P22", grav: "baixo", mod: "M12", tarefa: "GLYX-33", classe: "tarefa", correcao: "aberto", titulo: "Lista de e-mails do login social só vale após a sessão" },
+    { id: "P23", grav: "baixo", mod: "M14", tarefa: "GLYX-34", classe: "tarefa", correcao: "aberto", titulo: "Segredos antigos de cron no histórico (crítico se não trocados)" },
+    { id: "P24", grav: "baixo", mod: "M14", tarefa: "GLYX-32", classe: "tarefa", correcao: "aberto", titulo: "Mensagens de erro do banco devolvidas ao cliente" },
+    { id: "P25", grav: "baixo", mod: "M11", tarefa: "GLYX-31", classe: "tarefa", correcao: "aberto", titulo: "Endpoint de push aceita qualquer URL" },
+    { id: "P26", grav: "baixo", mod: "M12", tarefa: "GLYX-30", classe: "tarefa", correcao: "aberto", titulo: "Convite sem limite de tentativas" },
+    { id: "P27", grav: "baixo", mod: "M13", tarefa: "GLYX-18", classe: "tarefa", correcao: "aberto", titulo: "Admin lê colunas clínicas de todos os perfis" },
+    { id: "P28", grav: "baixo", mod: "M14", tarefa: "GLYX-35", classe: "tarefa", correcao: "aberto", titulo: "Sentry sem filtro de payload; erro de tela não chega" },
+    { id: "P29", grav: "baixo", mod: "M5", tarefa: "GLYX-22", classe: "aguardando_decisao", decisoes: ["D11"], correcao: "aberto", titulo: "Exame por foto gravado sem revisão humana", justificativa: "acrescentar etapa de revisão muda o fluxo do usuário; depende de decisão" },
+    { id: "P30", grav: "baixo", mod: "M15", tarefa: "GLYX-36", classe: "tarefa", correcao: "aberto", titulo: "Tipos defasados, código morto, CI e documentação",
+      justificativa: "GLYX-36 cobre só os tipos. Código morto e 'npm install' no CI: ADIADOS — manutenção sem efeito em comportamento. Documentação: parcialmente atualizada em 14/10 (PRD, TRD, schema)." },
+    { id: "P31", grav: "baixo", mod: "M2", tarefa: "GLYX-11", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Registro de dose podia duplicar" },
+    { id: "P32", grav: "medio", mod: "M11", tarefa: "GLYX-12", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: alarmes críticos simultâneos se substituíam (tag única)" },
+    { id: "P33", grav: "medio", mod: "M2", tarefa: "GLYX-08", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: cinco telas geravam doses ignorando a cadência" },
+    { id: "P34", grav: "baixo", mod: "M13", tarefa: "GLYX-15", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: limpeza do Storage parava em 1000 arquivos" },
+    { id: "P35", grav: "baixo", mod: "M2", tarefa: "GLYX-13", classe: "aguardando_decisao", decisoes: ["D10"], correcao: "aberto", titulo: "Novo: relatório de sobreposição sem chamador em produção", justificativa: "ligar à tela é funcionalidade; depende de decisão" },
+    { id: "P36", grav: "baixo", mod: "M12", tarefa: "GLYX-33", classe: "tarefa", correcao: "aberto", titulo: "Recuperação de senha barrada pela lista do login social para quem entrou por convite", justificativa: "estava na auditoria e faltava no registro; a mesma lista de e-mails de GLYX-33" },
+    { id: "P37", grav: "medio", mod: "M12", tarefa: "GLYX-23", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: tela do admin escondia falha no bloqueio de login" },
+    { id: "P38", grav: "baixo", mod: "M9", tarefa: "GLYX-26", classe: "tarefa", correcao: "aberto", titulo: "Novo: queda do stream da IA gera ECONNRESET não capturado no console", justificativa: "a rota trata e manda o aviso; investigar se aparece em produção" },
+    { id: "P39", grav: "medio", mod: "M13", tarefa: "GLYX-24", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Tela de exclusão dizia 'todos os registros', mas o uso de IA recente ficava", justificativa: "resolvido pela D4 (15/10): a exclusão apaga todo o uso de IA; validado no navegador" },
+    { id: "P45", grav: "alto", mod: "M2", tarefa: "GLYX-11", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo (D14): registro de dose do lote 1 descarta em silêncio um segundo registro com horário diferente na mesma dose", justificativa: "corrigido e validado em PostgreSQL 14 isolado em 15/10 (45 verificações); pendente de PostgREST/Auth reais e de produção" },
+    { id: "P46", grav: "medio", mod: "M8", tarefa: "GLYX-08", classe: "tarefa", decisoes: ["D16"], correcao: "corrigido_local", titulo: "Novo: relatório médico e histórico completo contam 'Pulei hoje' como tomada", justificativa: "D16 autorizada e implementada em 15/10 em 9 consumidores; validada localmente (14 resultados esperados)" },
+    { id: "P47", grav: "medio", mod: "M2", tarefa: "GLYX-11", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: tela descartava o erro do registro de dose (falha ou sessão expirada em silêncio)", justificativa: "corrigido local em 15/10; validado no navegador com PostgREST e Auth reais na A4 (F7 e falha de gravação na tela)" },
+    { id: "P48", grav: "alto", mod: "M8", tarefa: "GLYX-11", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Formatador de data derrubava o relatório completo (erro 500) e o gráfico de tendência da glicemia", justificativa: "anterior ao lote (03939f1, já na main); corrigido no helper em 15/10 e validado no navegador com PostgREST e Auth reais (14/14); pendente de produção" },
+    { id: "P49", grav: "medio", mod: "M8", tarefa: "GLYX-11", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: relatório completo não marcava \"horário corrigido\" (consulta sem a coluna de correções)", justificativa: "achado no navegador em 15/10, do próprio lote D16 (não existe na main); corrigido e validado no navegador" },
+    { id: "P50", grav: "alto", mod: "M2", tarefa: "GLYX-11", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: ação com redirect() nem sempre navegava no build de produção (pergunta de conflito e recusas não apareciam)", justificativa: "achado em 15/10 no build de produção (no dev funcionava); a ação passou a devolver destino/aviso e o navegador navega; validado no build de produção" },
+    { id: "P51", grav: "alto", mod: "M2", tarefa: "GLYX-09", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Novo: edição de item 'livre' ativava alarme sem escolha de frequência (campo pré-selecionado)", justificativa: "achado no navegador em 15/10, desta rodada; frequência passa a vir vazia; validado no navegador" },
+    { id: "P52", grav: "medio", mod: "M12", tarefa: "GLYX-24", classe: "adiado", correcao: "registrado", titulo: "Novo: não há teto global de gasto de IA que bloqueie chamadas (só medidor no admin, que soma ai_usage)", justificativa: "conflito informado na D4: a exclusão apaga registros que o medidor soma; teto real seria funcionalidade nova, fora do lote" },
+    { id: "P43", grav: "medio", mod: "M11", tarefa: "GLYX-12", classe: "tarefa", correcao: "aberto", titulo: "Novo (A3): 17 de 25 chamadas do banco para o app em timeout de 5 s do pg_net", justificativa: "o app pode ter concluído mesmo assim; o despacho do lote 1 não depende da resposta do pg_net; investigar" },
+    { id: "P44", grav: "baixo", mod: "M14", tarefa: "GLYX-39", classe: "fora_escopo", correcao: "registrado", titulo: "Novo (A3): histórico de migrations de produção difere do repositório (3 sem registro, 1 sem arquivo)", justificativa: "objetos existem em produção; não impede o lote 1; migration repair não autorizado" },
+    { id: "P41", grav: "alto", mod: "M15", tarefa: "GLYX-46", classe: "tarefa", correcao: "corrigido_local", titulo: "Novo: teste local podia carregar segredo de produção do .env.local (incidente de 14/10)", justificativa: "guarda no Vitest, no Playwright e no CI desde 15/10, validada localmente; não commitada" },
+    { id: "P42", grav: "medio", mod: "M2", tarefa: "GLYX-09", classe: "tarefa", correcao: "corrigido_teste_local", titulo: "Frequência 'diaria' gravada por presunção (migration de 07/09 e formulário com campo vazio)", justificativa: "resolvido pela D1 (15/10): frequência obrigatória em cadastro novo e cadence_confirmed_at; validado no navegador" },
+    { id: "P40", grav: "baixo", mod: "M15", tarefa: null, classe: "fora_escopo", correcao: "registrado", titulo: "Novo: next dev com webpack não hidrata o login (CSP bloqueia eval)", justificativa: "só afeta desenvolvimento local; com --turbopack funciona; registrado no plano §6" }
+  ],
+
+  blocos: { B1: "1 · Base e documentação", B2: "2 · Alarmes", B3: "3 · Dados e privacidade", B4: "4 · Acesso e IA", B5: "Operação e ambiente", B6: "Robustez", B7: "Produto e decisões" },
+  prioridades: { P0: "P0 risco clínico/legal", P1: "P1 integridade/segurança", P2: "P2 robustez", P3: "P3 opcional" },
+  statusTarefa: { concluida: "Concluída", implementada_local: "Implementada (local)", em_andamento: "Em andamento", nao_iniciada: "Não iniciada", bloqueada: "Bloqueada" },
+  statusValidacao: { validada_teste_local: "Validada localmente — integrada", validada_local: "Validada localmente — unitária", parcial_local: "Parcial local", nao_validada: "Não validada", bloqueada: "Validação bloqueada", validada_producao: "Validada em produção" },
+
+  // decisoes = IDs de decisão ou autorização que bloqueiam a tarefa (a seção 2 é derivada daqui).
+  tarefas: [
+    { id: "GLYX-01", ordem: 1, lote: 1, bloco: "B1", cat: "operação", prio: "P1", escopo: "observado", mods: ["M15"], titulo: "Linha de base de validação local isolada", st: "concluida", val: "validada_local", deps: [], decisoes: [], crit: ["lint, tipos, testes e build com exit 0", "0 ocorrências do projeto de produção no build"], metodo: "execução local com variáveis falsas", evid: "lint 0 avisos · tsc 0 erro · 1177 testes · build ok" },
+    { id: "GLYX-02", ordem: 2, lote: 1, bloco: "B1", cat: "documentação", prio: "P2", escopo: "observado", mods: [], titulo: "Documentação de referência (PRD, TRD, fluxo, design, schema, plano)", st: "concluida", val: "nao_validada", deps: [], decisoes: [], crit: ["cada afirmação com fonte", "bug não vira requisito"], metodo: "revisão do Rivas", evid: "docs/PRD.md, TRD.md, FLUXO-APP.md, DESIGN-SYSTEM-BRIEFING.md, SCHEMA-BACKEND.md, PLANO-IMPLEMENTACAO.md" },
+    { id: "GLYX-03", ordem: 15, lote: 2, bloco: "B5", cat: "operação", prio: "P1", escopo: "sugerido", mods: ["M15"], titulo: "Ambiente Supabase de teste", st: "concluida", val: "validada_teste_local", deps: [], decisoes: [], crit: ["supabase/tests/*.sql executam", "nenhuma chave de produção", "app_base_url fora da produção"], metodo: "execução dos testes SQL", evid: "ambiente local descartável em 14/10 (CLI fora do repo, crons desagendados, URL de produção trocada por endereço morto); não persistente" },
+    { id: "GLYX-04", ordem: 16, lote: 2, bloco: "B5", cat: "teste", prio: "P2", escopo: "observado", mods: ["M15"], titulo: "E2E clínico no CI contra ambiente de teste", st: "bloqueada", val: "bloqueada", deps: ["GLYX-03"], decisoes: ["A1"], crit: ["spec clínico executado no CI, não pulado"], metodo: "CI", evid: "" },
+    { id: "GLYX-05", ordem: 17, lote: 2, bloco: "B4", cat: "teste", prio: "P1", escopo: "sugerido", mods: ["M12", "M15"], titulo: "Testes de isolamento e bloqueio em banco real", st: "em_andamento", val: "validada_teste_local", deps: ["GLYX-03", "GLYX-23"], decisoes: [], crit: ["cruzamento entre contas recusado", "conta desativada recusada com token existente, refresh, tabela e Storage"], metodo: "SQL em banco de teste + E2E para refresh e login", evid: "executado em 14/10 por scripts fora do repo: escrita cruzada recusada; conta desativada recusada em tabela, Storage, refresh e login. Suíte ainda não versionada nem no CI" },
+    { id: "GLYX-06", ordem: 46, lote: 0, bloco: "B5", cat: "teste", prio: "P2", escopo: "observado", mods: [], titulo: "Resultado registrado de cada caso do roteiro de teste", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["48 casos com aprovado ou reprovado e data"], metodo: "execução pelo Rivas, na conta real", evid: "" },
+    { id: "GLYX-07", ordem: 3, lote: 1, sql: true, bloco: "B2", cat: "correção", prio: "P0", escopo: "observado", mods: ["M2"], titulo: "Alarme respeita cadência, rigidez e virada do dia", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: ["D1", "D2", "D3"], crit: ["semanal só no dia", "intervalo só em múltiplos da âncora, nunca antes", "livre sem alarme", "23:55 dispara às 00:02 com a data anterior", "fusos distintos corretos"], metodo: "TS local (18 casos) + SQL em banco de teste", evid: "18 casos SQL + 7 cenários aprovados; banco antigo reproduz o defeito; D1–D3 não aprovadas" },
+    { id: "GLYX-08", ordem: 4, lote: 1, bloco: "B2", cat: "correção", prio: "P0", escopo: "observado", mods: ["M2"], titulo: "\"Doses de hoje\" e adesão respeitam a cadência", st: "implementada_local", val: "validada_teste_local", deps: ["GLYX-07"], decisoes: [], crit: ["dia sem dose não gera dose nem entra na adesão"], metodo: "unitário", evid: "2 testes reproduziram a falha; 'Doses de hoje' conferido no navegador" },
+    { id: "GLYX-09", ordem: 5, lote: 1, bloco: "B2", cat: "funcionalidade", prio: "P0", escopo: "observado", mods: ["M2"], titulo: "Declarar a cadência no cadastro do medicamento", st: "implementada_local", val: "validada_teste_local", deps: ["GLYX-07"], decisoes: ["D1"], crit: ["cadência incompleta recusada com frase", "item novo com horário nasce diária"], metodo: "unitário + navegador", evid: "parser testado; formulário no navegador: semanal sem dia recusado, banco inalterado" },
+    { id: "GLYX-10", ordem: 6, lote: 1, sql: true, bloco: "B2", cat: "correção", prio: "P1", escopo: "observado", mods: ["M2"], titulo: "Filhos de medications só com medicamento do mesmo dono", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: [], crit: ["B não cria adiamento ou registro com remédio de A"], metodo: "estático local + SQL em teste", evid: "3 cenários SQL; com as policies antigas o teste falha (controle negativo)" },
+    { id: "GLYX-11", ordem: 7, lote: 1, bloco: "B2", cat: "correção", prio: "P1", escopo: "observado", mods: ["M2"], titulo: "Registro de dose idempotente", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: ["A3", "D14", "D15", "A4"], crit: ["reenvio da mesma ação (pedido) não cria tomada", "tomada já existente na dose gera pergunta explícita, nunca descarte silencioso", "correção preserva o valor anterior", "índice de dose única só para registros criados após o corte"], metodo: "banco falso + funções puras (local) e PostgreSQL 14 isolado no WSL com Auth simulado", evid: "15/10: F1–F8 pelo navegador com PostgreSQL 17.6, PostgREST e Auth reais (A4: 22/23); nova execução após P48: histórico completo e gráfico 14/14; 50 verificações em PG 14 isolado; 1263 testes locais. Pendente: produção, celular e push real" },
+    { id: "GLYX-12", ordem: 8, lote: 1, sql: true, bloco: "B2", cat: "correção", prio: "P1", escopo: "observado", mods: ["M11", "M2"], titulo: "Despacho de alarme com estado, reenvio e observabilidade", st: "implementada_local", val: "validada_teste_local", deps: ["GLYX-07"], decisoes: [], crit: ["reivindicação atômica", "reenvio até 3x em 30 min", "confirmação por item", "tag por dose"], metodo: "unitário + SQL em teste + navegador", evid: "despacho → push simulado; 503 → falhou após 3; 410 → assinatura apagada; SW no Chromium. Push real e aparelho pendentes" },
+    { id: "GLYX-13", ordem: 36, lote: 7, bloco: "B7", cat: "funcionalidade", prio: "P2", escopo: "sugerido", mods: ["M2"], titulo: "Relatório de sobreposição sem chamador em produção", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["D10"], crit: ["decidir se entra em tela; se sim, ligar com a cadência real"], metodo: "—", evid: "" },
+    { id: "GLYX-14", ordem: 37, lote: 7, bloco: "B7", cat: "correção", prio: "P2", escopo: "sugerido", mods: ["M2"], titulo: "Estoque considerando a cadência", st: "nao_iniciada", val: "nao_validada", deps: ["GLYX-09"], decisoes: [], crit: ["semanal não avisa reposição 7× cedo"], metodo: "unitário + SQL", evid: "" },
+    { id: "GLYX-15", ordem: 9, lote: 1, bloco: "B3", cat: "correção", prio: "P1", escopo: "observado", mods: ["M13"], titulo: "Inventário LGPD derivado do schema", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: [], crit: ["teste derivado do schema reprova tabela nova fora do inventário"], metodo: "unitário + exclusão em conta de teste", evid: "exportar e apagar pela tela (2500 leituras sintéticas); sobra 1 linha de ai_usage (D4)" },
+    { id: "GLYX-16", ordem: 10, lote: 1, bloco: "B3", cat: "correção", prio: "P1", escopo: "observado", mods: ["M13", "M8", "M9"], titulo: "Paginação com aviso de resultado parcial", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: [], crit: ["testes com mais de 1000 registros", "parcial declarado, nunca silencioso"], metodo: "unitário", evid: "unitário com 2500; exportação pela tela completa com 2500 leituras" },
+    { id: "GLYX-17", ordem: 30, lote: 6, bloco: "B3", cat: "documentação", prio: "P1", escopo: "observado", mods: ["M13", "M4"], titulo: "Política, DPIA e processamento automático consistentes", st: "em_andamento", val: "nao_validada", deps: [], decisoes: ["D5", "D6", "D13"], crit: ["divergência registrada", "correção depois das decisões"], metodo: "revisão", evid: "docs/DPIA.md §11" },
+    { id: "GLYX-18", ordem: 31, lote: 6, bloco: "B7", cat: "correção", prio: "P2", escopo: "sugerido", mods: ["M13"], titulo: "Admin sem leitura de colunas clínicas de outros perfis", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["admin não lê colunas clínicas via PostgREST"], metodo: "SQL em teste", evid: "" },
+    { id: "GLYX-19", ordem: 24, lote: 5, bloco: "B6", cat: "correção", prio: "P2", escopo: "observado", mods: ["M1"], titulo: "Ingestão de CGM sem perda silenciosa", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["mesmo CSV importado duas vezes mantém a contagem"], metodo: "unitário", evid: "" },
+    { id: "GLYX-20", ordem: 25, lote: 5, bloco: "B6", cat: "correção", prio: "P2", escopo: "observado", mods: ["M5"], titulo: "Reextração de valores de exame atômica", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["insert falhando preserva os valores antigos"], metodo: "unitário", evid: "" },
+    { id: "GLYX-21", ordem: 26, lote: 5, bloco: "B6", cat: "correção", prio: "P2", escopo: "observado", mods: ["M10"], titulo: "/api/health/ingest sem mock e com limites", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["source 'mock' devolve 400"], metodo: "unitário", evid: "" },
+    { id: "GLYX-22", ordem: 32, lote: 6, bloco: "B7", cat: "funcionalidade", prio: "P2", escopo: "sugerido", mods: ["M5"], titulo: "Revisão humana antes de gravar exame lido por foto", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["D11"], crit: ["confirmação antes do insert"], metodo: "navegador", evid: "" },
+    { id: "GLYX-23", ordem: 11, lote: 1, sql: true, bloco: "B4", cat: "correção", prio: "P1", escopo: "observado", mods: ["M12"], titulo: "Conta desativada barrada em todas as camadas", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: [], crit: ["middleware falha fechado", "policy restritiva em toda tabela com user_id e no Storage", "banimento no Auth"], metodo: "unitário + estático + SQL + E2E", evid: "token existente, Storage, refresh e login barrados; controle negativo; aviso do admin (P37) corrigido" },
+    { id: "GLYX-24", ordem: 12, lote: 1, sql: true, bloco: "B4", cat: "correção", prio: "P1", escopo: "observado", mods: ["M12"], titulo: "ai_usage protegida, com cota atômica", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: ["D4"], crit: ["usuário só lê ai_usage", "cota com trava por usuário", "exclusão mantém 24 h"], metodo: "unitário + SQL em teste", evid: "concorrência 5/20 (antigo 20/20); usuário não apaga; recuo com banco antigo; D4 não aprovada" },
+    { id: "GLYX-25", ordem: 13, lote: 1, bloco: "B4", cat: "correção", prio: "P2", escopo: "observado", mods: ["M12", "M4"], titulo: "Custo de IA do cron registrado", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: ["A3"], crit: ["registros meal_suggest voltam a aparecer"], metodo: "rota com IA simulada; efeito antigo em produção: consulta (A3)", evid: "custo registrado (+1 meal_suggest) com IA simulada" },
+    { id: "GLYX-26", ordem: 14, lote: 1, bloco: "B4", cat: "correção", prio: "P1", escopo: "observado", mods: ["M9"], titulo: "Payload do chat validado e stream interrompido sinalizado", st: "implementada_local", val: "validada_teste_local", deps: [], decisoes: [], crit: ["role 'system' devolve 400", "JSON inválido devolve 400", "queda do stream gera aviso"], metodo: "unitário", evid: "8 testes; system 400; queda do stream termina com aviso (IA simulada); P38 aberto" },
+    { id: "GLYX-27", ordem: 22, lote: 5, bloco: "B6", cat: "correção", prio: "P1", escopo: "observado", mods: ["M3", "M4", "M9"], titulo: "Robustez das respostas da IA e da checagem de segurança", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["faixas e 502", "erro da base lança", "checagem sempre no rótulo", "filtro de linguagem em execução", "glicemia paginada nas rotas de IA restantes"], metodo: "unitário", evid: "" },
+    { id: "GLYX-28", ordem: 23, lote: 5, bloco: "B6", cat: "correção", prio: "P1", escopo: "observado", mods: ["M2"], titulo: "Calculadora de bolus mostra a idade da leitura", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["leitura antiga não pré-preenchida", "fórmula e teto inalterados"], metodo: "unitário + navegador", evid: "" },
+    { id: "GLYX-29", ordem: 33, lote: 6, bloco: "B7", cat: "operação", prio: "P1", escopo: "confirmado", mods: ["M2", "M3", "M6"], titulo: "Decisões clínicas pendentes", st: "bloqueada", val: "nao_validada", deps: [], decisoes: ["D7"], crit: ["decisões registradas por escrito antes de virar código"], metodo: "—", evid: "" },
+    { id: "GLYX-30", ordem: 45, lote: 8, bloco: "B6", cat: "correção", prio: "P3", escopo: "sugerido", mods: ["M12"], titulo: "Convite de uso único com limite de tentativas", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["tentativas repetidas recebem 429"], metodo: "unitário", evid: "" },
+    { id: "GLYX-31", ordem: 28, lote: 5, bloco: "B6", cat: "correção", prio: "P2", escopo: "sugerido", mods: ["M11"], titulo: "Endpoint de push só para hosts conhecidos", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["host desconhecido devolve 400"], metodo: "unitário", evid: "" },
+    { id: "GLYX-32", ordem: 27, lote: 5, bloco: "B6", cat: "correção", prio: "P3", escopo: "sugerido", mods: ["M14"], titulo: "Erros genéricos ao cliente", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["nenhuma mensagem de banco na resposta"], metodo: "unitário", evid: "" },
+    { id: "GLYX-33", ordem: 34, lote: 6, bloco: "B7", cat: "operação", prio: "P3", escopo: "sugerido", mods: ["M12"], titulo: "Lista de e-mails do login social no Supabase", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["A3"], crit: ["disable_signup verdadeiro conferido", "recuperação de senha de quem entrou por convite não é barrada"], metodo: "painel do Supabase + teste da rota de callback", evid: "" },
+    { id: "GLYX-34", ordem: 35, lote: 6, bloco: "B5", cat: "operação", prio: "P1", escopo: "observado", mods: ["M14"], titulo: "Confirmar troca dos segredos antigos de cron", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["A3"], crit: ["valor antigo devolve 401"], metodo: "produção", evid: "" },
+    { id: "GLYX-35", ordem: 29, lote: 5, bloco: "B6", cat: "correção", prio: "P2", escopo: "sugerido", mods: ["M14"], titulo: "Sentry com filtro de payload e captura de erro de tela", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["erro forçado sem corpo da requisição"], metodo: "unitário", evid: "" },
+    { id: "GLYX-36", ordem: 41, lote: 8, bloco: "B5", cat: "operação", prio: "P2", escopo: "observado", mods: ["M15"], titulo: "Tipos gerados atualizados", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["A3"], crit: ["tsc verde após types:gen", "acréscimo manual em types/database.ts removido"], metodo: "execução", evid: "" },
+    { id: "GLYX-37", ordem: 38, lote: 7, bloco: "B7", cat: "funcionalidade", prio: "P2", escopo: "observado", mods: ["M8"], titulo: "Tela do marcador de evento", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["grava em health_events e mostra antes/depois"], metodo: "navegador", evid: "" },
+    { id: "GLYX-38", ordem: 18, lote: 2, bloco: "B5", cat: "teste", prio: "P2", escopo: "observado", mods: ["M14"], titulo: "Active scan em ambiente isolado", st: "nao_iniciada", val: "nao_validada", deps: ["GLYX-03"], decisoes: [], crit: ["scan sem dado real"], metodo: "ZAP", evid: "" },
+    { id: "GLYX-39", ordem: 21, lote: 4, bloco: "B5", cat: "operação", prio: "P0", escopo: "observado", mods: ["M2", "M11", "M12", "M13"], titulo: "Aplicar em produção as migrations do lote 1", st: "bloqueada", val: "nao_validada", deps: ["GLYX-03", "GLYX-07", "GLYX-10", "GLYX-11", "GLYX-12", "GLYX-23", "GLYX-24", "GLYX-45"], decisoes: ["D1", "D2", "D3", "D4", "A2", "A3", "D14"], crit: ["código implantado ANTES das migrations (ensaiado)", "conferências do plano §4", "reversão pronta (supabase/reversao/, ensaiada)", "D1–D4 decididas"], metodo: "produção", evid: "" },
+    { id: "GLYX-40", ordem: 42, lote: 8, bloco: "B5", cat: "operação", prio: "P3", escopo: "observado", mods: [], titulo: "Pasta PDF/ fora do caminho do git add", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["D12"], crit: ["PDF/ ignorada ou movida para _local/"], metodo: "git status", evid: "" },
+    { id: "GLYX-41", ordem: 39, lote: 7, bloco: "B7", cat: "funcionalidade", prio: "P3", escopo: "sugerido", mods: ["M6"], titulo: "Pontos do briefing de hipertrofia", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["D9"], crit: ["decisão registrada"], metodo: "—", evid: "" },
+    { id: "GLYX-42", ordem: 40, lote: 7, bloco: "B7", cat: "operação", prio: "P3", escopo: "observado", mods: ["M1", "M10"], titulo: "Dexcom e Google Fit", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: ["D8"], crit: ["decisão registrada"], metodo: "—", evid: "" },
+    { id: "GLYX-43", ordem: 43, lote: 8, bloco: "B7", cat: "funcionalidade", prio: "P3", escopo: "sugerido", mods: [], titulo: "Cores cruas contra os tokens (melhoria opcional)", st: "nao_iniciada", val: "nao_validada", deps: [], decisoes: [], crit: ["sem mudança de comportamento"], metodo: "lint + visual", evid: "2109 ocorrências medidas em 14/10" },
+    { id: "GLYX-45", ordem: 19, lote: 4, bloco: "B5", cat: "operação", prio: "P1", escopo: "observado", mods: ["M14"], titulo: "Fechar os incidentes do ambiente de 14/10", st: "em_andamento", val: "nao_validada", deps: [], decisoes: ["I1", "I2"], crit: ["decisão registrada sobre a troca da chave", "conferência dos efeitos externos dos outros projetos registrada"], metodo: "registro em docs/INCIDENTES-AMBIENTE-14-10-2026.md", evid: "linha do tempo reconstruída; chave ausente em 1.683 arquivos; migrations do LX_MED e RADAR sem cron externo" },
+    { id: "GLYX-46", ordem: 20, lote: 2, bloco: "B5", cat: "operação", prio: "P1", escopo: "confirmado", mods: ["M15", "M14"], titulo: "Guarda de destino nos testes do repositório", st: "implementada_local", val: "validada_local", deps: [], decisoes: [], crit: ["teste de servidor, E2E e build de verificação sem .env.local na pasta", "teste interrompido quando um destino não está na lista permitida", "trava no app em modo teste"], metodo: "testes da própria guarda + suíte inteira com ela ativa", evid: "lib/testes/guarda-destino.ts + Vitest (rede bloqueada) + Playwright + CI em porta morta; 10 testes da guarda, 1187 unitários, E2E 9/9 com ambiente falso; CI não executado" },
+    { id: "GLYX-44", ordem: 44, lote: 8, bloco: "B6", cat: "correção", prio: "P2", escopo: "observado", mods: ["M5", "M8", "M9"], titulo: "Referência entre contas em outras tabelas filhas", st: "nao_iniciada", val: "nao_validada", deps: ["GLYX-03"], decisoes: [], crit: ["exam_values, health_events e ai_messages exigem pai próprio"], metodo: "SQL em teste", evid: "" }
+  ],
+
+  // Responsável: confirmado só quando registrado; senão "a definir" (com sugestão).
+  decisoes: [
+    { id: "D1", texto: "Frequência não escolhida pela pessoa: o que vale?", resp: "Rivas", impacto: "aprovada em 15/10: frequência obrigatória e explícita em cadastro novo; os 12 antigos mantêm o alarme e aparecem como \"frequência a confirmar\" (coluna cadence_confirmed_at, sem preenchimento automático); confirmar é ação explícita; nada muda horário ou frequência dos antigos. Implementada e validada no navegador (PG 17)", prazo: "aprovada; implementada (local)" },
+    { id: "D2", texto: "Intervalo antes da data de início não dispara?", resp: "Rivas", impacto: "aprovada em 15/10: conta da data de início escolhida, não dispara antes dela; aviso quando o início está no futuro. Implementada e validada no navegador", prazo: "aprovada; implementada (local)" },
+    { id: "D3", texto: "Item 'livre' com horário cadastrado recebe alarme?", resp: "Rivas", impacto: "aprovada em 15/10: não recebe alarme implícito; é configuração inconsistente (mostrada na tela); ativar exige escolher frequência e programação no mesmo envio; nenhuma tela nova de \"uso livre\". Implementada e validada no navegador", prazo: "aprovada; implementada (local)" },
+    { id: "D4", texto: "Ao 'apagar meus dados', o que fica do registro técnico de uso de IA?", resp: "Rivas", impacto: "aprovada em 15/10: nada — a exclusão apaga todo o uso de IA da pessoa (pelo servidor, só na exclusão completa); a cota por hora reinicia (testado). Sem retenção, sem cron. Conflito informado: não existe teto global de gasto que bloqueie chamadas — só o medidor do admin, que depende dos registros apagados (P52)", prazo: "aprovada; implementada (local)" },
+    { id: "D5", texto: "Cron de sugestão: retirar dado clínico, pedir opt-in, ou manter e declarar", resp: "a definir", sugerido: "Rivas", impacto: "Fecha a divergência entre DPIA e código (P06).", prazo: "não definido" },
+    { id: "D6", texto: "Provedor de IA, país de processamento e base legal na política", resp: "a definir", sugerido: "Rivas com assessoria jurídica", impacto: "Texto da política; nada inventado sem confirmação.", prazo: "não definido" },
+    { id: "D7", texto: "Teto do bolus, curadoria de substâncias e score composto", resp: "a definir", sugerido: "Rivas com profissional de saúde", impacto: "Decisão clínica; nenhuma fórmula ou dose muda sem ela.", prazo: "não definido" },
+    { id: "D8", texto: "Dexcom e Google Fit continuam no escopo?", resp: "a definir", sugerido: "Rivas", impacto: "Muda o denominador de M1 e M10.", prazo: "não definido" },
+    { id: "D9", texto: "Pontos do briefing de hipertrofia contam como escopo?", resp: "a definir", sugerido: "Rivas", impacto: "Se não, M6 sobe para 90%.", prazo: "não definido" },
+    { id: "D10", texto: "O relatório de sobreposição de mecanismos entra em tela?", resp: "a definir", sugerido: "Rivas", impacto: "Funcionalidade nova sobre código já escrito e sem uso (P35).", prazo: "não definido" },
+    { id: "D11", texto: "Exame lido por foto passa a exigir revisão antes de gravar?", resp: "a definir", sugerido: "Rivas", impacto: "Muda o fluxo de cadastro de exame (P29).", prazo: "não definido" },
+    { id: "D12", texto: "Pasta PDF/ vai para o .gitignore ou para _local/?", resp: "a definir", sugerido: "Rivas", impacto: "Evita que o painel impresso entre num git add.", prazo: "não definido" },
+    { id: "D13", texto: "Desligar o envio automático de sugestão (cron glyx-meal-suggest) até decidir D5?", resp: "a definir", sugerido: "Rivas", impacto: "Recomendado: sim, desagendando o cron (reversível). Exige escrita em produção e aviso a quem usa (docs/P06-ENVIO-AUTOMATICO-IA.md).", prazo: "não definido" },
+    { id: "D14", texto: "O que fazer com as 22 doses duplicadas (11 grupos, 08/09 a 03/10) que impedem o índice de dose única?", resp: "Rivas", impacto: "Direção B escolhida em 15/10: preservar o histórico e proteger daqui para frente. Não autoriza implantação nem exclusão. Data de corte ainda não definida (definida na implantação).", prazo: "direção definida; corte não definido" },
+    { id: "D15", texto: "Registrar no histórico de correção QUEM corrigiu (auth.uid() e papel)?", resp: "Rivas", impacto: "Autorizada e implementada em 15/10: autor da identidade validada pelo PostgREST; nulo sem usuário autenticado; validada em PostgreSQL isolado (50 verificações).", prazo: "implementada (local)" },
+    { id: "D16", texto: "Relatório médico e histórico completo devem deixar de contar Pulei hoje como tomada (P46)?", resp: "Rivas", impacto: "Autorizada e implementada em 15/10 em 9 consumidores; fórmula da adesão inalterada; 14 resultados esperados explícitos.", prazo: "implementada (local)" },
+    { id: "A4", texto: "Ambiente isolado de integração: Docker Engine próprio + CLI Supabase Linux na Ubuntu-22.04 do WSL", resp: "Rivas", impacto: "Autorizada e executada em 15/10: isolamento comprovado; F1–F8 com PostgreSQL 17, PostgREST e Auth reais — 22/23 OK; ambiente desmontado.", prazo: "executada" },
+    { id: "I1", texto: "Trocar a chave de serviço de produção depois do incidente de 14/10?", resp: "a definir", sugerido: "Rivas", impacto: "Risco residual baixo (só componentes locais, já destruídos). Trocar dá certeza total; é ação em produção.", prazo: "não definido" },
+    { id: "I2", texto: "Conferir efeitos externos dos contêineres de outros projetos ligados por ≈1 min?", resp: "a definir", sugerido: "Rivas", impacto: "Conferência por WhatsApp, e-mail e serviços do n8n, sem ligar nada; ler o histórico interno exige ligar o Docker (nova autorização).", prazo: "não definido" },
+    { id: "A1", texto: "Autorizar a criação de Supabase de teste (local com Docker ou projeto separado)", resp: "Rivas", impacto: "Concedida em 14/10 para Supabase local descartável (usado). Falta ambiente persistente para o CI.", prazo: "não definido" },
+    { id: "A2", texto: "Autorizar a aplicação das migrations em produção (frase explícita)", resp: "Rivas", impacto: "Leva o lote 1 ao ar. NÃO autorizada em 15/10.", prazo: "não definido" },
+    { id: "A3", texto: "Autorizar leituras em produção (definição das funções, contagens, duplicatas)", resp: "Rivas", impacto: "Executada em 15/10, somente leitura e agregada: histórico explicado (P44; nomes iguais não provam conteúdo igual), função de alarme igual à da reversão, schema compatível para as dependências do lote 1 (não o schema inteiro), 11 grupos de doses duplicadas (D14), sugestão automática ativa.", prazo: "executada" },
+  ],
+
+  lotes: [
+    { n: 1, nome: "Lote 1 — executado em 14/10", dep: "—" },
+    { n: 5, nome: "Lote 5 — PRÓXIMO executável sem nova autorização", dep: "nenhuma (tudo local)", atual: true },
+    { n: 2, nome: "Lote 2 — ambiente de teste (local descartável feito em 14/10; CI pendente)", dep: "A1 para ambiente persistente" },
+    { n: 3, nome: "Lote 3 — testes SQL do lote 1 (executados em 14/10)", dep: "—", sql: true },
+    { n: 4, nome: "Lote 4 — produção do lote 1", dep: "D1–D4, D14 (duplicatas), GLYX-45 e A2 (A2 não autorizada; A3 executada em 15/10)" },
+    { n: 6, nome: "Lote 6 — privacidade e decisões", dep: "D5, D6, D7, D11; GLYX-34 precisa de A3" },
+    { n: 7, nome: "Lote 7 — produto", dep: "D8, D9, D10" },
+    { n: 8, nome: "Lote 8 — manutenção", dep: "GLYX-36 precisa de A3" },
+    { n: 0, nome: "Contínuo", dep: "o Rivas executar o roteiro" }
+  ],
+
+  paralelo: [
+    "Lote 5 inteiro é local e independente do ambiente de teste.",
+    "No lote 5, GLYX-27 e GLYX-28 não conflitam com GLYX-19, 20 e 21 (arquivos distintos).",
+    "Ambiente persistente para o CI (GLYX-04) pode ser preparado em paralelo ao lote 5, se A1 for estendido.",
+    "Decisões (seção 2) andam em paralelo a tudo."
+  ],
+
+  premissas: [
+    "Escopo = README + ROADMAP (entregue e P1) + roteiro §1–§6; o que o ROADMAP declara fora fica fora (rascunho em docs/PRD.md).",
+    "Os pontos do briefing de hipertrofia contam como escopo (D9).",
+    "Dexcom e Google Fit contam no escopo atual (D8).",
+    "Pesos: 3 risco clínico/legal, 2 núcleo diário, 1 complementar.",
+    "Critérios de aceitação = ROADMAP + roteiro enquanto o PRD não for aprovado."
+  ],
+
+  validacao: {
+    roadmap: { aprovados: 2, total: 6 },
+    roteiro: { aprovados: 1, total: 48 },
+    nota: "ROADMAP e roteiro se sobrepõem (exportação/exclusão e sensor) e quatro critérios do ROADMAP são as mesmas coisas que entregas: não são somados.",
+    producaoNestaExecucao: 0
+  },
+
+  cobertura: [
+    "Lido: configuração, CI, middleware, as 41 rotas de API, cerca de 50 das 72 migrations anteriores e todo arquivo alterado nesta sessão.",
+    "Alterado nesta sessão: 32 arquivos existentes, 4 migrations novas, 4 testes SQL, documentos em docs/ (lista em docs/lista-implementacao-glyx.md).",
+    "Não lido: maior parte dos componentes de tela, lib/reports/full-history.ts, lib/safety/interaction-check.ts.",
+    "Acessado em 14/10: só o Supabase local descartável, com usuários sintéticos.",
+    "Não acessado: banco de produção, Vault de produção, Vercel, painel do Supabase."
+  ]
+};
+
+/* =====================================================================
+   LÓGICA — tudo abaixo deriva de DADOS.
+   ===================================================================== */
+(function () {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const num = (v, c) => v.toFixed(c).replace(".", ",");
+  const pct = (v) => (v == null ? "não calculado" : num(v * 100, 1) + "%");
+  const dataBR = (iso) => iso.split("-").reverse().join("/");
+
+  const MOD = Object.fromEntries(DADOS.modulos.map((m) => [m.id, m]));
+  const TAR = Object.fromEntries(DADOS.tarefas.map((t) => [t.id, t]));
+  const DEC = Object.fromEntries(DADOS.decisoes.map((d) => [d.id, d]));
+  const GRAV = { alto: "Alto", medio: "Médio", baixo: "Baixo" };
+  const ORDEM_GRAV = ["alto", "medio", "baixo"];
+  const CORR = { corrigido_teste_local: "Corrigido e validado em teste local (não implantado)", corrigido_local: "Corrigido local (não implantado)", aberto: "Aberto", registrado: "Registrado; aguarda decisão" };
+  const CLASSE = { tarefa: "tarefa", aguardando_decisao: "aguardando decisão", adiado: "adiado", fora_escopo: "fora do escopo" };
+
+  /* ---------- Vínculos derivados ---------- */
+  const problemasDaTarefa = (id) => DADOS.problemas.filter((p) => p.tarefa === id);
+  const problemasDoModulo = (id) => DADOS.problemas.filter((p) => p.mod === id);
+  const modulosDaTarefa = (t) => [...new Set(t.mods.concat(problemasDaTarefa(t.id).map((p) => p.mod)))];
+  const tarefasDoModulo = (id) => DADOS.tarefas.filter((t) => modulosDaTarefa(t).includes(id)).sort((a, b) => a.ordem - b.ordem);
+  const tarefasBloqueadasPor = (dId) =>
+    DADOS.tarefas.filter((t) => t.decisoes.includes(dId) || DADOS.problemas.some((p) => p.tarefa === t.id && (p.decisoes || []).includes(dId)))
+      .sort((a, b) => a.ordem - b.ordem);
+  const tarefasDoLote = (l) => DADOS.tarefas.filter((t) => (l.sql ? t.sql : t.lote === l.n)).sort((a, b) => a.ordem - b.ordem);
+
+  const lnkT = (id) => (TAR[id] ? "<a class='idt' href='#t-" + id + "'>" + esc(id) + "</a>" : esc(id));
+  const lnkM = (id) => (MOD[id] ? "<a href='#mod-" + id + "'>" + esc(MOD[id].nome) + "</a>" : esc(id));
+  const lnkP = (id) => "<a class='idt' href='#p-" + id + "'>" + esc(id) + "</a>";
+  const lnkD = (id) => (DEC[id] ? "<a class='idt' href='#d-" + id + "'>" + esc(id) + "</a>" : esc(id));
+
+  /* ---------- Cálculo ---------- */
+  function pontos(status, e) {
+    if (status === "nao_verificado") return null;
+    if (status === "bloqueado") return typeof e.pontos === "number" ? e.pontos : 0;
+    return DADOS.pontos[status];
+  }
+  function calc(m, qual) {
+    const st = (e) => (qual === "main" ? e.main || e.status : e.status);
+    const cont = m.entregas.filter((e) => pontos(st(e), e) != null);
+    if (!cont.length) return { pct: null, soma: 0, n: 0 };
+    const seg = { v: 0, i: 0, p: 0 };
+    let soma = 0;
+    cont.forEach((e) => {
+      const p = pontos(st(e), e); soma += p;
+      if (st(e) === "validado") seg.v += 1; else if (st(e) === "implementado") seg.i += 0.9; else seg.p += p;
+    });
+    return { pct: soma / cont.length, soma, n: cont.length, seg: { v: seg.v / cont.length, i: seg.i / cont.length, p: seg.p / cont.length } };
+  }
+  const CL = Object.fromEntries(DADOS.modulos.map((m) => [m.id, calc(m, "local")]));
+  const CM = Object.fromEntries(DADOS.modulos.map((m) => [m.id, calc(m, "main")]));
+  function geral(C) {
+    let n = 0, d = 0;
+    DADOS.modulos.forEach((m) => { if (C[m.id].pct != null) { n += C[m.id].pct * m.peso; d += m.peso; } });
+    return { v: d ? n / d : null, n, d };
+  }
+  const GL = geral(CL), GM = geral(CM);
+  const TODAS = DADOS.modulos.flatMap((m) => m.entregas.map((e) => ({ ...e, mod: m.id })));
+  const conta = (f) => TODAS.filter(f).length;
+  const K = {
+    total: TODAS.length,
+    nv: TODAS.filter((e) => e.status === "nao_verificado"),
+    validadas: TODAS.filter((e) => e.status === "validado"),
+    locais: TODAS.filter((e) => e.validadaLocal),
+    integradas: TODAS.filter((e) => e.testeIntegrado),
+    implementado: conta((e) => e.status === "implementado"),
+    em: conta((e) => e.status === "em_implementacao"),
+    bloq: conta((e) => e.status === "bloqueado"),
+    ni: conta((e) => e.status === "nao_iniciado")
+  };
+  K.contadas = K.total - K.nv.length;
+
+  /* ---------- Componentes ---------- */
+  const CHIP = {
+    validado: "c-ok", implementado: "c-info", em_implementacao: "c-warn", bloqueado: "c-block", nao_iniciado: "c-bad", nao_verificado: "c-none",
+    concluida: "c-ok", implementada_local: "c-info", em_andamento: "c-warn", nao_iniciada: "c-bad", bloqueada: "c-block",
+    validada_teste_local: "c-info", validada_local: "c-ok", parcial_local: "c-warn", nao_validada: "c-none", validada_producao: "c-ok",
+    alto: "c-bad", medio: "c-warn", baixo: "c-info", corrigido_local: "c-info", corrigido_teste_local: "c-info", aberto: "c-bad", registrado: "c-warn",
+    P0: "c-bad", P1: "c-warn", P2: "c-info", P3: "c-none",
+    tarefa: "c-info", aguardando_decisao: "c-warn", adiado: "c-none", fora_escopo: "c-none"
+  };
+  const chip = (k, txt) => '<span class="chip ' + (CHIP[k] || "c-none") + '">' + esc(txt) + "</span>";
+  const ul = (arr) => (arr.length ? "<ul class='lista'>" + arr.map((x) => "<li>" + x + "</li>").join("") + "</ul>" : "<span class='vazio'>—</span>");
+  const trilhos = (id) => {
+    const c = CL[id], cm = CM[id];
+    const s = c.seg ? "<i class='seg-validado' style='width:" + c.seg.v * 100 + "%'></i><i class='seg-implementado' style='width:" + c.seg.i * 100 + "%'></i><i class='seg-parcial' style='width:" + c.seg.p * 100 + "%'></i>" : "";
+    return "<div class='trilhos'><div class='trilho main'><i class='seg-main' style='width:" + (cm.pct || 0) * 100 + "%'></i></div>" +
+      "<div class='trilho' role='progressbar' aria-valuemin='0' aria-valuemax='100' aria-valuenow='" + Math.round((c.pct || 0) * 100) + "'>" + s + "</div></div>";
+  };
+
+  /* ---------- Filtros ---------- */
+  const filtro = () => ({ busca: $("#f-busca").value.trim().toLowerCase(), bloco: $("#f-bloco").value, prio: $("#f-prio").value, st: $("#f-status").value, grav: $("#f-grav").value });
+  const tarefaPassa = (t, f) => {
+    if (f.bloco && t.bloco !== f.bloco) return false;
+    if (f.prio && t.prio !== f.prio) return false;
+    if (f.st && t.st !== f.st) return false;
+    if (f.grav && !problemasDaTarefa(t.id).some((p) => p.grav === f.grav)) return false;
+    if (f.busca && ![t.id, t.titulo, t.cat, t.evid].concat(t.deps, t.decisoes, t.crit, modulosDaTarefa(t).map((m) => MOD[m].nome)).join(" ").toLowerCase().includes(f.busca)) return false;
+    return true;
+  };
+  const moduloPassa = (m, f) => {
+    if (f.grav && !problemasDoModulo(m.id).some((p) => p.grav === f.grav)) return false;
+    if (f.busca && ![m.id, m.nome, m.objetivo].concat(m.entregas.map((e) => e.nome), problemasDoModulo(m.id).map((p) => p.id + " " + p.titulo), tarefasDoModulo(m.id).map((t) => t.id)).join(" ").toLowerCase().includes(f.busca)) return false;
+    return true;
+  };
+  const problemaPassa = (p, f) => {
+    if (f.grav && p.grav !== f.grav) return false;
+    if (f.busca && ![p.id, p.titulo, p.tarefa, MOD[p.mod].nome, p.justificativa || ""].join(" ").toLowerCase().includes(f.busca)) return false;
+    return true;
+  };
+
+  /* ---------- 0. Topo ---------- */
+  function renderTopo() {
+    const d = dataBR(DADOS.meta.dataAnalise);
+    $("#sub-topo").textContent = "Revisão de " + d + " · main " + DADOS.meta.commitMain + " · " + DADOS.meta.estadoLocal;
+    $("#aviso").innerHTML =
+      "<p><strong>Painel provisório baseado em leitura do código, registros históricos, validação local unitária e validação local integrada de " + esc(DADOS.meta.validacaoIntegrada.data) + ". Revisado em " + esc(d) + ". Os percentuais não representam prontidão para produção.</strong></p>" +
+      "<p><strong>Executado nesta análise</strong> (" + esc(DADOS.meta.comoExecutado) + "): " + esc(DADOS.meta.executado.join("; ")) + ".</p>" +
+      "<p><strong>Validação integrada de " + esc(DADOS.meta.validacaoIntegrada.data) + "</strong> (" + esc(DADOS.meta.validacaoIntegrada.ambiente) + "): " + esc(DADOS.meta.validacaoIntegrada.executado.join("; ")) + ". <strong>Não aprova a integração com serviços reais.</strong></p>" +
+      "<p><strong>Não executado:</strong> " + esc(DADOS.meta.naoExecutado.join("; ")) + ". As " + DADOS.meta.migrationsNaoAplicadas + " migrations novas <strong>não foram aplicadas em produção</strong> (só no banco local descartável).</p>" +
+      "<p class='fraco'>Atualizado por revisão: este painel não lê nem monitora o repositório. Para atualizar, peça uma nova revisão; só o objeto DADOS muda.</p>";
+    $("#rodape").textContent = "Revisão de " + d + ". Mantido consistente com docs/lista-implementacao-glyx.md.";
+  }
+
+  /* ---------- 1. Resumo e riscos ---------- */
+  function renderResumo(f) {
+    const v = DADOS.validacao;
+    const abertos = DADOS.problemas.filter((p) => !p.correcao.startsWith("corrigido")).length;
+    const decPend = DADOS.decisoes.length;
+    $("#cards").innerHTML = [
+      '<div class="card-k"><div class="rot">Implementação estimada</div><div class="val">' + pct(GL.v) + " <small>local</small></div><ul>" +
+        "<li>main " + esc(DADOS.meta.commitMain) + ": <strong>" + pct(GM.v) + "</strong></li>" +
+        "<li>" + K.total + " entregas · " + K.contadas + " no cálculo · " + K.nv.length + " não verificadas</li>" +
+        "<li>" + K.implementado + " implementadas <strong>sem validação de uso real</strong> — " + conta((e) => e.status === "implementado" && (e.validadaLocal || e.testeIntegrado)) + " delas com validação local</li><li>provisório; não é prontidão</li></ul></div>",
+      '<div class="card-k"><div class="rot">Validação</div><div class="val">' + K.integradas.length + " <small>local integrada</small></div><ul>" +
+        "<li>Validada localmente — unitária: " + K.locais.length + " entregas</li>" +
+        "<li>Validada localmente — integrada: " + K.integradas.length + " entregas (" + conta((e) => e.simulado) + " com IA ou push <strong>simulados</strong>)</li>" +
+        "<li>Uso real (histórica): " + K.validadas.length + " entregas</li>" +
+        "<li>ROADMAP " + v.roadmap.aprovados + "/" + v.roadmap.total + " · roteiro " + v.roteiro.aprovados + "/" + v.roteiro.total + " (não somados)</li>" +
+        "<li class='zero'>Validada em produção: " + v.producaoNestaExecucao + "</li></ul></div>",
+      '<div class="card-k"><div class="rot">Pendências</div><div class="val">' + (K.em + K.ni) + " <small>entregas</small></div><ul>" +
+        "<li>" + K.em + " em implementação · " + K.ni + " não iniciadas</li>" +
+        "<li>" + abertos + " de " + DADOS.problemas.length + " problemas sem correção</li>" +
+        "<li>" + DADOS.tarefas.filter((t) => t.st !== "concluida").length + " de " + DADOS.tarefas.length + " tarefas não concluídas</li></ul></div>",
+      '<div class="card-k"><div class="rot">Bloqueios</div><div class="val">' + K.bloq + " <small>entregas bloqueadas</small></div><ul>" +
+        "<li>" + decPend + " decisões e autorizações pendentes (<a href='#decisoes'>seção 2</a>)</li>" +
+        "<li>" + DADOS.tarefas.filter((t) => t.st === "bloqueada").length + " tarefas bloqueadas</li></ul></div>"
+    ].join("");
+
+    const altos = DADOS.problemas.filter((p) => p.grav === "alto");
+    const riscos = altos.map((p) => chip(p.correcao, CORR[p.correcao]) + " " + lnkP(p.id) + " " + esc(p.titulo) + " → " + lnkT(p.tarefa));
+    riscos.push(chip("bloqueada", "Produção") + " As " + DADOS.meta.migrationsNaoAplicadas + " migrations novas rodaram só no banco local descartável; produção não recebeu nenhuma, e implantar exige D1–D4, os incidentes fechados (GLYX-45), A3 e A2 — A2 não autorizada em 15/10 → " + lnkT("GLYX-39"));
+    riscos.push(chip("aberto", "Ordem") + " Código antigo com banco novo bloqueia a IA de todos e reenvia alarmes (ensaiado): código primeiro, e na reversão banco primeiro → " + lnkT("GLYX-39"));
+    riscos.push(chip("aberto", "Validação") + " Validação em produção nesta execução: " + v.producaoNestaExecucao + "; validação histórica cobre " + K.validadas.length + " de " + K.contadas + " entregas.");
+    (DADOS.incidentes || []).forEach((i) => riscos.push(chip("aberto", "Incidente") + " " + esc(i.titulo) + " — em aberto: " + esc(i.aberto) + " → " + lnkD(i.decisao) + ", " + lnkT(i.tarefa)));
+    $("#riscos").innerHTML = ul(riscos);
+
+    $("#barras").innerHTML = DADOS.modulos.filter((m) => moduloPassa(m, f)).map((m) =>
+      "<div class='linha-barra'><div><a href='#mod-" + m.id + "'>" + esc(m.nome) + "</a> <span class='fraco'>· peso " + m.peso + "</span></div>" + trilhos(m.id) +
+      "<div class='num'><b>" + pct(CL[m.id].pct) + "</b> · main " + pct(CM[m.id].pct) + "</div></div>"
+    ).join("") || "<p class='vazio'>Nenhum módulo corresponde aos filtros.</p>";
+  }
+
+  /* ---------- 2. Decisões ---------- */
+  function renderDecisoes(f) {
+    $("#tbody-dec").innerHTML = DADOS.decisoes.filter((d) => !f.busca || [d.id, d.texto, d.impacto].join(" ").toLowerCase().includes(f.busca)).map((d) => {
+      const bl = tarefasBloqueadasPor(d.id);
+      const resp = d.resp === "a definir" ? "a definir" + (d.sugerido ? "<br><span class='fraco'>sugerido: " + esc(d.sugerido) + "</span>" : "") : esc(d.resp);
+      return "<tr id='d-" + d.id + "'><td><strong>" + esc(d.id) + "</strong></td><td>" + esc(d.texto) + "</td><td>" + resp + "</td><td>" + esc(d.impacto) +
+        "</td><td>" + (bl.length ? bl.map((t) => lnkT(t.id)).join(", ") : "<span class='vazio'>—</span>") + "</td><td>" + esc(d.prazo) + "</td></tr>";
+    }).join("");
+    $("#premissas").innerHTML = "<ol class='lista'>" + DADOS.premissas.map((p) => "<li>" + esc(p) + "</li>").join("") + "</ol>";
+  }
+
+  /* ---------- 3. Lotes ---------- */
+  function renderLotes() {
+    $("#lista-lotes").innerHTML = DADOS.lotes.map((l) => {
+      const ts = tarefasDoLote(l);
+      const feito = l.n === 1 ? " · executado; validação parcial" : "";
+      return "<div class='lote" + (l.atual ? " atual" : "") + "'><h3>" + esc(l.nome) + "</h3>" +
+        (ts.length ? ts.map((t) => lnkT(t.id) + " " + esc(t.titulo)).join("<br>") : "<span class='vazio'>—</span>") +
+        "<p class='dep'>Depende de: " + esc(l.dep) + esc(feito) + "</p></div>";
+    }).join("");
+    $("#paralelo").innerHTML = ul(DADOS.paralelo.map(esc));
+  }
+
+  /* ---------- 4. Lista mestra ---------- */
+  function renderTarefas(f) {
+    const lista = DADOS.tarefas.slice().sort((a, b) => a.ordem - b.ordem).filter((t) => tarefaPassa(t, f));
+    $("#sub-lista").innerHTML = lista.length + " de " + DADOS.tarefas.length + " tarefas, em ordem de execução (separada do ID). A lista não amplia nenhuma autorização. <span class='so-tela'>Cada linha abre os critérios e a evidência.</span>";
+    $("#lista-tarefas").innerHTML = lista.map((t) => {
+      const probs = problemasDaTarefa(t.id);
+      return "<details class='tarefa' id='t-" + t.id + "'" + (f.busca ? " open" : "") + "><summary><span class='ordem'>" + t.ordem + "</span><span class='idt'>" + esc(t.id) + "</span>" +
+        "<span class='tit'>" + esc(t.titulo) + "</span>" + chip(t.prio, t.prio) + chip(t.st, DADOS.statusTarefa[t.st]) + chip(t.val, DADOS.statusValidacao[t.val]) + "</summary>" +
+        "<div class='corpo'><dl class='campos'>" +
+        "<dt>Bloco · categoria</dt><dd>" + esc(DADOS.blocos[t.bloco]) + " · " + esc(t.cat) + " · escopo " + esc(t.escopo) + " · " + (t.lote ? "lote " + t.lote : "contínuo") + "</dd>" +
+        "<dt>Módulos</dt><dd>" + (modulosDaTarefa(t).map(lnkM).join(", ") || "—") + "</dd>" +
+        "<dt>Problemas</dt><dd>" + (probs.map((p) => lnkP(p.id)).join(", ") || "—") + "</dd>" +
+        "<dt>Dependências</dt><dd>" + (t.deps.map(lnkT).join(", ") || "—") + "</dd>" +
+        "<dt>Decisões / autorizações</dt><dd>" + (t.decisoes.map(lnkD).join(", ") || "—") + "</dd>" +
+        "<dt>Critérios de aceitação</dt><dd>" + ul(t.crit.map(esc)) + "</dd>" +
+        "<dt>Método de validação</dt><dd>" + esc(t.metodo) + "</dd>" +
+        "<dt>Evidência</dt><dd>" + (t.evid ? esc(t.evid) : "—") + "</dd></dl></div></details>";
+    }).join("") || "<p class='vazio'>Nenhuma tarefa corresponde aos filtros.</p>";
+  }
+
+  /* ---------- 5. Cards dos módulos ---------- */
+  function renderModulos(f) {
+    $("#cards-modulos").innerHTML = DADOS.modulos.filter((m) => moduloPassa(m, f)).map((m) => {
+      const c = CL[m.id];
+      const linhas = m.entregas.map((e) => {
+        const p = pontos(e.status, e);
+        const antes = e.main && e.main !== e.status ? chip(e.main, "main: " + DADOS.statusEntrega[e.main]) + " → " : "";
+        return "<tr><td>" + esc(e.nome) + (e.corrigida ? " <span class='fraco'>(status corrigido nesta revisão)</span>" : "") + "</td><td>" + antes + chip(e.status, DADOS.statusEntrega[e.status]) +
+          (e.validadaLocal ? " " + chip("validada_local", "validada localmente — unitária") : "") + (e.testeIntegrado ? " " + chip("validada_teste_local", "validada localmente — integrada") : "") + (e.simulado ? " " + chip("parcial_local", e.simulado + " simulado") : "") + "</td><td>" + (p == null ? "fora" : num(p, 1)) + "</td><td><code>" + esc(e.evid) + "</code>" +
+          (e.fonte ? "<br><span class='fraco'>Validação histórica: " + esc(e.fonte) + "</span>" : "") + (e.motivoNV ? "<br><span class='fraco'>Não verificado: " + esc(e.motivoNV) + "</span>" : "") + "</td></tr>";
+      }).join("");
+      const probs = problemasDoModulo(m.id).map((p) => chip(p.grav, GRAV[p.grav]) + " " + chip(p.correcao, CORR[p.correcao]) + " " + lnkP(p.id) + " " + esc(p.titulo) + " → " + lnkT(p.tarefa));
+      const tarefas = tarefasDoModulo(m.id).map((t) => lnkT(t.id) + " " + esc(t.titulo) + " " + chip(t.st, DADOS.statusTarefa[t.st]));
+      const bloq = m.bloqueios.map((b) => (b.ref ? lnkD(b.ref) + " " : "") + esc(b.texto));
+      const prox = TAR[m.proxima];
+      return "<article class='modulo' id='mod-" + m.id + "'><header><h3>" + esc(m.nome) + "</h3><div class='num'><strong>" + pct(c.pct) + "</strong> local · " + pct(CM[m.id].pct) + " main</div>" + trilhos(m.id) + "</header>" +
+        "<p class='fraco'>" + esc(m.objetivo) + " Peso " + m.peso + " (" + esc(DADOS.pesos[m.peso]) + "). Execução local = " + num(c.soma, 1) + " ÷ " + c.n + " entregas contadas.</p>" +
+        "<table><thead><tr><th>Entrega</th><th>Status</th><th>Pontos</th><th>Evidência</th></tr></thead><tbody>" + linhas + "</tbody></table>" +
+        "<div class='grade'><div><h3>Problemas</h3>" + ul(probs) + (m.nota ? "<p class='fraco'>" + esc(m.nota) + "</p>" : "") + "</div>" +
+        "<div><h3>Tarefas</h3>" + ul(tarefas) + "</div><div><h3>Bloqueios</h3>" + ul(bloq) + "</div></div>" +
+        "<div class='nota'><strong>Próxima ação:</strong> " + (prox ? lnkT(prox.id) + " " + esc(prox.titulo) : esc(m.proxima)) + "</div></article>";
+    }).join("") || "<p class='vazio'>Nenhum módulo corresponde aos filtros.</p>";
+  }
+
+  /* ---------- 6. Problemas ---------- */
+  function renderProblemas(f) {
+    const corr = DADOS.problemas.filter((p) => p.correcao.startsWith("corrigido")).length;
+    const semTarefa = DADOS.problemas.filter((p) => !p.tarefa && p.classe === "tarefa").length;
+    $("#sub-problemas").textContent = DADOS.problemas.length + " problemas (31 da auditoria, 4 achados durante a execução, 1 que faltava no registro, 4 da validação integrada, 2 do fechamento de 15/10, 3 da leitura A3 e da D14, 2 da inspeção de integração, 2 da integração com A4 e da correção da P48, 3 da implementação de D1–D4). " +
+      corr + " corrigidos só no código local (a maioria também validada em teste local); nenhum corrigido em produção. Problemas classificados como tarefa sem tarefa: " + semTarefa + ".";
+    $("#tbody-prob").innerHTML = DADOS.problemas.filter((p) => problemaPassa(p, f))
+      .sort((a, b) => ORDEM_GRAV.indexOf(a.grav) - ORDEM_GRAV.indexOf(b.grav) || a.id.localeCompare(b.id))
+      .map((p) => "<tr id='p-" + p.id + "'><td><strong>" + esc(p.id) + "</strong></td><td>" + chip(p.grav, GRAV[p.grav]) + "</td><td>" + esc(p.titulo) +
+        (p.justificativa ? "<br><span class='fraco'>" + esc(p.justificativa) + "</span>" : "") + "</td><td>" + lnkM(p.mod) + "</td><td>" +
+        chip(p.classe, CLASSE[p.classe]) + " " + (p.tarefa ? lnkT(p.tarefa) : "") + ((p.decisoes || []).length ? "<br>decisão: " + p.decisoes.map(lnkD).join(", ") : "") +
+        "</td><td>" + chip(p.correcao, CORR[p.correcao]) + "</td></tr>").join("") ||
+      "<tr><td colspan='6' class='vazio'>Nenhum problema corresponde aos filtros.</td></tr>";
+  }
+
+  /* ---------- 7. Validação e método ---------- */
+  function renderValidacao() {
+    const v = DADOS.validacao;
+    const nomeEnt = (e) => esc(e.nome) + " (" + lnkM(e.mod) + ")";
+    const pesos = [3, 2, 1].map((p) => "<tr><td>" + p + "</td><td>" + esc(DADOS.pesos[p]) + "</td><td>" + DADOS.modulos.filter((m) => m.peso === p).map((m) => lnkM(m.id) + " " + pct(CL[m.id].pct)).join(", ") + "</td></tr>").join("");
+    const pts = Object.keys(DADOS.statusEntrega).map((s) => {
+      const p = DADOS.pontos[s];
+      const txt = p === null ? "fora do cálculo" : typeof p === "number" ? num(p, 1) : p;
+      return "<tr><td>" + chip(s, DADOS.statusEntrega[s]) + "</td><td>" + esc(txt) + "</td><td>" + conta((e) => e.status === s) + "</td></tr>";
+    }).join("");
+    $("#painel-validacao").innerHTML =
+      "<div class='painel'><h3 style='margin-top:0'>Entregas</h3><ul class='lista'>" +
+      "<li><strong>Total:</strong> " + K.total + "</li><li><strong>No cálculo:</strong> " + K.contadas + "</li>" +
+      "<li><strong>Não verificadas (" + K.nv.length + "):</strong>" + ul(K.nv.map((e) => nomeEnt(e) + " — " + esc(e.motivoNV || "sem motivo registrado"))) + "</li></ul></div>" +
+
+      "<div class='painel' style='margin-top:12px'><h3 style='margin-top:0'>Validação, separada por tipo</h3>" +
+      "<table><thead><tr><th>Tipo</th><th>Quantidade</th><th>Quais</th></tr></thead><tbody>" +
+      "<tr><td><strong>Histórica</strong><br><span class='fraco'>registrada antes desta sessão</span></td><td>" + K.validadas.length + " de " + K.contadas + " entregas</td><td>" +
+        ul(K.validadas.map((e) => nomeEnt(e) + " — " + esc(e.fonte))) + "<span class='fraco'>Critérios: ROADMAP " + v.roadmap.aprovados + "/" + v.roadmap.total + " · roteiro " + v.roteiro.aprovados + "/" + v.roteiro.total + ". " + esc(v.nota) + "</span></td></tr>" +
+      "<tr><td><strong>Local, nesta execução</strong><br><span class='fraco'>teste unitário ou estático, sem banco</span></td><td>" + K.locais.length + " entregas</td><td>" +
+        ul(K.locais.map(nomeEnt)) + "<span class='fraco'>Comandos: " + esc(DADOS.meta.executado.join("; ")) + ". Não promove a 'validado'.</span></td></tr>" +
+      "<tr><td><strong>Teste local integrado</strong><br><span class='fraco'>" + esc(DADOS.meta.validacaoIntegrada.data) + " · banco descartável, serviços simulados</span></td><td>" + K.integradas.length + " entregas</td><td>" +
+        ul(K.integradas.map(nomeEnt)) + "<span class='fraco'>" + esc(DADOS.meta.validacaoIntegrada.executado.join("; ")) + ". Não promove a 'validado': IA e push eram simulados e nada rodou em produção.</span></td></tr>" +
+      "<tr><td><strong>Simulado</strong><br><span class='fraco'>parte externa falsa no teste integrado</span></td><td>" + conta((e) => e.simulado) + " entregas</td><td>" +
+        ul(TODAS.filter((e) => e.simulado).map((e) => nomeEnt(e) + " — " + esc(e.simulado))) + "<span class='fraco'>A integração com o provedor de IA e o serviço de push reais continua pendente em produção.</span></td></tr>" +
+      "<tr><td><strong>Pendente em produção</strong></td><td class='zero'>" + v.producaoNestaExecucao + " validadas</td><td>Nada foi aplicado nem lido em produção. A2 não autorizada; A3 com consultas prontas e não executadas.</td></tr>" +
+      "<tr><td><strong>Incidentes abertos</strong></td><td>" + (DADOS.incidentes || []).length + "</td><td>" + ul((DADOS.incidentes || []).map((i) => esc(i.titulo) + " — evidência: " + esc(i.evidencia) + "; em aberto: " + esc(i.aberto) + " → " + lnkD(i.decisao))) + "</td></tr>" +
+      "</tbody></table></div>" +
+
+      "<div class='painel' style='margin-top:12px'><h3 style='margin-top:0'>Pontuação, pesos e fórmula</h3>" +
+      "<p><strong>Escopo:</strong> " + esc(DADOS.meta.escopo) + "</p>" +
+      "<table><thead><tr><th>Status da entrega</th><th>Pontos</th><th>Entregas (local)</th></tr></thead><tbody>" + pts + "</tbody></table>" +
+      "<table style='margin-top:10px'><thead><tr><th>Peso</th><th>Critério</th><th>Módulos (local)</th></tr></thead><tbody>" + pesos + "</tbody></table>" +
+      "<ul class='lista'><li>Execução do módulo = soma dos pontos ÷ entregas contadas.</li>" +
+      "<li>Geral = Σ(execução × peso) ÷ Σ pesos. Local: " + num(GL.n, 4) + " ÷ " + GL.d + " = <strong>" + pct(GL.v) + "</strong>. Main: " + num(GM.n, 4) + " ÷ " + GM.d + " = <strong>" + pct(GM.v) + "</strong>. Sem arredondamento intermediário.</li>" +
+      "<li>Módulo sem entrega contada mostra 'não calculado'.</li></ul>" +
+      "<h3>O que mudou no cálculo</h3>" + ul(DADOS.meta.mudancasMetodo.map(esc)) + "</div>" +
+
+      "<div class='painel' style='margin-top:12px'><h3 style='margin-top:0'>Data e cobertura</h3><p>Revisão de " + dataBR(DADOS.meta.dataAnalise) + ".</p>" + ul(DADOS.cobertura.map(esc)) + "</div>";
+  }
+
+  /* ---------- Ligação ---------- */
+  function preencher(sel, todos, mapa) {
+    sel.innerHTML = "<option value=''>" + esc(todos) + "</option>" + Object.keys(mapa).map((k) => "<option value='" + k + "'>" + esc(mapa[k]) + "</option>").join("");
+  }
+  function aplicar() {
+    const f = filtro();
+    renderResumo(f); renderDecisoes(f); renderTarefas(f); renderModulos(f); renderProblemas(f);
+  }
+  preencher($("#f-bloco"), "Todos os blocos", DADOS.blocos);
+  preencher($("#f-prio"), "Todas as prioridades", DADOS.prioridades);
+  preencher($("#f-status"), "Todos os status", DADOS.statusTarefa);
+  preencher($("#f-grav"), "Todas as gravidades", GRAV);
+  const CAMPOS = ["#f-busca", "#f-bloco", "#f-prio", "#f-status", "#f-grav"];
+  CAMPOS.forEach((s) => $(s).addEventListener("input", aplicar));
+  $("#btn-limpar").addEventListener("click", () => { CAMPOS.forEach((s) => { $(s).value = ""; }); aplicar(); });
+
+  // Link interno para uma tarefa fechada: abre antes de rolar.
+  function abrirAlvo() {
+    const alvo = location.hash && document.getElementById(location.hash.slice(1));
+    if (alvo && alvo.tagName === "DETAILS") alvo.open = true;
+  }
+  window.addEventListener("hashchange", abrirAlvo);
+
+  let abertos = [];
+  window.addEventListener("beforeprint", () => {
+    abertos = Array.from(document.querySelectorAll("details")).map((d) => d.open);
+    document.querySelectorAll("details").forEach((d) => { d.open = true; });
+  });
+  window.addEventListener("afterprint", () => { document.querySelectorAll("details").forEach((d, i) => { d.open = !!abertos[i]; }); });
+  $("#btn-imprimir").addEventListener("click", () => window.print());
+
+  renderTopo(); renderLotes(); renderValidacao(); aplicar(); abrirAlvo();
+})();
+</script>
+</body>
+</html>

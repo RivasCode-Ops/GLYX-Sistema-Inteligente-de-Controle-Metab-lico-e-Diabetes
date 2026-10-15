@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  AuditoriaIncompletaError,
+  MENSAGEM_AUDITORIA_INCOMPLETA,
   listMetabolicAudits,
   persistMetabolicAudit,
   runMetabolicAudit,
@@ -25,7 +27,13 @@ export async function generateMetabolicAudit(windowDays: number = 14): Promise<A
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
 
-  const report = await runMetabolicAudit(supabase, user.id, windowDays);
+  let report: MetabolicAuditReport;
+  try {
+    report = await runMetabolicAudit(supabase, user.id, windowDays);
+  } catch (e) {
+    if (e instanceof AuditoriaIncompletaError) return { error: MENSAGEM_AUDITORIA_INCOMPLETA };
+    throw e;
+  }
   const saved = await persistMetabolicAudit(supabase, user.id, report);
   if (saved.error) return { error: saved.error };
 

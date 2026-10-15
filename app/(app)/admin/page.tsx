@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { toggleUserDisabled } from "@/app/actions/admin";
+import { codigoDeErroAdmin, mensagemDeErroAdmin, toggleUserDisabled } from "@/app/actions/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SpendGauge } from "@/components/admin/spend-gauge";
@@ -43,7 +43,13 @@ function ultimoUso(u: UserStat): string {
   return `entrou ${sinceLabel(sign)}`;
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ erro?: string }>;
+}) {
+  const { erro } = await searchParams;
+  const mensagemErro = erro ? ((await mensagemDeErroAdmin(erro)) ?? "Não foi possível concluir a alteração.") : null;
   const supabase = await createClient();
   if (!supabase) redirect("/dashboard");
 
@@ -61,7 +67,10 @@ export default async function AdminPage() {
 
   async function toggleAction(formData: FormData): Promise<void> {
     "use server";
-    await toggleUserDisabled(formData);
+    // O retorno era descartado: se o banimento no Auth falhasse, o admin não
+    // ficava sabendo e achava que a conta estava barrada.
+    const r = await toggleUserDisabled(formData);
+    if (r.error) redirect(`/admin?erro=${(await codigoDeErroAdmin(r.error)) ?? "falha"}`);
   }
 
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -93,6 +102,12 @@ export default async function AdminPage() {
           outros usuários.
         </p>
       </div>
+
+      {mensagemErro ? (
+        <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          {mensagemErro}
+        </p>
+      ) : null}
 
       <Card>
         <CardHeader>

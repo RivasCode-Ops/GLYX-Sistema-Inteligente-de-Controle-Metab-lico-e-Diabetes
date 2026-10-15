@@ -14,7 +14,11 @@ import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications, demoMedicationLogs } from "@/lib/demo/data";
 import { resumirDosesDoDia } from "@/lib/medications/day-summary";
-import { formatarDataHora } from "@/lib/time/format";
+import { formatarDataHora, formatarHora } from "@/lib/time/format";
+import { destinoAposRegistro, lerConflito } from "@/lib/medications/conflito-registro";
+import { FormularioDeAcao, type ResultadoDeAcao } from "@/components/medicacao/formulario-de-acao";
+import { MENSAGENS_REGISTRO, type CodigoRegistro } from "@/lib/medications/register-dose";
+import { consolidarRegistrosDeDose, marcacaoDoRegistro } from "@/lib/medications/tomadas";
 
 // "Doses de hoje" = a tela de AGIR: o que tomar agora, marcar como tomada e o
 // histórico recente (agenda fundida aqui). O cadastro, estoque, alarmes e
@@ -22,14 +26,30 @@ import { formatarDataHora } from "@/lib/time/format";
 // a ação diária da gestão. Antes tudo isso vivia numa única tela de 539 linhas.
 type HistoryRow = {
   id: string;
+  medication_id?: string | null;
   taken_at: string;
+  confirmed?: boolean;
+  adherence_status?: string | null;
+  /** Só existe depois da migration 20261015101000; o `select("*")` a traz quando houver. */
+  correcoes?: unknown[] | null;
   medications: { name: string; dosage: string | null } | null;
 };
 type RawHistoryRow = Omit<HistoryRow, "medications"> & {
   medications: HistoryRow["medications"] | HistoryRow["medications"][];
 };
 
-export default async function MedicacaoDosesPage() {
+export default async function MedicacaoDosesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const conflito = lerConflito(sp);
+  const codigoErro = typeof sp.registro_erro === "string" && sp.registro_erro in MENSAGENS_REGISTRO
+    ? (sp.registro_erro as CodigoRegistro)
+    : null;
+  let conflitoExistentes: { id: string; taken_at: string }[] = [];
+  let conflitoNome: string | null = null;
   let meds: Medication[] = [];
   let todayLogs: TodayLog[] = [];
   let todaySnoozes: TodaySnooze[] = [];
@@ -37,9 +57,13 @@ export default async function MedicacaoDosesPage() {
   let timezone: string | null = null;
   const demoMode = !isSupabaseConfigured();
 
-  async function logMedicationTakenAction(formData: FormData): Promise<void> {
+  async function logMedicationTakenAction(_anterior: ResultadoDeAcao, formData: FormData): Promise<ResultadoDeAcao> {
     "use server";
-    await logMedicationTaken(formData);
+    // Conflito, falha, sessão expirada ou resposta à pergunta: a tela navega
+    // para o destino (FormularioDeAcao). Sem `redirect()` depois da ação.
+    const r = await logMedicationTaken(formData);
+    const ir = destinoAposRegistro(r, Boolean(formData.get("intencao")), "/medicacao");
+    return ir ? { ir } : null;
   }
 
   if (demoMode) {
@@ -69,7 +93,7 @@ export default async function MedicacaoDosesPage() {
             .order("created_at", { ascending: false }),
           supabase
             .from("medication_logs")
-            .select("medication_id, taken_at")
+            .select("medication_id, taken_at, confirmed")
             .eq("user_id", user.id)
             .gte("taken_at", startOfDayISO),
           supabase
@@ -77,20 +101,40 @@ export default async function MedicacaoDosesPage() {
             .select("medication_id, snoozed_until, scheduled_for")
             .eq("user_id", user.id)
             .gte("created_at", startOfDayISO),
+          // `*`: traz `correcoes` quando a migration estiver aplicada, sem quebrar antes dela.
           supabase
             .from("medication_logs")
-            .select("id, taken_at, medications ( name, dosage )")
+            .select("*, medications ( name, dosage )")
             .eq("user_id", user.id)
             .order("taken_at", { ascending: false })
             .limit(40),
         ]);
+        if (conflito) {
+          const [ex, med] = await Promise.all([
+            supabase
+              .from("medication_logs")
+              .select("id, taken_at")
+              .eq("user_id", user.id)
+              .eq("medication_id", conflito.medicationId)
+              .eq("scheduled_for", conflito.scheduledFor)
+              .eq("confirmed", true)
+              .order("taken_at", { ascending: true }),
+            supabase.from("medications").select("name").eq("id", conflito.medicationId).eq("user_id", user.id).maybeSingle(),
+          ]);
+          conflitoExistentes = (ex.data ?? []) as { id: string; taken_at: string }[];
+          conflitoNome = (med.data?.name as string | undefined) ?? null;
+        }
         meds = (medsRes.data ?? []) as Medication[];
         todayLogs = (logsRes.data ?? []) as TodayLog[];
         todaySnoozes = (snoozesRes.data ?? []) as TodaySnooze[];
-        history = ((historyRes.data ?? []) as RawHistoryRow[]).map((log) => ({
-          ...log,
-          medications: Array.isArray(log.medications) ? log.medications[0] ?? null : log.medications,
-        }));
+        // Repetição IDÊNTICA do histórico antigo aparece uma vez (D14); instantes
+        // diferentes aparecem todos, com a marcação do que são.
+        history = consolidarRegistrosDeDose(
+          ((historyRes.data ?? []) as RawHistoryRow[]).map((log) => ({
+            ...log,
+            medications: Array.isArray(log.medications) ? log.medications[0] ?? null : log.medications,
+          }))
+        ).registros;
       }
     }
   }
@@ -102,6 +146,52 @@ export default async function MedicacaoDosesPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
+      {codigoErro ? (
+        <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          {MENSAGENS_REGISTRO[codigoErro]}
+        </p>
+      ) : null}
+
+      {conflito && conflitoExistentes.length > 0 ? (
+        <Card className="border-amber-500/40">
+          <CardHeader>
+            <CardTitle className="text-base">Já existe uma tomada registrada nesta dose</CardTitle>
+            <CardDescription>
+              {conflitoNome ?? "Este item"}: dose prevista das {formatarHora(conflito.scheduledFor, timezone)}, já registrada
+              às {conflitoExistentes.map((e) => formatarHora(e.taken_at, timezone)).join(", ")}. Você pediu para registrar
+              às {formatarHora(conflito.takenAtPedido, timezone)}. Nada foi gravado ainda — o que aconteceu?
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {conflitoExistentes.map((e) => (
+              <FormularioDeAcao key={e.id} acao={logMedicationTakenAction}>
+                <input type="hidden" name="medication_id" value={conflito.medicationId} />
+                <input type="hidden" name="taken_at_iso" value={conflito.takenAtPedido} />
+                <input type="hidden" name="intencao" value="corrigir" />
+                <input type="hidden" name="alvo_id" value={e.id} />
+                {conflito.pedido ? <input type="hidden" name="pedido" value={conflito.pedido} /> : null}
+                <Button type="submit" size="sm" variant="outline">
+                  Corrigir: a tomada das {formatarHora(e.taken_at, timezone)} foi às{" "}
+                  {formatarHora(conflito.takenAtPedido, timezone)}
+                </Button>
+              </FormularioDeAcao>
+            ))}
+            <FormularioDeAcao acao={logMedicationTakenAction}>
+              <input type="hidden" name="medication_id" value={conflito.medicationId} />
+              <input type="hidden" name="taken_at_iso" value={conflito.takenAtPedido} />
+              <input type="hidden" name="intencao" value="outra" />
+              {conflito.pedido ? <input type="hidden" name="pedido" value={conflito.pedido} /> : null}
+              <Button type="submit" size="sm" variant="outline">
+                Foi outra tomada às {formatarHora(conflito.takenAtPedido, timezone)}
+              </Button>
+            </FormularioDeAcao>
+            <Link href="/medicacao" className="self-center px-2 text-sm text-zinc-400 underline">
+              Cancelar
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {!demoMode && resumo.total > 0 ? (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -146,12 +236,14 @@ export default async function MedicacaoDosesPage() {
                     <p className="text-xs text-zinc-500">{resumo.proxima.dosage}</p>
                   ) : null}
                 </div>
-                <form action={logMedicationTakenAction}>
+                <FormularioDeAcao acao={logMedicationTakenAction}>
                   <input type="hidden" name="medication_id" value={resumo.proxima.medicationId} />
+                  {/* Identidade da ação: enviar o mesmo formulário de novo não cria outra tomada. */}
+                  <input type="hidden" name="pedido" value={crypto.randomUUID()} />
                   <Button type="submit" size="sm">
                     Registrar agora
                   </Button>
-                </form>
+                </FormularioDeAcao>
               </CardContent>
             </Card>
           ) : null}
@@ -197,6 +289,11 @@ export default async function MedicacaoDosesPage() {
                     <div>
                       <p className="font-medium text-zinc-100">
                         {log.medications?.name ?? "Medicamento removido"}
+                        {marcacaoDoRegistro(log) ? (
+                          <span className="ml-2 rounded-full border border-zinc-700 px-2 py-0.5 text-[11px] font-normal text-zinc-400">
+                            {marcacaoDoRegistro(log)}
+                          </span>
+                        ) : null}
                       </p>
                       <p className="text-xs text-zinc-500">{log.medications?.dosage ?? "—"}</p>
                     </div>

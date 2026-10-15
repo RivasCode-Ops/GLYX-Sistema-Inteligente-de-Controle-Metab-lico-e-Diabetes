@@ -519,7 +519,7 @@ export default async function RelatorioCompletoPage() {
                     <Td className="whitespace-nowrap font-medium">{fmtDay(d.day)}</Td>
                     <Td>
                       {d.entries
-                        .map((e) => `${fmtTime(e.takenAt, tz)} ${e.name}`)
+                        .map((e) => `${fmtTime(e.takenAt, tz)} ${e.name}${e.marca ? ` (${e.marca})` : ""}`)
                         .join(" · ")}
                     </Td>
                   </tr>

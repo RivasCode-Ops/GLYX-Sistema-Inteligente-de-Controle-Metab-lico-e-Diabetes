@@ -12,7 +12,7 @@ export type AiKind =
   | "body_photo";
 
 // Limites por usuário em janela deslizante de 1 hora.
-// Persistidos em ai_usage (RLS) para valer entre instâncias serverless.
+// Persistidos em ai_usage para valer entre instâncias serverless.
 const HOURLY_LIMITS: Record<AiKind, number> = {
   chat: 30,
   meal_photo: 10,
@@ -27,17 +27,70 @@ const HOURLY_LIMITS: Record<AiKind, number> = {
   body_photo: 5,
 };
 
+const JANELA_SEGUNDOS = 60 * 60;
+
 export type RateLimitResult =
   | { allowed: true; usageId: string | null }
   | { allowed: false; limit: number; retryAfterMinutes: number };
 
+/** A RPC ainda não existe no banco (migration 20261015102000 não aplicada). */
+function rpcAusente(error: { code?: string } | null): boolean {
+  return error?.code === "PGRST202" || error?.code === "42883";
+}
+
+function minutosAteLiberar(maisAntigo: string | null | undefined): number {
+  const oldestMs = maisAntigo ? new Date(maisAntigo).getTime() : Date.now();
+  return Math.max(1, Math.ceil((oldestMs + JANELA_SEGUNDOS * 1000 - Date.now()) / 60000));
+}
+
+/**
+ * Consome uma unidade da cota de IA, ou recusa. Fail-closed: qualquer erro
+ * nega o uso.
+ *
+ * Desde GLYX-24 a contagem e o registro são UMA operação no banco
+ * (`consumir_cota_ia`, com trava por usuário e tipo). Antes eram duas:
+ * requisições em paralelo passavam juntas pela contagem, e a policy `for all`
+ * deixava o usuário apagar o próprio histórico e zerar o limite.
+ */
 export async function checkAndRecordAiUsage(
   supabase: SupabaseClient,
   userId: string,
   kind: AiKind
 ): Promise<RateLimitResult> {
   const limit = HOURLY_LIMITS[kind];
-  const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase.rpc("consumir_cota_ia", {
+    p_kind: kind,
+    p_limite: limit,
+    p_janela_segundos: JANELA_SEGUNDOS,
+  });
+
+  if (rpcAusente(error)) return checkAndRecordLegado(supabase, userId, kind, limit);
+  if (error) return { allowed: false, limit, retryAfterMinutes: 5 };
+
+  const linha = (Array.isArray(data) ? data[0] : data) as
+    | { permitido: boolean; usage_id: string | null; mais_antigo: string | null }
+    | null
+    | undefined;
+  if (!linha) return { allowed: false, limit, retryAfterMinutes: 5 };
+  if (!linha.permitido) {
+    return { allowed: false, limit, retryAfterMinutes: minutosAteLiberar(linha.mais_antigo) };
+  }
+  return { allowed: true, usageId: linha.usage_id ?? null };
+}
+
+/**
+ * Caminho anterior (contar e inserir), usado SÓ enquanto a migration da RPC não
+ * estiver aplicada. Depois dela, a policy de `ai_usage` não deixa mais o
+ * usuário inserir direto, e este caminho falha fechado.
+ */
+async function checkAndRecordLegado(
+  supabase: SupabaseClient,
+  userId: string,
+  kind: AiKind,
+  limit: number
+): Promise<RateLimitResult> {
+  const windowStart = new Date(Date.now() - JANELA_SEGUNDOS * 1000).toISOString();
 
   const { count, error } = await supabase
     .from("ai_usage")
@@ -45,11 +98,7 @@ export async function checkAndRecordAiUsage(
     .eq("user_id", userId)
     .eq("kind", kind)
     .gte("created_at", windowStart);
-
-  // Fail-closed: se a contagem falhar, não liberamos uso de IA (evita bypass).
-  if (error) {
-    return { allowed: false, limit, retryAfterMinutes: 5 };
-  }
+  if (error) return { allowed: false, limit, retryAfterMinutes: 5 };
 
   if ((count ?? 0) >= limit) {
     const { data: oldest } = await supabase
@@ -61,10 +110,7 @@ export async function checkAndRecordAiUsage(
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
-
-    const oldestMs = oldest?.created_at ? new Date(oldest.created_at).getTime() : Date.now();
-    const retryAfterMinutes = Math.max(1, Math.ceil((oldestMs + 60 * 60 * 1000 - Date.now()) / 60000));
-    return { allowed: false, limit, retryAfterMinutes };
+    return { allowed: false, limit, retryAfterMinutes: minutosAteLiberar(oldest?.created_at) };
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -72,13 +118,13 @@ export async function checkAndRecordAiUsage(
     .insert({ user_id: userId, kind })
     .select("id")
     .maybeSingle();
-  if (insertError) {
-    return { allowed: false, limit, retryAfterMinutes: 5 };
-  }
+  if (insertError) return { allowed: false, limit, retryAfterMinutes: 5 };
   return { allowed: true, usageId: inserted?.id ?? null };
 }
 
 // Grava a contagem de tokens reportada pelo provedor após a chamada concluir.
+// Pela RPC, que só toca linha própria ainda sem tokens; sem a RPC, pelo update
+// antigo. Falha aqui não derruba a resposta ao usuário — é contabilidade.
 export async function recordAiTokens(
   supabase: SupabaseClient,
   usageId: string | null,
@@ -86,6 +132,13 @@ export async function recordAiTokens(
   model: string
 ): Promise<void> {
   if (!usageId || !usage) return;
+  const { error } = await supabase.rpc("registrar_tokens_ia", {
+    p_usage_id: usageId,
+    p_prompt: usage.prompt_tokens ?? null,
+    p_completion: usage.completion_tokens ?? null,
+    p_model: model,
+  });
+  if (!rpcAusente(error)) return;
   await supabase
     .from("ai_usage")
     .update({

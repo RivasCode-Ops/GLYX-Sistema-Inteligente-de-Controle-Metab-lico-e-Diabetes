@@ -37,16 +37,33 @@ function tzOu(timezone: string | null | undefined): string {
   return timezone || FUSO_PADRAO;
 }
 
-/** Data e hora: `08/09/2026, 00:24`. */
+/** Campos avulsos do Intl. Nenhum deles pode conviver com `dateStyle`/`timeStyle`:
+ *  a combinação lança `TypeError: Invalid option` (P48). */
+const CAMPOS_AVULSOS = [
+  "weekday",
+  "era",
+  "year",
+  "month",
+  "day",
+  "dayPeriod",
+  "hour",
+  "minute",
+  "second",
+  "fractionalSecondDigits",
+  "timeZoneName",
+] as const;
+
+/** Data e hora: `08/09/2026, 00:24`. Se o chamador escolhe campos avulsos
+ *  (`day`, `hour`…), o formato é o dele e o curto padrão não entra. */
 export function formatarDataHora(
   iso: string | Date,
   timezone?: string | null,
   opcoes?: Intl.DateTimeFormatOptions
 ): string {
+  const temCampos = CAMPOS_AVULSOS.some((c) => opcoes?.[c] !== undefined);
   return new Date(iso).toLocaleString("pt-BR", {
     timeZone: tzOu(timezone),
-    dateStyle: "short",
-    timeStyle: "short",
+    ...(temCampos ? {} : { dateStyle: "short", timeStyle: "short" }),
     ...opcoes,
   });
 }
