@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { definirContaDesativada } from "@/lib/admin/definir-desativada";
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -49,8 +50,8 @@ const BANIMENTO = "876000h";
  *   3. O token em mãos continua válido até expirar (minutos); nesse intervalo
  *      quem barra é a camada 1.
  *
- * O banimento exige service role e roda SÓ aqui no servidor, depois de a
- * policy de admin ter aceitado a alteração do perfil.
+ * O banimento exige service role e roda SÓ aqui no servidor, depois de o banco
+ * ter aceitado a alteração do perfil como vinda de um admin.
  */
 export async function toggleUserDisabled(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
@@ -66,17 +67,8 @@ export async function toggleUserDisabled(formData: FormData): Promise<ActionResu
   if (!targetId) return { error: "Usuário inválido." };
   if (targetId === user.id) return { error: MENSAGENS_ADMIN.propria_conta };
 
-  // RLS: só passa se o usuário logado for admin (policy profiles_update_admin).
-  // `.select` devolve as linhas alteradas: zero linhas = a policy recusou, e
-  // antes isso voltava como sucesso.
-  const { data: alteradas, error } = await supabase
-    .from("profiles")
-    .update({ disabled: nextDisabled })
-    .eq("id", targetId)
-    .select("id");
-
-  if (error) return { error: MENSAGENS_ADMIN.falha_alterar };
-  if (!alteradas?.length) return { error: MENSAGENS_ADMIN.sem_permissao };
+  const alteracao = await definirContaDesativada(supabase, targetId, nextDisabled);
+  if (alteracao !== "ok") return { error: MENSAGENS_ADMIN[alteracao] };
 
   const admin = createAdminClient();
   if (!admin) {
