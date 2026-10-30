@@ -53,7 +53,15 @@ Supabase, arquivos sem alteração, com conferência após cada uma:
 **Corrigida no mesmo dia** com `20261030120000_fuso_valido_sem_varrer_catalogo` (autorizada e aplicada
 ~21:14 UTC): a função testa o fuso com `at time zone` (0,87 ms por chamada); inválido, vazio e nulo
 continuam virando America/Sao_Paulo; 14 de 14 horários disparam na simulação; execução real das 21:15
-em **0,087 s**, sem falha. Não validados: chat em produção, "Já tomei" e push real no celular.
+em **0,087 s**, sem falha.
+
+**Primeiro alarme real com o despachante novo — validado em produção (30/10/2026):** dose das 19:00
+(America/Sao_Paulo, 22:00 UTC): 2 alarmes `med` ficaram `enviado` às 22:00:02, na 1ª tentativa, sem erro, e
+**a notificação chegou no celular** (confirmado pelo Rivas). `check:prod` no mesmo dia: obrigatórias OK, 1
+aviso (`OPS_ALERT_WEBHOOK_URL` ausente); signup desligado; `app_base_url` = domínio da Vercel; segredo do
+cron no Vault aceito pela rota (12 respostas 200, nenhum 401) — o `CRON_SECRET` do `.env.local` local
+difere do Vault (arquivo local defasado); 19 de 31 chamadas do `pg_net` sem resposta em 6 h (P43).
+Não validados: chat em produção, "Já tomei" e adiar pela notificação.
 
 **Lote 5 executado em 30/10/2026**, inteiro e só local: as oito tarefas implementadas e validadas por teste
 unitário (suíte 115 arquivos / 1386 testes; tipos e lint limpos). **Sem commit, sem push, sem migration,
@@ -158,7 +166,7 @@ Problemas da auditoria (P01–P31), achados durante a execução (P32–P35), um
 | P24 | GLYX-32 | tarefa | corrigido local · validado unitário |
 | P25 | GLYX-31 | tarefa | corrigido local · validado unitário |
 | P26 | GLYX-30 | tarefa | aberto |
-| P27 | GLYX-18 | tarefa | aberto |
+| P27 | GLYX-18 | tarefa | corrigido local · validado unitário · migration não aplicada |
 | P28 | GLYX-35 | tarefa | corrigido local · validado unitário |
 | P29 | GLYX-22 | aguardando decisão (D11): revisão antes de gravar muda o fluxo | aberto |
 | P30 | GLYX-36 (tipos) | tarefa só para os tipos; código morto e `npm install` no CI **adiados** — manutenção sem efeito em comportamento; documentação parcialmente atualizada em 14/10 | aberto |
@@ -475,7 +483,17 @@ O lote 3 não tem ID próprio: é a execução dos testes SQL das tarefas do lot
 #### GLYX-18 — Admin sem leitura de colunas clínicas de outros perfis
 - **Categoria:** correção · **Prioridade:** P2 · **Escopo:** sugerido
 - **Problema:** `profiles_select_admin` libera todas as colunas.
-- **Status:** não iniciada.
+- **Achado junto (30/10):** `profiles_update_admin` deixava o admin **alterar** qualquer coluna do perfil
+  alheio — inclusive razão carbo/insulina e fator de correção, que alimentam a calculadora de dose.
+- **Arquivos:** migration `20261030140000_admin_sem_acesso_amplo_a_perfis.sql`,
+  `lib/admin/definir-desativada.ts` (novo), `app/actions/admin.ts`, `supabase/tests/admin_perfis.sql`,
+  `supabase/reversao/20261030_reverter_glyx18_glyx44.sql`.
+- **Status:** implementada (local) · **validada localmente — unitária** (6 testes) · teste SQL escrito,
+  **não executado** (sem banco de teste ligado) · migration **não aplicada em produção**. As duas policies
+  amplas saem; desativar passa pela RPC `admin_definir_conta_desativada`, que confere admin e mexe só em
+  `disabled`. Conferido em produção (leitura): nada além dessas policies usa `is_current_user_admin`, e as
+  telas de admin leem por `admin_user_stats`/`admin_ai_spend` (SECURITY DEFINER). Código vai antes: sem a
+  RPC, a action recua para o UPDATE antigo.
 
 #### GLYX-19 — Ingestão de CGM sem perda silenciosa
 - **Categoria:** correção · **Prioridade:** P2 · **Escopo:** observado
@@ -691,7 +709,12 @@ O lote 3 não tem ID próprio: é a execução dos testes SQL das tarefas do lot
 - **Categoria:** correção · **Prioridade:** P2 · **Escopo:** observado
 - **Problema:** `exam_values.exam_id`, `health_events.medication_id` e `ai_messages.thread_id` aceitam pai
   de outra conta (mesma classe de GLYX-10).
-- **Status:** não iniciada.
+- **Arquivos:** migration `20261030130000_filhos_de_exames_eventos_e_conversas_mesmo_dono.sql`,
+  `supabase/tests/policies_pai_do_mesmo_dono.sql`, reversão em `20261030_reverter_glyx18_glyx44.sql`.
+- **Status:** implementada (local) · testes estáticos de migration verdes · teste SQL escrito, **não
+  executado** (sem banco de teste ligado) · migration **não aplicada em produção**. Varredura do schema em
+  produção (30/10): só estas três e as duas de GLYX-10 ligam tabela de usuário a tabela de usuário; **0
+  linhas cruzadas** hoje. Leitura inalterada; não exige mudança de código.
 
 #### GLYX-45 — Fechar os incidentes do ambiente de 14/10
 - **Categoria:** operação · **Prioridade:** P1 · **Escopo:** observado
