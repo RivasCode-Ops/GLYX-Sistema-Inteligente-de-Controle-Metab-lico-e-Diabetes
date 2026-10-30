@@ -36,6 +36,25 @@ e a frase de autorização (A2). **A2 não autorizada em 15/10.**
 O próximo lote que roda **sem nova autorização** é o **lote 5** (robustez de IA e dados, tudo local):
 GLYX-27, 28, 19, 20, 21, 32, 31, 35.
 
+**Lote 1 implantado em produção em 30/10/2026.** Código publicado pelo merge do PR #2 (`73b0e81`,
+deploy Vercel concluído ~20:56 UTC). Leituras B0/B2/B4 repetidas antes: 70 migrations, nenhuma do lote;
+schema compatível; duplicatas de dose **12 grupos / 26 linhas até 29/10** (eram 11/22 em 15/10 — o código
+antigo seguiu duplicando), todas anteriores ao corte. Migrations aplicadas uma a uma pelo conector do
+Supabase, arquivos sem alteração, com conferência após cada uma:
+1. `filhos_de_medications_mesmo_dono` — as duas policies exigem remédio do próprio dono.
+2. `medication_logs_dose_unica` — corte **`2026-10-30T21:05:00Z`**; o índice registra "corte 21:05:00+00,
+   aplicada em 21:05:16"; 426 doses intactas.
+3. `conta_ativa_e_uso_de_ia` — 32 policies `conta_ativa` + Storage; `ai_usage` só `select`; 0 contas desativadas.
+4. `med_alarms_cadencia_e_confiabilidade` — 7 colunas de estado; 12 remédios ativos, 0 com frequência
+   confirmada (D1); execução das 21:10 do cron sem falha.
+
+**Regressão achada depois da 4:** o cron `glyx-med-alarms` foi de 0,04 s para **8,3 s** por execução —
+`glyx_fuso_valido` varre `pg_timezone_names` (~50 ms) a cada referência. Alarmes funcionando.
+**Corrigida no mesmo dia** com `20261030120000_fuso_valido_sem_varrer_catalogo` (autorizada e aplicada
+~21:14 UTC): a função testa o fuso com `at time zone` (0,87 ms por chamada); inválido, vazio e nulo
+continuam virando America/Sao_Paulo; 14 de 14 horários disparam na simulação; execução real das 21:15
+em **0,087 s**, sem falha. Não validados: chat em produção, "Já tomei" e push real no celular.
+
 **Lote 5 executado em 30/10/2026**, inteiro e só local: as oito tarefas implementadas e validadas por teste
 unitário (suíte 115 arquivos / 1386 testes; tipos e lint limpos). **Sem commit, sem push, sem migration,
 produção intocada.** Não validados: navegador com sessão, IA real, banco real, envio real ao Sentry. Os
