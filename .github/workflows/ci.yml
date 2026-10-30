@@ -7,7 +7,10 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Fixo em 24.04: em 10/2026 o ubuntu-latest virou 26.04, e o Playwright 1.59
+    # não instala o Chromium nele ("does not support chromium on ubuntu26.04").
+    # Voltar para latest quando o Playwright do projeto suportar a versão nova.
+    runs-on: ubuntu-24.04
     env:
       # Porta morta na própria máquina: nada responde e nada sai do runner. Antes era
       # https://example.supabase.co, um host EXTERNO de verdade. A guarda de destino
