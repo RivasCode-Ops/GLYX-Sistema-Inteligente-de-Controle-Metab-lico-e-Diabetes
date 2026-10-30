@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusPill } from "@/components/ui/status-pill";
 import { computeBolusDose, type BolusWarning } from "@/lib/medications/bolus-calculator";
+import type { BolusPrefill } from "@/lib/medications/bolus-prefill";
 
 const WARNING_TEXT: Record<BolusWarning, string> = {
   abaixo_da_meta:
@@ -17,7 +18,8 @@ type Props = {
   carbRatio: number | null;
   correctionFactor: number | null;
   targetGlucose: number | null;
-  latestGlucose: number | null;
+  /** Última leitura com idade; só vem com `value` se for recente o bastante para ser "atual". */
+  glucosePrefill: BolusPrefill;
   /** Meta mínima do perfil — define o limiar de hipo que trava o cálculo. */
   targetGlucoseMin: number | null;
 };
@@ -26,13 +28,14 @@ export function BolusCalculatorForm({
   carbRatio,
   correctionFactor,
   targetGlucose,
-  latestGlucose,
+  glucosePrefill,
   targetGlucoseMin,
 }: Props) {
   const [carbsG, setCarbsG] = useState("");
   const [currentGlucose, setCurrentGlucose] = useState(
-    latestGlucose != null ? String(latestGlucose) : ""
+    glucosePrefill.value != null ? String(glucosePrefill.value) : ""
   );
+  const latest = glucosePrefill.latest;
 
   const result = useMemo(() => {
     const carbs = Number.parseFloat(carbsG);
@@ -72,6 +75,18 @@ export function BolusCalculatorForm({
             onChange={(e) => setCurrentGlucose(e.target.value)}
             placeholder="ex.: 150"
           />
+          {latest ? (
+            latest.freshness === "fresh" ? (
+              <p className="text-[11px] text-zinc-500">
+                Preenchido com a leitura de {latest.ageLabel}.
+              </p>
+            ) : (
+              <p className="text-[11px] text-amber-300">
+                Última leitura: {latest.value} mg/dL, {latest.ageLabel} — antiga demais para
+                valer como atual. Meça agora e digite o valor.
+              </p>
+            )
+          ) : null}
         </div>
       </div>
 

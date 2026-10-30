@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
+import { publicDbError } from "@/lib/errors/public-error";
 import {
   BODY_FIELD_BY_KEY,
   BODY_FIELD_KEYS,
@@ -88,7 +89,7 @@ export async function saveBodyMeasurement(formData: FormData): Promise<ActionRes
     },
     { onConflict: "user_id,measured_on" }
   );
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/body") };
 
   // Peso da medição também vira pesagem do dia: o ajuste calórico e o gráfico
   // de peso leem weight_logs, e quem mede a fita costuma pesar na mesma hora.
@@ -122,7 +123,7 @@ export async function deleteBodyMeasurement(formData: FormData): Promise<ActionR
     .delete()
     .eq("user_id", user.id)
     .eq("measured_on", measuredOn);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/body") };
 
   revalidateComposition();
   return { ok: true };
@@ -193,7 +194,7 @@ export async function saveBodyGoal(formData: FormData): Promise<ActionResult> {
     },
     { onConflict: "user_id,metric" }
   );
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/body") };
 
   revalidateComposition();
   return { ok: true };
@@ -215,7 +216,7 @@ export async function deleteBodyGoal(formData: FormData): Promise<ActionResult> 
     .delete()
     .eq("user_id", user.id)
     .eq("metric", metric);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/body") };
 
   revalidateComposition();
   return { ok: true };
@@ -296,7 +297,7 @@ export async function deleteBodyPhoto(formData: FormData): Promise<ActionResult>
     .maybeSingle();
 
   const { error } = await supabase.from("body_photos").delete().eq("id", id).eq("user_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/body") };
 
   // Remove o arquivo depois da linha: órfão no banco apontando pra arquivo que
   // não existe quebra a tela; arquivo órfão no bucket, não.

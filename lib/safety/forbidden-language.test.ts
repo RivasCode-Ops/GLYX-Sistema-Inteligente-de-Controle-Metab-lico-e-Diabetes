@@ -9,6 +9,7 @@ import {
   NO_FINDING_NOTE,
   TONE_LABEL,
   blockedText,
+  checkUnavailablePayload,
   renderVerdictBlock,
   toSafetyPayload,
   unknownSubstanceNote,
@@ -57,7 +58,14 @@ function textosRenderizados(): string[] {
     verdictPara([], []),
   ];
 
-  const textos: string[] = [NO_FINDING_NOTE, DOCTOR_NOTE, ...Object.values(TONE_LABEL)];
+  const indisponivel = checkUnavailablePayload();
+  const textos: string[] = [
+    NO_FINDING_NOTE,
+    DOCTOR_NOTE,
+    ...Object.values(TONE_LABEL),
+    indisponivel.label,
+    indisponivel.unknownNote ?? "",
+  ];
 
   for (const v of cenarios) {
     const payload = toSafetyPayload(v);

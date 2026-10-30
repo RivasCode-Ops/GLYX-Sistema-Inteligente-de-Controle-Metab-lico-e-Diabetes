@@ -5,6 +5,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
+import { describeGlucoseAverage, glucoseAverage } from "@/lib/ai/glucose-average";
 import { createClient } from "@/lib/supabase/server";
 import { loadBodySnapshot, PROGRESSION_WINDOW_WEEKS, VOLUME_WINDOW_WEEKS } from "@/lib/queries/body-composition";
 import { METHOD_LABEL } from "@/lib/body/composition";
@@ -53,12 +54,8 @@ export async function POST() {
   // JUNTO com glicemia, sono e alimentação — não como um app de academia
   // qualquer que só olha a fita.
   const since14d = new Date(Date.now() - 14 * 86_400_000).toISOString();
-  const [glucoseRes, sleepRes, mealsRes] = await Promise.all([
-    supabase
-      .from("glucose_readings")
-      .select("value_mg_dl")
-      .eq("user_id", user.id)
-      .gte("recorded_at", since14d),
+  const [glucose, sleepRes, mealsRes] = await Promise.all([
+    glucoseAverage(supabase, user.id),
     supabase
       .from("health_snapshots")
       .select("sleep_hours")
@@ -71,11 +68,6 @@ export async function POST() {
       .eq("user_id", user.id)
       .gte("eaten_at", since14d),
   ]);
-
-  const glucose = (glucoseRes.data ?? []) as { value_mg_dl: number }[];
-  const glucoseAvg = glucose.length
-    ? Math.round(glucose.reduce((s, g) => s + Number(g.value_mg_dl), 0) / glucose.length)
-    : null;
 
   const sleep = (sleepRes.data ?? []) as { sleep_hours: number | null }[];
   const sleepAvg = sleep.length
@@ -182,7 +174,7 @@ ${volumeLines}
 ${progressionLines}
 
 CONTEXTO METABÓLICO (14 dias)
-- Glicemia média: ${glucoseAvg ?? "sem registro"} mg/dL
+- ${describeGlucoseAverage(glucose)}
 - Sono médio: ${sleepAvg ?? "sem registro"} h/noite
 - Alimentação registrada: ${caloriesPerDay ?? "sem registro"} kcal/dia, ${proteinPerDay ?? "?"} g de proteína/dia (${mealDays} dias com registro)${
     energyTargets

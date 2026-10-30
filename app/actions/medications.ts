@@ -7,6 +7,7 @@ import { uploadPrivatePhoto } from "@/lib/storage/upload-private-photo";
 import { namesLookSimilar } from "@/lib/medications/similar";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localDateKey, wallClockToUTC } from "@/lib/time/local-day";
+import { publicDbError } from "@/lib/errors/public-error";
 import {
   MENSAGENS_CADENCIA,
   cadenciaDoFormulario,
@@ -152,7 +153,7 @@ export async function addMedication(formData: FormData): Promise<ActionResult> {
     (l) => supabase.from("medications").insert(l)
   );
 
-  if (error) return { error: error.message ?? "Falha ao salvar." };
+  if (error) return { error: publicDbError(error, "actions/medications") };
 
   revalidatePath("/medicacao");
   return { ok: true };
@@ -217,7 +218,7 @@ export async function attachMedicationLabel(formData: FormData): Promise<ActionR
     .eq("id", medicationId)
     .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/medications") };
 
   if (current?.label_photo_path) {
     await supabase.storage.from("medication-labels").remove([current.label_photo_path]);
@@ -252,7 +253,7 @@ export async function removeMedicationLabel(formData: FormData): Promise<ActionR
     .eq("id", medicationId)
     .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/medications") };
 
   if (current?.label_photo_path) {
     await supabase.storage.from("medication-labels").remove([current.label_photo_path]);
@@ -312,7 +313,7 @@ export async function updateMedication(formData: FormData): Promise<ActionResult
     (l) => supabase.from("medications").update(l).eq("id", medicationId).eq("user_id", user.id)
   );
 
-  if (error) return { error: error.message ?? "Falha ao salvar." };
+  if (error) return { error: publicDbError(error, "actions/medications") };
 
   revalidatePath("/medicacao");
   return { ok: true };
@@ -382,7 +383,7 @@ export async function updateMedicationStock(formData: FormData): Promise<ActionR
     .eq("id", medicationId)
     .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/medications") };
 
   revalidatePath("/medicacao");
   return { ok: true };
@@ -406,7 +407,7 @@ export async function deactivateMedication(formData: FormData): Promise<ActionRe
     .eq("id", medicationId)
     .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/medications") };
 
   revalidatePath("/medicacao");
   return { ok: true };

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { encryptCredential, lluFirstPatientId, lluLogin } from "@/lib/cgm/librelinkup";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 // Conecta/desconecta a conta LibreLinkUp do usuário (a mesma via que o
 // médico usa para acompanhar o sensor). A senha é validada num login de
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     },
     { onConflict: "user_id,provider" }
   );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: publicDbError(error, "api/cgm/libre-link/route") }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }
@@ -76,7 +77,7 @@ export async function DELETE() {
     .delete()
     .eq("user_id", user.id)
     .eq("provider", "librelinkup");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: publicDbError(error, "api/cgm/libre-link/route") }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 /**
  * Plano de hipoglicemia — conduta DO USUÁRIO, definida com o médico dele.
@@ -55,7 +56,7 @@ export async function saveHypoPlan(formData: FormData): Promise<ActionResult> {
     },
     { onConflict: "user_id" }
   );
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/hypo-plan") };
 
   revalidatePath("/perfil/hipoglicemia");
   revalidatePath("/dashboard");
@@ -86,7 +87,7 @@ export async function markHypoActed(formData: FormData): Promise<ActionResult> {
     .eq("id", eventId)
     .eq("user_id", user.id)
     .is("acted_at", null);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/hypo-plan") };
 
   revalidatePath("/dashboard");
   return { ok: true };
@@ -115,7 +116,7 @@ export async function recordHypoRecheck(formData: FormData): Promise<ActionResul
     .eq("id", eventId)
     .eq("user_id", user.id)
     .is("recheck_at", null);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/hypo-plan") };
 
   revalidatePath("/dashboard");
   return { ok: true };

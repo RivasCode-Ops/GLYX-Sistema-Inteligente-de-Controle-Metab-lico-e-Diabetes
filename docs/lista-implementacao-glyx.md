@@ -36,6 +36,11 @@ e a frase de autorização (A2). **A2 não autorizada em 15/10.**
 O próximo lote que roda **sem nova autorização** é o **lote 5** (robustez de IA e dados, tudo local):
 GLYX-27, 28, 19, 20, 21, 32, 31, 35.
 
+**Lote 5 executado em 30/10/2026**, inteiro e só local: as oito tarefas implementadas e validadas por teste
+unitário (suíte 115 arquivos / 1386 testes; tipos e lint limpos). **Sem commit, sem push, sem migration,
+produção intocada.** Não validados: navegador com sessão, IA real, banco real, envio real ao Sentry. Os
+lotes seguintes dependem de decisão ou de produção (seção D).
+
 Lote 1, como foi executado (sem banco e sem produção):
 
 | Ordem | ID | Título |
@@ -124,19 +129,18 @@ Problemas da auditoria (P01–P31), achados durante a execução (P32–P35), um
 | P09, P17 | GLYX-26 | tarefa | corrigido local · validado em teste local (provedor simulado) |
 | P10, P32 | GLYX-12 | tarefa | corrigido local · validado em teste local (push simulado; aparelho pendente) |
 | P11 | GLYX-10 | tarefa | corrigido local · validado em teste local (com controle negativo) |
-| P12, P13, P14, P16 | GLYX-27 | tarefa | aberto |
-| P15 | GLYX-28 | tarefa | aberto |
-| P18 | GLYX-04 | tarefa | aberto |
-| P19 | GLYX-21 | tarefa | aberto |
+| P12, P13, P14, P16 | GLYX-27 | tarefa | corrigido local · validado unitário (P16 sem o chat) |
+| P15 | GLYX-28 | tarefa | corrigido local · validado unitário || P18 | GLYX-04 | tarefa | aberto |
+| P19 | GLYX-21 | tarefa | corrigido local · validado unitário |
 | P20 | GLYX-19 | tarefa | aberto |
 | P21 | GLYX-20 | tarefa | aberto |
 | P22, P36 | GLYX-33 | tarefa (P36: recuperação de senha barrada pela lista do login social — estava na auditoria e faltava no registro) | aberto |
 | P23 | GLYX-34 | tarefa | aberto |
-| P24 | GLYX-32 | tarefa | aberto |
-| P25 | GLYX-31 | tarefa | aberto |
+| P24 | GLYX-32 | tarefa | corrigido local · validado unitário |
+| P25 | GLYX-31 | tarefa | corrigido local · validado unitário |
 | P26 | GLYX-30 | tarefa | aberto |
 | P27 | GLYX-18 | tarefa | aberto |
-| P28 | GLYX-35 | tarefa | aberto |
+| P28 | GLYX-35 | tarefa | corrigido local · validado unitário |
 | P29 | GLYX-22 | aguardando decisão (D11): revisão antes de gravar muda o fluxo | aberto |
 | P30 | GLYX-36 (tipos) | tarefa só para os tipos; código morto e `npm install` no CI **adiados** — manutenção sem efeito em comportamento; documentação parcialmente atualizada em 14/10 | aberto |
 | P31 | GLYX-11 | tarefa | corrigido local · validado em teste local ("Já tomei" no aparelho pendente) |
@@ -457,16 +461,44 @@ O lote 3 não tem ID próprio: é a execução dos testes SQL das tarefas do lot
 #### GLYX-19 — Ingestão de CGM sem perda silenciosa
 - **Categoria:** correção · **Prioridade:** P2 · **Escopo:** observado
 - **Problema:** `lib/cgm/ingest.ts` ignora erro na deduplicação e no fallback; CSV grande vai inteiro.
-- **Status:** não iniciada.
+- **Arquivos:** `lib/cgm/ingest.ts`, `app/api/cgm/ingest/route.ts`, `components/glicemia/libre-csv-import.tsx`.
+- **Status:** implementada (local) · **validada localmente — unitária** (8 testes, 30/10/2026; suíte 110
+  arquivos / 1335 testes) · banco real e navegador **não validados**.
+  Ingestão em blocos de 200 (consulta de duplicadas cabe na URL e abaixo do teto de 1000 linhas); erro na
+  consulta de duplicadas **para** a ingestão em vez de virar "nada existe"; no plano B linha a linha, erro
+  que não é duplicata é contado (`failed`) e devolvido; resultado sempre traz `inserted + skipped + failed`
+  = total. A rota devolve as contagens junto do erro (e não mais a mensagem crua do banco). O import do
+  LibreView envia em partes de 2000 com progresso e, se parar, diz quanto já entrou e que reenviar não duplica.
+  Fora do escopo: leituras sem `external_id` (origem `manual`) continuam sem deduplicação.
 
 #### GLYX-20 — Reextração de valores de exame atômica
 - **Categoria:** correção · **Prioridade:** P2 · **Escopo:** observado
 - **Problema:** `app/actions/exam-values.ts:54` apaga antes de gravar, sem checar erro.
-- **Status:** não iniciada.
+- **Arquivos:** `lib/exams/save-values.ts` (novo), `app/actions/exam-values.ts`,
+  `components/exams/exam-row-actions.tsx` (novo), `app/(app)/exames/page.tsx`.
+- **Status:** implementada (local) · **validada localmente — unitária** (7 testes, 30/10/2026; suíte 111
+  arquivos / 1342 testes) · banco real e navegador **não validados** (o upsert depende da constraint
+  `exam_values_unico`, que existe desde `20260908160000`).
+  Ordem invertida, sem migration: lê os ids atuais → `upsert` por `(exam_id, analyte)` num comando só →
+  apaga só os analitos que o laudo não tem mais. Falha na leitura ou na gravação não altera nada; falha
+  na limpeza mantém os novos e devolve aviso. O slug livre cortado em 40 caracteres passou a ser
+  deduplicado antes de gravar (dois rótulos longos com o mesmo começo quebravam o unique).
+  **Achado junto:** a página descartava o retorno das duas actions — erro de extração e de data da
+  coleta era invisível. Agora `exam-row-actions.tsx` mostra erro, aviso ou "N valores extraídos". A
+  propagação da data da coleta para `exam_values` também deixou de ignorar o erro.
+  Atomicidade de banco (função `security invoker` numa transação) fica como opção se um dia for exigida.
 
 #### GLYX-21 — `/api/health/ingest` sem `mock` e com limites
 - **Categoria:** correção · **Prioridade:** P2 · **Escopo:** observado
-- **Status:** não iniciada.
+- **Arquivos:** `lib/health/snapshot-limits.ts` (novo), `app/api/health/ingest/route.ts`.
+- **Status:** implementada (local) · **validada localmente — unitária** (30/10/2026) · `source: "mock"`
+  recusado (400) no schema e de novo após normalizar; máx. 400 dias por envio e 1 MB de corpo (413, medido
+  no texto, não no Content-Length); data `AAAA-MM-DD` real e no máximo amanhã; faixas físicas por campo
+  (passos 0–100 mil, sono 0–24 h, FC repouso 20–250, kcal ativas 0–10 mil, estresse 0–100) valem também
+  para os modos `google_fit` e `apple_health`; dia e fonte repetidos no envio ficam com o último (antes
+  quebravam o upsert inteiro). Erro de gravação não devolve mais a mensagem do banco.
+  Fora: `/api/cgm/ingest` (modo `unified`) segue sem teto de leituras por pedido — os blocos do GLYX-19
+  aguentam o volume, mas não há limite explícito.
 
 #### GLYX-22 — Revisão humana antes de gravar exame lido por foto
 - **Categoria:** funcionalidade · **Prioridade:** P2 · **Escopo:** sugerido
@@ -531,12 +563,29 @@ O lote 3 não tem ID próprio: é a execução dos testes SQL das tarefas do lot
 - **Categoria:** correção · **Prioridade:** P1 · **Escopo:** observado
 - **Problema:** refeição sem faixa e JSON inválido virando zero (P12); erro na base de interações virando
   "sem alerta" (P13); checagem por foto só para "suplemento" (P14); filtro de linguagem só em teste (P16).
-- **Status:** não iniciada.
+- **Status:** implementada (local) · **validada localmente — unitária** (30/10/2026; suíte 109 arquivos /
+  1327 testes) · IA real e navegador **não validados**.
+  - P13: `lib/queries/substance-safety.ts` lança `SafetyCheckUnavailableError` em erro de leitura ou base
+    vazia; `supplement-check`, `med-label` e `/medicacao/interacoes` mostram "Checagem de interação não
+    executada" (âmbar, `checkUnavailablePayload` em `lib/safety/present.ts`). Painel e chat já tratavam a exceção.
+  - P14: `med-label` checa qualquer `kind`, não só `supplement`.
+  - P12: `validateMealEstimate` (`lib/ai/parse-meal.ts`) reprova JSON ilegível, lista vazia e valor fora de
+    0–3000 kcal / 0–400 g carb / 0–300 g prot e gord por item; `meal-text` e `meal-photo` devolvem 422/502
+    em vez de zeros. Carga glicêmica inválida vira `null`, não 0.
+  - P16: `supplement-check` passa o texto do modelo por `findForbiddenLanguage`; reprovado cai no texto
+    determinístico (`llmSkipped: true`). Chat em streaming **não** coberto (o texto já saiu quando daria
+    para checar).
+  - Glicemia: `lib/ai/glucose-average.ts` pagina e devolve média `null` se a leitura for parcial;
+    usado em `supplement-check`, `goal-feasibility`, `body-composition`.
 
 #### GLYX-28 — Calculadora de bolus mostra a idade da leitura
 - **Categoria:** correção · **Prioridade:** P1 · **Escopo:** observado
 - **Problema:** a última leitura é pré-preenchida como "glicemia atual" sem data. **Não altera fórmula nem teto.**
-- **Status:** não iniciada.
+- **Arquivos:** `lib/medications/bolus-prefill.ts` (novo), `app/(app)/medicacao/calculadora/page.tsx`,
+  `components/medicacao/bolus-calculator-form.tsx`.
+- **Status:** implementada (local) · **validada localmente — unitária** (4 testes, 30/10/2026) · só
+  pré-preenche leitura de até 20 min (corte `fresh` de `reading-freshness.ts`); mais antiga aparece com a
+  idade e o campo fica vazio · navegador **não validado** (exige sessão) · fórmula e teto intocados.
 
 #### GLYX-29 — Decisões clínicas pendentes
 - **Categoria:** operação · **Prioridade:** P1 · **Escopo:** confirmado como pendente
@@ -547,10 +596,24 @@ O lote 3 não tem ID próprio: é a execução dos testes SQL das tarefas do lot
 - **Categoria:** correção · **Prioridade:** P3 · **Escopo:** sugerido · **Status:** não iniciada.
 
 #### GLYX-31 — Endpoint de push só para hosts conhecidos
-- **Categoria:** correção · **Prioridade:** P2 · **Escopo:** sugerido · **Status:** não iniciada.
+- **Categoria:** correção · **Prioridade:** P2 · **Escopo:** sugerido
+- **Arquivos:** `lib/push/endpoint.ts` (novo), `app/api/push/subscribe/route.ts`, `lib/push/send.ts`.
+- **Status:** implementada (local) · **validada localmente — unitária** (30/10/2026) · só `https` na porta
+  padrão, sem credencial, para FCM, Mozilla, Apple e WNS (Edge); host desconhecido recebe 400 no cadastro.
+  O envio (`entregarPush`, ponto único) também recusa e marca como morta — assinatura maliciosa gravada
+  antes do filtro é apagada no próximo alarme, sem requisição sair. Navegador com serviço novo precisa
+  entrar na lista.
 
 #### GLYX-32 — Erros genéricos ao cliente
-- **Categoria:** correção · **Prioridade:** P3 · **Escopo:** sugerido · **Status:** não iniciada.
+- **Categoria:** correção · **Prioridade:** P3 · **Escopo:** sugerido
+- **Arquivos:** `lib/errors/public-error.ts` (novo) e 22 arquivos de `app/actions` e `app/api`.
+- **Status:** implementada (local) · **validada localmente — unitária** (30/10/2026) · 48 pontos que
+  devolviam `error.message` do PostgREST agora passam por `publicDbError`: log completo no servidor, frase
+  em português na tela (duplicado, valor fora do permitido, sem permissão — inclui conta desativada —,
+  sessão expirada, genérica). Teste que varre `app/` reprova `error: X.message` novo.
+  **Mantidos de propósito:** mensagens do fabricante do sensor (LibreLinkUp, Dexcom, Google Fit) nas rotas
+  de conexão e sincronização — são traduzidas por `friendlyCgmError` para a pessoa agir; e a rota de
+  autorização OAuth, que em erro de configuração mostra o nome da variável de ambiente.
 
 #### GLYX-33 — Lista de e-mails do login social no Supabase
 - **Categoria:** operação · **Prioridade:** P3 · **Escopo:** sugerido
@@ -565,7 +628,15 @@ O lote 3 não tem ID próprio: é a execução dos testes SQL das tarefas do lot
 - **Status:** não iniciada · **Exige:** A3 (produção).
 
 #### GLYX-35 — Sentry com filtro de payload e captura de erro de tela
-- **Categoria:** correção · **Prioridade:** P2 · **Escopo:** sugerido · **Status:** não iniciada.
+- **Categoria:** correção · **Prioridade:** P2 · **Escopo:** sugerido
+- **Arquivos:** `lib/sentry-scrub.ts` (novo), `sentry.server.config.ts`, `sentry.edge.config.ts`,
+  `instrumentation-client.ts`, `app/error.tsx`, `app/(app)/error.tsx`.
+- **Status:** implementada (local) · **validada localmente — unitária** (6 testes, 30/10/2026) · envio
+  real ao Sentry **não validado** (sem DSN local). `beforeSend`, `beforeSendTransaction` e
+  `beforeBreadcrumb` nos três `Sentry.init`: sai sem corpo, cookies, query (só os nomes das chaves),
+  cabeçalhos além de content-type/length, accept e user-agent; usuário só com id; breadcrumb de console
+  sem texto. As duas telas de erro que só faziam `console.error` agora capturam no Sentry (tag
+  `boundary`); a de versão antiga em cache continua fora, porque se resolve sozinha.
 
 ### Bloco 5 e operação
 

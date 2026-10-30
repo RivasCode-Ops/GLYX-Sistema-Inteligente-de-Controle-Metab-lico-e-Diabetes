@@ -7,6 +7,7 @@ import { MUSCLE_GROUP_IDS } from "@/lib/data/muscle-groups";
 import { ACTIVITY_TYPE_IDS } from "@/lib/data/activity-types";
 import { wallClockToUTC } from "@/lib/time/local-day";
 import { LOAD_PATTERN } from "@/lib/exercicios/training-plan";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const schema = z.object({
   label: z.string().min(1),
@@ -77,7 +78,7 @@ export async function logMuscleTraining(
     duration_source: "estimado",
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/exercise") };
 
   // Treinar um grupo que estava pausado é o próprio usuário dizendo que já
   // consegue seguir o plano nele de novo — retoma automaticamente.
@@ -115,7 +116,7 @@ export async function pauseMuscleGroup(muscleGroup: string, reason?: string): Pr
 
   if (error) {
     if (error.code === "23505") return { error: "Esse grupo já está pausado." };
-    return { error: error.message };
+    return { error: publicDbError(error, "actions/exercise") };
   }
 
   revalidatePath("/exercicios/recuperacao");
@@ -140,7 +141,7 @@ export async function resumeMuscleGroup(muscleGroup: string): Promise<ActionResu
     .eq("muscle_group", muscleGroup)
     .is("resumed_at", null);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/exercise") };
 
   revalidatePath("/exercicios/recuperacao");
   revalidatePath("/dashboard");
@@ -189,7 +190,7 @@ export async function addExerciseSession(formData: FormData): Promise<ActionResu
     ...(rest.duration_min != null ? { duration_source: "informado" as const } : {}),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/exercise") };
 
   revalidatePath("/exercicios");
   revalidatePath("/dashboard");
@@ -214,7 +215,7 @@ export async function deleteExerciseSession(formData: FormData): Promise<ActionR
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/exercise") };
 
   revalidatePath("/exercicios");
   revalidatePath("/exercicios/sessoes");

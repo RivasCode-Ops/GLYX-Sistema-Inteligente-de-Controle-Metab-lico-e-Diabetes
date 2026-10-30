@@ -8,6 +8,9 @@ import { parseLibreViewCsv } from "@/lib/cgm/normalize/libre-csv";
 import type { UnifiedCgmReading } from "@/lib/cgm/types";
 import { formatarData } from "@/lib/time/format";
 
+/** Leituras por pedido. ~300 KB de JSON: rápido e bem abaixo do limite de corpo da Vercel. */
+const CHUNK = 2000;
+
 type Preview = {
   readings: UnifiedCgmReading[];
   from: string;
@@ -20,6 +23,7 @@ export function LibreCsvImport() {
   const [status, setStatus] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -49,28 +53,54 @@ export function LibreCsvImport() {
     if (!preview) return;
     setLoading(true);
     setStatus(null);
+    const total = preview.readings.length;
+    let inserted = 0;
+    let skipped = 0;
+
+    // Em partes: 90 dias de LibreView são ~8.600 leituras, e um pedido só que
+    // cai no meio não diz quanto entrou (GLYX-19). Cada parte é confirmada
+    // antes da próxima; reenviar o arquivo depois não duplica nada.
+    const parar = (motivo: string) => {
+      const enviadas = inserted + skipped;
+      setStatus(
+        `${motivo} ${enviadas ? `${enviadas} de ${total} leituras já foram processadas (${inserted} novas) e ficam salvas. ` : ""}` +
+          "Envie o mesmo arquivo de novo para completar — o que já entrou é reconhecido e ignorado."
+      );
+      if (inserted) router.refresh();
+    };
+
     try {
-      const res = await fetch("/api/cgm/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "unified", readings: preview.readings }),
-      });
-      const data = (await res.json()) as { inserted?: number; skipped?: number; error?: string };
-      if (!res.ok) {
-        setStatus(typeof data.error === "string" ? data.error : "Falha na importação.");
-        return;
+      for (let i = 0; i < total; i += CHUNK) {
+        setProgress(`Importando ${Math.min(i + CHUNK, total)} de ${total}…`);
+        const res = await fetch("/api/cgm/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "unified", readings: preview.readings.slice(i, i + CHUNK) }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          inserted?: number;
+          skipped?: number;
+          error?: string;
+        };
+        inserted += data.inserted ?? 0;
+        skipped += data.skipped ?? 0;
+        if (!res.ok) {
+          parar(typeof data.error === "string" ? data.error : "Falha na importação.");
+          return;
+        }
       }
       setDone(
-        `✅ ${data.inserted ?? 0} leituras novas importadas` +
-          (data.skipped ? ` (${data.skipped} já existiam — ignoradas)` : "") +
+        `✅ ${inserted} leituras novas importadas` +
+          (skipped ? ` (${skipped} já existiam — ignoradas)` : "") +
           ". Veja em Glicemia → Tendências."
       );
       setPreview(null);
       router.refresh();
     } catch {
-      setStatus("Erro de rede.");
+      parar("Erro de rede.");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }
 
@@ -108,7 +138,7 @@ export function LibreCsvImport() {
               {preview.to})
             </p>
             <Button className="mt-2" onClick={() => void importReadings()} disabled={loading}>
-              {loading ? "Importando…" : "Importar para o GLYX"}
+              {loading ? (progress ?? "Importando…") : "Importar para o GLYX"}
             </Button>
           </div>
         ) : null}

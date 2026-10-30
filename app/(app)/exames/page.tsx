@@ -12,19 +12,10 @@ import { EXAM_TYPE_LABEL, parseExamType } from "@/lib/exams/types";
 import { buildExamParameterSeries } from "@/lib/exams/parameter-series";
 import { ExamParameterChart } from "@/components/exams/exam-parameter-chart";
 import { formatarData } from "@/lib/time/format";
-import { definirDataDaColeta, extrairValoresDoExame } from "@/app/actions/exam-values";
+import { ExamCollectedOnForm, ExamExtractValuesForm } from "@/components/exams/exam-row-actions";
 import { formatarDiaISO } from "@/lib/time/format";
 
 export default async function ExamesPage() {
-  async function extrairValoresAction(formData: FormData): Promise<void> {
-    "use server";
-    await extrairValoresDoExame(formData);
-  }
-  async function definirDataDaColetaAction(formData: FormData): Promise<void> {
-    "use server";
-    await definirDataDaColeta(formData);
-  }
-
   let exams: {
     id: string;
     title: string | null;
@@ -168,31 +159,8 @@ export default async function ExamesPage() {
                 </Link>
 
                 <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/70 px-4 py-2.5">
-                  <form action={definirDataDaColetaAction} className="flex items-center gap-1.5">
-                    <input type="hidden" name="exam_id" value={e.id} />
-                    <label className="text-[11px] text-zinc-500" htmlFor={`coleta-${e.id}`}>
-                      Coleta
-                    </label>
-                    <input
-                      id={`coleta-${e.id}`}
-                      type="date"
-                      name="collected_on"
-                      defaultValue={e.collected_on ?? ""}
-                      className="h-7 rounded-md border border-zinc-800 bg-zinc-950 px-2 font-mono text-[11px] text-zinc-300"
-                    />
-                    <Button type="submit" variant="ghost" size="sm" className="h-7 text-[11px]">
-                      Salvar
-                    </Button>
-                  </form>
-
-                  {e.raw_text ? (
-                    <form action={extrairValoresAction}>
-                      <input type="hidden" name="exam_id" value={e.id} />
-                      <Button type="submit" variant="outline" size="sm" className="h-7 text-[11px]">
-                        Extrair valores
-                      </Button>
-                    </form>
-                  ) : null}
+                  <ExamCollectedOnForm examId={e.id} collectedOn={e.collected_on} />
+                  {e.raw_text ? <ExamExtractValuesForm examId={e.id} /> : null}
                 </div>
               </li>
             ))}

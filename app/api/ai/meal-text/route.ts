@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
-import { isUnusableCompletion, parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
+import { isUnusableCompletion, mealEstimateError, validateMealEstimate } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -79,14 +79,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const rawParsed = parseMealJson(choice?.message?.content ?? "{}");
-  const totals = sumMealItems(rawParsed);
+  const estimate = validateMealEstimate(choice?.message?.content);
+  if (!estimate.ok) {
+    console.warn("[meal-text] estimativa reprovada:", estimate.motivo, estimate.detalhe);
+    const { error, status } = mealEstimateError(estimate.motivo, "texto");
+    return NextResponse.json({ error }, { status });
+  }
 
   return NextResponse.json({
     meal: {
-      ...totals,
-      glycemic_load_estimate: rawParsed.glycemic_load_estimate ?? 0,
-      notes: rawParsed.notes ?? "",
+      ...estimate.totals,
+      glycemic_load_estimate: estimate.glycemicLoad,
+      notes: typeof estimate.raw.notes === "string" ? estimate.raw.notes : "",
     },
   });
 }

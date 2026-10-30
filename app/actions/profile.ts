@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 import {
   isCoherentTargetRange,
   MIN_TARGET_SPAN_MG_DL,
@@ -97,7 +98,7 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     { onConflict: "id" }
   );
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/profile") };
 
   revalidatePath("/perfil");
   return { ok: true };
@@ -153,7 +154,7 @@ export async function completeOnboarding(formData: FormData): Promise<ActionResu
     },
     { onConflict: "id" }
   );
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/profile") };
 
   if (weight_kg) {
     await supabase.from("weight_logs").upsert(
@@ -195,7 +196,7 @@ export async function logWeight(formData: FormData): Promise<ActionResult> {
     { onConflict: "user_id,logged_on" }
   );
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/profile") };
 
   revalidatePath("/perfil");
   revalidatePath("/dashboard");

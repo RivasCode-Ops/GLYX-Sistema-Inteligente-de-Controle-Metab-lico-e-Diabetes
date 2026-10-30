@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const schema = z.object({
   systolic: z.coerce.number().int().min(50).max(300),
@@ -35,7 +36,7 @@ export async function addBloodPressureReading(formData: FormData): Promise<Actio
     pulse: parsed.data.pulse ?? null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/blood-pressure") };
 
   revalidatePath("/dashboard");
   revalidatePath("/glicemia/pressao");
@@ -60,7 +61,7 @@ export async function deleteBloodPressureReading(formData: FormData): Promise<Ac
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/blood-pressure") };
 
   revalidatePath("/glicemia/pressao");
   return { ok: true };

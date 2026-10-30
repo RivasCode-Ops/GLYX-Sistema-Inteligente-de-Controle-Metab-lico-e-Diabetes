@@ -5,6 +5,7 @@ import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
+import { describeGlucoseAverage, glucoseAverage } from "@/lib/ai/glucose-average";
 import { GOAL_LABEL, bmr, dailyTargets, safeWeeklyRateKg, tdee } from "@/lib/health/energy";
 import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
 import { createClient } from "@/lib/supabase/server";
@@ -66,14 +67,7 @@ export async function POST() {
     );
   }
 
-  const { data: glucose } = await supabase
-    .from("glucose_readings")
-    .select("value_mg_dl")
-    .eq("user_id", user.id)
-    .gte("recorded_at", new Date(Date.now() - 14 * 86_400_000).toISOString());
-  const glucoseAvg = glucose?.length
-    ? Math.round(glucose.reduce((s, g) => s + g.value_mg_dl, 0) / glucose.length)
-    : null;
+  const glucose = await glucoseAverage(supabase, user.id);
 
   const { data: meds } = await supabase
     .from("medications")
@@ -108,7 +102,7 @@ DADOS DO USUÁRIO:
 - Objetivo: ${GOAL_LABEL[goal]}${profile.target_weight_kg ? ` | Peso-meta declarado: ${profile.target_weight_kg} kg` : ""}
 - Peso atual: ${body.weightKg} kg | Altura: ${body.heightCm} cm | Idade: ${age} | Sexo: ${body.sex === "m" ? "masculino" : "feminino"}
 - Atividade: ${profile.activity_level} | Diabetes: ${profile.diabetes_type ?? "não informado"}
-- Glicemia média (14 dias): ${glucoseAvg ?? "sem registros"} mg/dL | Meta glicêmica: ${profile.target_glucose_min}-${profile.target_glucose_max} mg/dL
+- ${describeGlucoseAverage(glucose)} | Meta glicêmica: ${profile.target_glucose_min}-${profile.target_glucose_max} mg/dL
 - Medicações ativas: ${meds?.length ? meds.map((m) => `${sanitizeForPrompt(m.name, 60)}${m.dosage ? ` ${sanitizeForPrompt(m.dosage, 30)}` : ""}`).join(", ") : "nenhuma registrada"}
 - Histórico familiar: ${profile.family_history ?? "não informado"}
 - Últimas pesagens: ${weights.map((w) => `${w.weight_kg}kg em ${w.logged_on}`).join("; ")}

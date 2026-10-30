@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { loadInteracoesEmUso } from "@/lib/queries/substance-safety";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CircleHelp, Info } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";import { AlertTriangle, CircleHelp, Info } from "lucide-react";
 
 export const metadata = { title: "Interações — GLYX" };
 
@@ -41,7 +40,32 @@ export default async function InteracoesPage() {
     return <p className="text-sm text-zinc-500">Entre na sua conta para ver as interações.</p>;
   }
 
-  const { interacoes, naoReconhecidos, totalItens } = await loadInteracoesEmUso(supabase, user.id);
+  // Falha de leitura vira aviso, não "Nenhuma interação na base" (GLYX-27 / P13).
+  let panorama;
+  try {
+    panorama = await loadInteracoesEmUso(supabase, user.id);
+  } catch (e) {
+    console.error("[interacoes] checagem de interação falhou", e);
+    return (
+      <div className="mx-auto max-w-3xl">
+        <Card className="border-amber-500/40 bg-amber-500/10">
+          <CardHeader>
+            <CardTitle className="text-base text-amber-300">
+              ⚠️ Checagem de interação não executada
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-zinc-200">
+              A leitura da base de interação falhou, então o app não sabe agora se o que você usa
+              conflita entre si. Isso não é o mesmo que &quot;nenhuma interação&quot; — tente de novo
+              mais tarde ou confirme com seu médico ou farmacêutico.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  const { interacoes, naoReconhecidos, totalItens } = panorama;
   const graves = interacoes.filter((i) => i.finding.severity === "grave").length;
 
   return (

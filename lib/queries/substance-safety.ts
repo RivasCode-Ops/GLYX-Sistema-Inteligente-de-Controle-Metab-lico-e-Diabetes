@@ -20,6 +20,19 @@ import {
 
 export type SafetyBase = { aliases: AliasRow[]; interactions: InteractionFinding[] };
 
+/**
+ * A leitura falhou e não há veredito. Lançar é o comportamento certo: todo
+ * chamador já trata exceção como "checagem não executada". O que não pode
+ * acontecer é devolver lista vazia — base vazia gera veredito "sem alerta" para
+ * qualquer substância, que é o oposto do que aconteceu (GLYX-27 / P13).
+ */
+export class SafetyCheckUnavailableError extends Error {
+  constructor(motivo: string) {
+    super(`Checagem de interação indisponível: ${motivo}`);
+    this.name = "SafetyCheckUnavailableError";
+  }
+}
+
 export async function loadSafetyBase(supabase: SupabaseClient): Promise<SafetyBase> {
   const [aliasRes, interRes] = await Promise.all([
     supabase.from("substance_aliases").select("canonical, alias"),
@@ -27,6 +40,14 @@ export async function loadSafetyBase(supabase: SupabaseClient): Promise<SafetyBa
       .from("substance_interactions")
       .select("substance_a, substance_b, severity, mechanism, message"),
   ]);
+
+  if (aliasRes.error) throw new SafetyCheckUnavailableError(`aliases: ${aliasRes.error.message}`);
+  if (interRes.error) throw new SafetyCheckUnavailableError(`interações: ${interRes.error.message}`);
+  // A base é semeada por migration e nunca fica vazia em uso normal. Vazia é
+  // sinal de leitura barrada (policy, papel errado), não de "nada a alertar".
+  if (!aliasRes.data?.length || !interRes.data?.length) {
+    throw new SafetyCheckUnavailableError("base de interação vazia");
+  }
 
   const aliases = (aliasRes.data ?? []).map((r) => ({
     canonical: r.canonical as string,
@@ -84,6 +105,11 @@ export async function loadUserSubstances(
       .eq("user_id", userId)
       .gte("applied_at", desde),
   ]);
+
+  // Conjunto em uso incompleto é o mesmo defeito da base vazia, do outro lado:
+  // sem a insulina na lista, berberina × insulina nunca é cruzado.
+  if (medsRes.error) throw new SafetyCheckUnavailableError(`medicamentos: ${medsRes.error.message}`);
+  if (insulinRes.error) throw new SafetyCheckUnavailableError(`insulina: ${insulinRes.error.message}`);
 
   const names = (medsRes.data ?? [])
     .map((m) => (m.name as string | null) ?? "")

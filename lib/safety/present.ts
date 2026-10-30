@@ -103,6 +103,31 @@ export function toSafetyPayload(verdict: SafetyVerdict): SafetyPayload {
   };
 }
 
+/** Legenda do estado em que a checagem nem rodou — base ou cadastro ilegível. */
+export const CHECK_UNAVAILABLE_NOTE =
+  "A checagem de interação não pôde ser feita agora, então o app não sabe se este produto conflita " +
+  "com o que você usa. Não trate a falta de alerta como liberação: tente de novo mais tarde ou " +
+  "confirme com seu médico ou farmacêutico antes de usar.";
+
+/**
+ * Payload para quando não há veredito. É âmbar, não cinza: cinza é "procurei e
+ * não achei", e aqui ninguém procurou (GLYX-27 / P13, P14). Antes, a falha
+ * virava `safety: null`, que a tela desenha igual a "nada a dizer".
+ */
+export function checkUnavailablePayload(): SafetyPayload {
+  return {
+    tone: "atencao",
+    label: "⚠️ Checagem de interação não executada",
+    blocked: false,
+    worst: null,
+    findings: [],
+    unresolved: [],
+    unknownNote: CHECK_UNAVAILABLE_NOTE,
+    noFindingNote: null,
+    doctorNote: DOCTOR_NOTE,
+  };
+}
+
 const SEVERIDADE_VAZIA = "nenhuma";
 
 /**

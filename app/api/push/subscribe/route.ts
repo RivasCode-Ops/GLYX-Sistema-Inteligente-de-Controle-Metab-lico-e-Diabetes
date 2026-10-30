@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { isKnownPushEndpoint } from "@/lib/push/endpoint";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().max(2048).refine(isKnownPushEndpoint),
   keys: z.object({
     p256dh: z.string().min(1),
     auth: z.string().min(1),
@@ -22,10 +24,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
   const parsed = subscriptionSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Assinatura inválida." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Assinatura inválida ou de um serviço de notificação não reconhecido." },
+      { status: 400 }
+    );
   }
 
   const { error } = await supabase.from("push_subscriptions").upsert(
@@ -39,7 +44,7 @@ export async function POST(req: Request) {
     { onConflict: "endpoint" }
   );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: publicDbError(error, "api/push/subscribe/route") }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 

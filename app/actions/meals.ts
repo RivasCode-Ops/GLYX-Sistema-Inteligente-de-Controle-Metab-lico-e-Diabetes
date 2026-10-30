@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 import {
   uploadPrivatePhotoResult,
   UPLOAD_FAIL_MESSAGE,
@@ -73,7 +74,7 @@ export async function addMeal(formData: FormData): Promise<ActionResult> {
     ...(eatenAt ? { eaten_at: eatenAt } : {}),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/meals") };
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
@@ -132,7 +133,7 @@ export async function saveMealPhoto(formData: FormData): Promise<ActionResult> {
     eaten_at: new Date().toISOString(),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/meals") };
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
@@ -195,7 +196,7 @@ export async function saveMealPhotoItems(formData: FormData): Promise<ActionResu
   }));
 
   const { error } = await supabase.from("meals").insert(rows);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/meals") };
 
   revalidatePath("/dashboard");
   revalidatePath("/alimentacao");
@@ -228,7 +229,7 @@ export async function deleteMeal(formData: FormData): Promise<ActionResult> {
     .maybeSingle();
 
   const { error } = await supabase.from("meals").delete().eq("id", id).eq("user_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/meals") };
 
   // saveMealPhotoItems dá o MESMO photo_path a vários itens da mesma foto —
   // só apaga do bucket se nenhuma refeição "irmã" ainda referenciar essa

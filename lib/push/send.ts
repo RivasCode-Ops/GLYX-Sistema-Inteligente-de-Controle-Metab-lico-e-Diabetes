@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isKnownPushEndpoint } from "./endpoint";
 
 export type PushPayload = {
   title: string;
@@ -54,6 +55,11 @@ export async function entregarPush(
   payload: PushPayload
 ): Promise<ResultadoEntrega> {
   if (!configure()) return { entregue: false, morta: false, motivo: "push não configurado no servidor" };
+  // Assinatura gravada antes do filtro da rota de cadastro (GLYX-31): não sai
+  // requisição para ela, e `morta` faz quem chama apagá-la.
+  if (!isKnownPushEndpoint(sub.endpoint)) {
+    return { entregue: false, morta: true, motivo: "endpoint fora dos serviços de push conhecidos" };
+  }
   try {
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

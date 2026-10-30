@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 // Registro de insulina EXTRA (correção quando a glicemia está alta, dose de
 // refeição fora da agenda etc.): guarda o que o usuário JÁ aplicou, por
@@ -52,7 +53,7 @@ export async function addInsulinLog(formData: FormData): Promise<ActionResult> {
     glucose_mg_dl: parsed.data.glucose_mg_dl ?? null,
     notes: parsed.data.notes?.trim() || null,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/insulin") };
 
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");
@@ -77,7 +78,7 @@ export async function deleteInsulinLog(formData: FormData): Promise<ActionResult
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/insulin") };
 
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");

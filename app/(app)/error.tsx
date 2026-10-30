@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 
 // Assinaturas de erro de "peça antiga": o cliente ficou numa versão anterior
@@ -24,7 +25,12 @@ export default function AppError({
 
   useEffect(() => {
     console.error(error);
-    if (!isStaleBuild) return;
+    // Versão antiga em cache é esperada e se resolve sozinha: não vai ao Sentry.
+    // O resto ia só para o console do aparelho — e de lá ninguém lê (GLYX-35).
+    if (!isStaleBuild) {
+      Sentry.captureException(error, { tags: { boundary: "app" } });
+      return;
+    }
     // Recarrega sozinho no máximo 1x por 30s — evita loop se o reload não
     // resolver (ex.: sem rede).
     const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) ?? 0);

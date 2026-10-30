@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BolusCalculatorForm } from "@/components/medicacao/bolus-calculator-form";
 import { isSupabaseConfigured } from "@/lib/env";
+import { bolusGlucosePrefill, type BolusPrefill } from "@/lib/medications/bolus-prefill";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function CalculadoraDosePage() {
   let carbRatio: number | null = null;
   let correctionFactor: number | null = null;
   let targetGlucose: number | null = null;
-  let latestGlucose: number | null = null;
+  let glucosePrefill: BolusPrefill = { value: null, latest: null };
   let targetGlucoseMin: number | null = null;
 
   if (isSupabaseConfigured()) {
@@ -26,7 +27,7 @@ export default async function CalculadoraDosePage() {
             .maybeSingle(),
           supabase
             .from("glucose_readings")
-            .select("value_mg_dl")
+            .select("value_mg_dl, recorded_at")
             .eq("user_id", user.id)
             .order("recorded_at", { ascending: false })
             .limit(1)
@@ -36,7 +37,9 @@ export default async function CalculadoraDosePage() {
         correctionFactor = profile?.correction_factor ?? null;
         targetGlucose = profile?.target_glucose_bolus ?? null;
         targetGlucoseMin = profile?.target_glucose_min ?? null;
-        latestGlucose = glucose?.value_mg_dl ?? null;
+        glucosePrefill = bolusGlucosePrefill(
+          glucose ? { value: glucose.value_mg_dl, recordedAt: glucose.recorded_at } : null
+        );
       }
     }
   }
@@ -57,7 +60,7 @@ export default async function CalculadoraDosePage() {
               carbRatio={carbRatio}
               correctionFactor={correctionFactor}
               targetGlucose={targetGlucose}
-              latestGlucose={latestGlucose}
+              glucosePrefill={glucosePrefill}
               targetGlucoseMin={targetGlucoseMin}
             />
           ) : (

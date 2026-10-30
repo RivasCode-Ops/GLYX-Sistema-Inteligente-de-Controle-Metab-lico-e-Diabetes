@@ -96,7 +96,18 @@ export async function POST(req: Request) {
   const result = await ingestUnifiedReadings(supabase, user.id, readings);
 
   if (result.error) {
-    return NextResponse.json({ error: result.error }, { status: 500 });
+    // As contagens vão junto: o que entrou antes da falha está gravado, e a
+    // tela precisa dizer isso em vez de um "falhou" que sugere que nada entrou.
+    console.error("[cgm/ingest] ingestão interrompida", result);
+    return NextResponse.json(
+      {
+        error: "A importação parou no meio.",
+        inserted: result.inserted,
+        skipped: result.skipped,
+        failed: result.failed,
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({
