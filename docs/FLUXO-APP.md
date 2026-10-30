@@ -1,7 +1,7 @@
 # Fluxo do aplicativo — GLYX
 
 > **Revisão técnica concluída em 15/10/2026** — conferido contra o código, as migrations e a validação
-> local de 14–15/10. **Não aprovado pelo Rivas.** D1–D4 aprovadas em 15/10. Decisões pendentes que afetam este documento: D5 e D13 (sugestão automática de refeição), A2 (os fluxos do lote 1 não estão em produção).
+> local de 14–15/10. **Não aprovado pelo Rivas.** D1–D4 aprovadas em 15/10. Decisões pendentes que afetam este documento: D5 e D13 (sugestão automática de refeição). A2 executada em 30/10/2026: os fluxos do lote 1 estão em produção.
 
 **Data:** 14/10/2026 · **Fonte:** `lib/navigation.ts` e `app/**/page.tsx` (lidos nesta data)
 
@@ -43,7 +43,7 @@ Tela (Server Component) ─▶ Server Action / Route Handler
 
 ## 3. Fluxos críticos
 
-### 3.1 Alarme de medicação (código do lote 1: validado em teste local com push simulado; migration não aplicada em produção)
+### 3.1 Alarme de medicação (lote 1 implantado em 30/10: código e migration no ar; validado em teste local com push simulado; entrega real no aparelho ainda não validada)
 1. A cada 5 min, `pg_cron` chama `dispatch_med_alarms()`.
 2. `med_alarms_due(now())` lista as doses vencidas há menos de 10 min, **só nos dias de dose** da
    cadência, ignorando rigidez "livre", conta desativada e horário inválido; considera hoje e ontem

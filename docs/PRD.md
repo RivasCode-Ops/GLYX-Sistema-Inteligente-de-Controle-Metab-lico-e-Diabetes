@@ -65,9 +65,9 @@ Critério de aceitação entre parênteses quando já existe caso no roteiro de 
 
 ### 3.2 Medicação
 - R-MED-1 Cadastrar medicamento ou suplemento, manualmente ou por foto do rótulo [observado].
-- R-MED-2 Declarar **horários** e **frequência** (diária, semanal num dia, a cada N dias a partir de uma data) [observado: a coluna existe desde 07/09; o formulário passou a ter o campo em 14/10]. **D1 (aprovada em 15/10):** em cadastro novo com horário, a frequência é obrigatória e escolhida explicitamente; itens antigos mantêm o alarme como sempre e aparecem como "frequência a confirmar" até a pessoa confirmar por ação explícita; nada muda horário ou frequência de item antigo sozinho [implementado local, não implantado].
-- R-MED-3 **Alarme push na hora certa e só nos dias de dose** [observado — a promessa existe; o desvio era GLYX-07]. **D2 (aprovada):** o intervalo conta da data de início escolhida, não dispara antes dela, e a tela avisa quando o início está no futuro [implementado local].
-- R-MED-4 Alarme crítico para medicamento [observado]. Item de rigidez "livre": o comentário da coluna diz "sem alarme", mas nenhuma tela permite escolher "livre" e o alarme antigo tocava para ele — **D3 (aprovada):** "livre" com horário é configuração inconsistente — não recebe alarme implícito, a tela mostra a inconsistência, e o alarme só é ativado com escolha explícita de frequência e programação; nenhuma tela nova de "uso livre" [implementado local].
+- R-MED-2 Declarar **horários** e **frequência** (diária, semanal num dia, a cada N dias a partir de uma data) [observado: a coluna existe desde 07/09; o formulário passou a ter o campo em 14/10]. **D1 (aprovada em 15/10):** em cadastro novo com horário, a frequência é obrigatória e escolhida explicitamente; itens antigos mantêm o alarme como sempre e aparecem como "frequência a confirmar" até a pessoa confirmar por ação explícita; nada muda horário ou frequência de item antigo sozinho [implantado em 30/10; os 12 itens ativos aparecem como "a confirmar"].
+- R-MED-3 **Alarme push na hora certa e só nos dias de dose** [observado — a promessa existe; o desvio era GLYX-07]. **D2 (aprovada):** o intervalo conta da data de início escolhida, não dispara antes dela, e a tela avisa quando o início está no futuro [implantado em 30/10].
+- R-MED-4 Alarme crítico para medicamento [observado]. Item de rigidez "livre": o comentário da coluna diz "sem alarme", mas nenhuma tela permite escolher "livre" e o alarme antigo tocava para ele — **D3 (aprovada):** "livre" com horário é configuração inconsistente — não recebe alarme implícito, a tela mostra a inconsistência, e o alarme só é ativado com escolha explícita de frequência e programação; nenhuma tela nova de "uso livre" [implantado em 30/10].
 - R-MED-5 Adiar dose até 3 vezes; depois, só "Registrei" ou "Pulei hoje" [observado] (roteiro §2).
 - R-MED-6 Registrar dose (tela ou notificação) **sem duplicar a mesma dose** [observado] (roteiro §2 "não duplica").
 - R-MED-7 Registro atrasado é aceito e rotulado [observado] (roteiro §2).
@@ -92,29 +92,29 @@ Critério de aceitação entre parênteses quando já existe caso no roteiro de 
 - R-COM-1 Medidas, fotos (IA só sob pedido), metas e veredito [observado] (roteiro §6).
 
 ### 3.5 Análise e relatórios
-- R-ANA-1 Auditoria metabólica e resumo semanal sobre **todo** o período; dado incompleto **não vira número** [observado; corrigido no código em 14/10 e validado em teste local — GLYX-16; não implantado].
+- R-ANA-1 Auditoria metabólica e resumo semanal sobre **todo** o período; dado incompleto **não vira número** [observado; corrigido no código em 14/10 e validado em teste local — GLYX-16; implantado em 30/10].
 - R-ANA-2 Relatório para o médico com o aviso de idade da auditoria [observado] (roteiro §6).
 - R-ANA-3 Marcador de evento (início de suplemento etc.) com comparação antes/depois [observado — tabela existe; tela falta, GLYX-37].
 
 ### 3.6 Copiloto de IA
 - R-IA-1 Chat com o contexto do usuário, declarando o que não foi registrado [observado].
-- R-IA-2 O usuário não altera as instruções de sistema [observado; corrigido no código em 14/10 e validado em teste local com IA simulada — GLYX-26; não implantado].
-- R-IA-3 Limite de uso por hora que o usuário não consegue zerar [observado; corrigido no código em 14/10 e validado em teste local — GLYX-24; migration não aplicada em produção].
+- R-IA-2 O usuário não altera as instruções de sistema [observado; corrigido no código em 14/10 e validado em teste local com IA simulada — GLYX-26; implantado em 30/10].
+- R-IA-3 Limite de uso por hora que o usuário não consegue zerar [observado; corrigido no código em 14/10 e validado em teste local — GLYX-24; migration aplicada em produção em 30/10].
 - R-IA-4 Resposta interrompida ou truncada é sinalizada [observado].
 
 ### 3.7 Conta, privacidade e operação
 - R-CON-1 Cadastro só por convite [comprovado — 14/08].
-- R-CON-2 Conta desativada perde acesso a **tudo**, inclusive pelo banco direto [observado; corrigido no código em 14/10 e validado em teste local — GLYX-23; migration não aplicada em produção].
-- R-LGPD-1 Exportar **todos** os dados, sem corte silencioso [observado; corrigido no código em 14/10 e validado em teste local — GLYX-15/16; não implantado].
+- R-CON-2 Conta desativada perde acesso a **tudo**, inclusive pelo banco direto [observado; corrigido no código em 14/10 e validado em teste local — GLYX-23; migration aplicada em produção em 30/10].
+- R-LGPD-1 Exportar **todos** os dados, sem corte silencioso [observado; corrigido no código em 14/10 e validado em teste local — GLYX-15/16; implantado em 30/10].
 - R-LGPD-2 Apagar **todos** os dados clínicos e fotos; a conta de login permanece [observado; corrigido no código em 14/10 e validado em teste local]. **D4 (aprovada):** a exclusão apaga também todo o histórico individual de uso de IA; isso reinicia a cota individual por hora (consequência aceita). Não há teto global de gasto que bloqueie chamadas — só o medidor do painel admin, que deixa de contar o que foi apagado [implementado local; conflito informado em `DECISOES-D1-D4.md`].
 - R-LGPD-3 Política de privacidade que diga quais dados vão a qual provedor e onde [observado no DPIA; texto pendente — D5, D6]. Envio automático de glicemia à IA sem ação do titular: [`P06-ENVIO-AUTOMATICO-IA.md`](P06-ENVIO-AUTOMATICO-IA.md).
 
 ## 4. Critérios de "pronto para beta mais amplo" (ROADMAP)
 
-| Critério | Estado em 15/10/2026 |
+| Critério | Estado em 15/10/2026 (migrations atualizadas em 30/10) |
 |---|---|
 | `check:prod` verde nas obrigatórias | não verificado |
-| Migrations e secrets de produção aplicados | não verificado; **4 migrations novas não aplicadas em produção** (validadas só em banco local descartável) |
+| Migrations e secrets de produção aplicados | **migrations do lote 1 aplicadas em produção em 30/10** (mais a `20261030120000`); secrets não verificados |
 | Signup fechado + convite | aprovado (14/08) |
 | Exclusão e exportação exercitadas em conta real | **validadas em teste local** com conta sintética (14/10); em conta real: pendente |
 | Sentry recebendo erros de cron | pendente |
