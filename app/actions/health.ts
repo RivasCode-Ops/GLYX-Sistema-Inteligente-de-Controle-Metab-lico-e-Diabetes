@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { ingestHealthSnapshots } from "@/lib/health/ingest";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const schema = z.object({
   snapshot_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -42,7 +43,7 @@ export async function logManualSleep(formData: FormData): Promise<ActionResult> 
       metadata: null,
     },
   ]);
-  if (result.error) return { error: result.error };
+  if (result.error) return { error: publicDbError({ message: result.error }, "actions/health") };
 
   revalidatePath("/integracoes");
   revalidatePath("/dashboard");

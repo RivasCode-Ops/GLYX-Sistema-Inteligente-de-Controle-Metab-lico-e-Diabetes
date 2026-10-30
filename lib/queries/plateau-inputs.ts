@@ -78,6 +78,7 @@ export async function getPlateauInputs(dias = 28): Promise<PlateauInputs> {
       .from("medication_logs")
       .select("id")
       .eq("user_id", user.id)
+      .eq("confirmed", true) // "Pulei hoje" não é dose tomada (D16)
       .gte("taken_at", desdeIso),
   ]);
 

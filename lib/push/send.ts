@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isKnownPushEndpoint } from "./endpoint";
 
 export type PushPayload = {
   title: string;
@@ -8,7 +9,23 @@ export type PushPayload = {
   critical?: boolean;
   /** ID do medicamento — habilita a ação "Já tomei" na notificação */
   medId?: string | null;
+  /** Dose anunciada (ISO UTC) — o "Já tomei" registra esta dose, não a mais próxima. */
+  scheduledFor?: string | null;
+  /** Tag da notificação: uma por dose, para não se substituírem nem duplicarem. */
+  tag?: string | null;
 };
+
+/**
+ * Resultado de UMA tentativa de entrega.
+ *
+ * `sendToSubscription` devolve só "a assinatura está viva", e uma falha
+ * transitória (5xx do serviço de push, rede) também conta como viva — certo
+ * para decidir limpeza, errado para decidir se o alarme chegou. O despacho de
+ * alarme precisa dos três casos separados para saber se reenvia.
+ */
+export type ResultadoEntrega =
+  | { entregue: true }
+  | { entregue: false; morta: boolean; motivo: string };
 
 export type StoredSubscription = {
   endpoint: string;
@@ -32,27 +49,43 @@ function configure(): boolean {
   return true;
 }
 
-/** Envia para uma assinatura; devolve false se ela expirou (para limpeza). */
-export async function sendToSubscription(
+/** Uma tentativa de entrega, com o resultado detalhado. */
+export async function entregarPush(
   sub: StoredSubscription,
   payload: PushPayload
-): Promise<boolean> {
-  if (!configure()) return true;
+): Promise<ResultadoEntrega> {
+  if (!configure()) return { entregue: false, morta: false, motivo: "push não configurado no servidor" };
+  // Assinatura gravada antes do filtro da rota de cadastro (GLYX-31): não sai
+  // requisição para ela, e `morta` faz quem chama apagá-la.
+  if (!isKnownPushEndpoint(sub.endpoint)) {
+    return { entregue: false, morta: true, motivo: "endpoint fora dos serviços de push conhecidos" };
+  }
   try {
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify(payload),
       { TTL: 60 * 60, urgency: payload.critical ? "high" : "normal" }
     );
-    return true;
+    return { entregue: true };
   } catch (e) {
     const status =
       typeof e === "object" && e !== null && "statusCode" in e
         ? Number((e as { statusCode?: number }).statusCode)
         : null;
     // 404/410 = assinatura morta (app desinstalado, permissão revogada)
-    return !(status === 404 || status === 410);
+    const morta = status === 404 || status === 410;
+    return { entregue: false, morta, motivo: status ? `serviço de push respondeu ${status}` : "falha de rede" };
   }
+}
+
+/** Envia para uma assinatura; devolve false se ela expirou (para limpeza). */
+export async function sendToSubscription(
+  sub: StoredSubscription,
+  payload: PushPayload
+): Promise<boolean> {
+  if (!configure()) return true;
+  const r = await entregarPush(sub, payload);
+  return r.entregue || !r.morta;
 }
 
 /** Envia para todas as assinaturas do usuário da sessão atual (RLS restringe ao dono). */

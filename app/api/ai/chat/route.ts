@@ -7,9 +7,7 @@ import { featureIndexForPrompt } from "@/lib/feature-index";
 import { appendMessages, ensureThread } from "@/lib/queries/ai-threads";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-
-const MAX_MESSAGES = 30;
-const MAX_MESSAGE_CHARS = 4000;
+import { AVISO_STREAM_INTERROMPIDO, validarPayloadDoChat } from "@/lib/ai/chat-payload";
 
 const SYSTEM = `Você é o copiloto metabólico GLYX: linguagem clínica, racional e segura em português do Brasil, falando com um usuário leigo.
 Você recebe um resumo dos dados recentes do usuário: glicemia, refeições (inclusive as que causaram pico), insulina extra aplicada, bebidas, exercício, faixa alvo, padrão de glicemia por hora do dia, o score mais recente do Mapa de risco (auditoria longitudinal) com seus principais fatores, alertas metabólicos já notificados nas últimas 48h, medicação/insulina programada com contagem de doses REGISTRADAS no app (não necessariamente tomadas — pode ser falha de registro, não presuma não-adesão) e sono dos últimos dias. Use-os para análises concretas e personalizadas:
@@ -43,26 +41,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const body = (await req.json()) as {
-    messages?: { role: string; content: string }[];
-    threadId?: string;
-  };
-  const messages = body.messages ?? [];
-  if (!messages.length) {
-    return NextResponse.json({ error: "Mensagens vazias." }, { status: 400 });
+  // Validação em tempo de execução (lib/ai/chat-payload.ts): papel só
+  // user/assistant — `system` vindo do navegador acrescentaria instruções às do
+  // app — e JSON inválido é 400, não 500.
+  const validado = validarPayloadDoChat(await req.json().catch(() => null));
+  if (!validado.ok) {
+    return NextResponse.json({ error: validado.erro }, { status: 400 });
   }
-  if (messages.length > MAX_MESSAGES) {
-    return NextResponse.json(
-      { error: `Conversa muito longa (máx. ${MAX_MESSAGES} mensagens). Inicie um novo chat.` },
-      { status: 400 }
-    );
-  }
-  if (messages.some((m) => typeof m.content !== "string" || m.content.length > MAX_MESSAGE_CHARS)) {
-    return NextResponse.json(
-      { error: `Mensagem muito longa (máx. ${MAX_MESSAGE_CHARS} caracteres).` },
-      { status: 400 }
-    );
-  }
+  const body = validado.data;
+  const messages = body.messages;
 
   if (!isOpenAIConfigured()) {
     return NextResponse.json({
@@ -89,7 +76,7 @@ export async function POST(req: Request) {
 
   // Só a última mensagem do usuário é nova; o resto do array é histórico que o
   // cliente reenvia a cada turno e que já está gravado.
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  const lastUserMessage = validado.ultimaPergunta;
   let threadId: string | null = null;
   try {
     threadId = await ensureThread(supabase, user.id, body.threadId ?? null, lastUserMessage);
@@ -109,10 +96,8 @@ export async function POST(req: Request) {
         // confiável, enquanto o resumo carrega texto livre do usuário.
         { role: "system" as const, content: featureIndexForPrompt() },
         ...(userContext ? [{ role: "system" as const, content: userContext }] : []),
-        ...messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
+        // `role` já é user|assistant por validação, não por cast.
+        ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
       // 800 cortava a resposta no meio da palavra — uma explicação sobre risco
       // glicêmico terminou literalmente em "**Cair ab". Resposta clínica
@@ -132,6 +117,7 @@ export async function POST(req: Request) {
       let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
       let reply = "";
       let finishReason: string | null = null;
+      let interrompida = false;
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content;
@@ -143,7 +129,16 @@ export async function POST(req: Request) {
           if (chunk.usage) usage = chunk.usage;
         }
       } catch {
-        // conexão com o provedor caiu no meio — encerra com o que já foi enviado
+        interrompida = true;
+      }
+
+      // Conexão com o provedor caiu no meio. Antes, o texto parcial ia para a
+      // tela e para o histórico como se fosse a resposta inteira — o mesmo
+      // risco do corte por tamanho logo abaixo: o que falta costuma ser a
+      // ressalva do fim. Agora quem lê sabe, e o histórico guarda o aviso.
+      if (interrompida) {
+        reply += AVISO_STREAM_INTERROMPIDO;
+        controller.enqueue(encoder.encode(AVISO_STREAM_INTERROMPIDO));
       }
 
       // Truncagem por limite é a falha que o sistema DAVA como sucesso: 200,

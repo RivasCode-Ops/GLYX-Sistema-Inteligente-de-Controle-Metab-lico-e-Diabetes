@@ -48,3 +48,7 @@ projeto.manifest.json
 
 # scratch do CLI do Supabase (criado por `npm run types:gen`)
 supabase/.temp/
+
+# material local: prints de sessao logada, laudos e relatorios com dado de
+# saude identificavel. Nao versionar — estavam soltos na raiz ate 08/09/2026.
+/_local/

@@ -94,3 +94,24 @@ O tratamento de dados sensíveis de saúde **só se justifica** com consentiment
 Revisar este DPIA quando houver: novo papel (cuidador/clínica), novo operador de dados, mudança de região Supabase, submissão regulatória, ou compartilhamento com terceiros além dos já listados.
 
 Próxima revisão sugerida: **2026-10-15** ou antes se o escopo mudar.
+
+## 11. Divergências entre este DPIA e o código — registradas em 14/10/2026
+
+> Registro da auditoria técnica de 14/10/2026 (tarefa GLYX-17). **Não é parecer jurídico** e não
+> altera nenhuma das seções acima: as correções de texto e de comportamento dependem das decisões D5
+> e D6 (`docs/lista-implementacao-glyx.md`). Nada aqui afirma país de processamento, condição
+> contratual de provedor ou base legal que não esteja documentada.
+
+| # | O DPIA diz | O código faz | Evidência |
+|---|---|---|---|
+| 1 | §3: IA "só quando o titular aciona a função"; §6: "não enviar sem ação do usuário" | O cron de sugestão de refeição (a cada 15 min) envia ao provedor de IA o tipo de diabetes e a última glicemia, **sem ação do titular** — confirmado em teste local com IA simulada (14/10); se está ativo em produção, só a consulta B6 da A3 dirá | `app/api/meals/suggest-dispatch/route.ts`; `docs/P06-ENVIO-AUTOMATICO-IA.md` |
+| 2 | §4: Moonshot "pode ser fora do BR — informar na privacidade" | `/privacidade` diz "um provedor de modelo de linguagem", sem nome nem país | `app/privacidade/page.tsx` |
+| 3 | §4 lista só a Moonshot como operador de IA | O código aceita três provedores (Kimi/Moonshot, Anthropic, OpenAI) trocáveis por variável de ambiente | `lib/env.ts` |
+| 4 | §6: wipe coberto por inventário + teste | Até 14/10/2026 o wipe deixava quatro tabelas (`hypo_plan`, `hypo_events`, `health_events`, `user_substance_windows`) e três colunas do perfil (parâmetros de insulina) para trás. **Corrigido no código em 14/10** (GLYX-15), com teste derivado do schema; exercitado pela tela em conta **sintética** num banco local descartável (14/10); em conta real, pendente; não implantado | `lib/privacy/user-data.ts` |
+| 5 | §5: export JSON | Até 14/10/2026 cada tabela saía cortada em 1000 linhas. **Corrigido no código em 14/10** (GLYX-16) | `lib/privacy/export.ts` |
+| 6 | §8: apagar os dados | No código do lote 1 (não implantado), a exclusão mantém as últimas 24 h do registro técnico de uso de IA, sem limpeza automática, e a tela diz "todos os seus registros foram apagados". Decisão D4 **não aprovada**; a alternativa recomendada é reter 1 h com eliminação automática e mensagem correta (`docs/DECISOES-D1-D4.md`) | `app/actions/privacy.ts` |
+
+**Decisões pendentes:**
+- **D5** — no cron de sugestão: retirar o dado clínico do prompt, pedir opt-in ou manter e declarar.
+- **D6** — nome do provedor, país de processamento e base legal na política. Exige confirmação com o
+  provedor e, se possível, assessoria.

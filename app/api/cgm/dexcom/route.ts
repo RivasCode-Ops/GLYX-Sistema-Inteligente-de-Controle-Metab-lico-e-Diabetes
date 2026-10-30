@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 /** Desconecta a conta Dexcom do usuário. */
 export async function DELETE() {
@@ -19,7 +20,7 @@ export async function DELETE() {
     .delete()
     .eq("user_id", user.id)
     .eq("provider", "dexcom");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: publicDbError(error, "api/cgm/dexcom/route") }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 

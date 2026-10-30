@@ -8,7 +8,9 @@ import { getContextReceipt } from "@/lib/queries/context-receipt";
 import { BEVERAGE_META, isBeverageKind } from "@/lib/health/beverages";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
-import { startOfLocalDayISO } from "@/lib/time/local-day";
+import { localDateKey, startOfLocalDayISO } from "@/lib/time/local-day";
+import { descreverCadencia, ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
+import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
 
 // Contexto compacto dos dados recentes do usuário para o copiloto de IA:
 // glicemia, refeições, insulina extra, bebidas, água e exercício. Sem isso o
@@ -38,6 +40,9 @@ export async function buildUserContext(
   const twoDaysAgo = new Date(Date.now() - 48 * 3600_000).toISOString();
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const ultimos7Dias = Array.from({ length: 7 }, (_, k) =>
+    localDateKey(new Date(Date.now() - k * 86_400_000).toISOString(), tz)
+  );
   const fiveDaysAgoDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
 
   const [
@@ -101,16 +106,18 @@ export async function buildUserContext(
         .gte("eaten_at", new Date(Date.now() - 72 * 3600_000).toISOString())
         .order("eaten_at", { ascending: false })
         .limit(5),
-      supabase
-        .from("glucose_readings")
-        .select("value_mg_dl, recorded_at")
-        .eq("user_id", userId)
-        .gte("recorded_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
-        .order("recorded_at", { ascending: false })
-        .limit(2000),
+      // 14 dias de CGM são ~2.700 leituras. O `.limit(2000)` antigo não valia:
+      // o teto do PostgREST é 1000, e o modelo recebia ~5 dias rotulados como
+      // "14 dias". Paginado, e o rótulo diz se ficou incompleto.
+      fetchAllRowsDetalhado<{ value_mg_dl: number; recorded_at: string }>(
+        supabase, "glucose_readings", "value_mg_dl, recorded_at", userId,
+        { orderColumn: "recorded_at", since: new Date(Date.now() - 14 * 86_400_000).toISOString() }
+      ),
       supabase
         .from("medications")
-        .select("id, name, dosage, reminder_times, kind")
+        .select(
+          "id, name, dosage, reminder_times, kind, cadence, cadence_weekday, cadence_interval_days, cadence_anchor_on"
+        )
         .eq("user_id", userId)
         .eq("active", true)
         .eq("kind", "med"),
@@ -153,6 +160,7 @@ export async function buildUserContext(
       .from("medication_logs")
       .select("medication_id")
       .eq("user_id", userId)
+      .eq("confirmed", true) // "Pulei hoje" não é dose tomada (D16)
       .in("medication_id", medIds)
       .gte("taken_at", sevenDaysAgo);
     for (const l of medLogs ?? []) {
@@ -204,9 +212,11 @@ export async function buildUserContext(
       `Medicação/insulina com horário programado (últimos 7 dias, doses REGISTRADAS no app — pode não refletir 100% da adesão real se o usuário esquecer de registrar): ${meds
         .map((m) => {
           const times = (m.reminder_times as string[] | null) ?? [];
-          const expected = times.length * 7;
+          // Dose esperada só em dia de dose: um semanal não "espera" sete.
+          const diasDeDose = ultimos7Dias.filter((dia) => ehDiaDeDose(m as CamposDeCadencia, dia)).length;
+          const expected = times.length * diasDeDose;
           const logged = medLogCounts.get(m.id as string) ?? 0;
-          return `${sanitizeForPrompt(m.name, 60)}${m.dosage ? ` (${sanitizeForPrompt(m.dosage, 30)})` : ""} — ${times.length}×/dia, ${logged}/${expected} doses registradas`;
+          return `${sanitizeForPrompt(m.name, 60)}${m.dosage ? ` (${sanitizeForPrompt(m.dosage, 30)})` : ""} — ${times.length}× por dia de dose, ${descreverCadencia(m as CamposDeCadencia)}, ${logged}/${expected} doses registradas`;
         })
         .join("; ")}.`
     );
@@ -265,12 +275,16 @@ export async function buildUserContext(
     );
   }
 
-  const history = historyRes.data ?? [];
-  if (history.length >= 20) {
+  const history = historyRes.rows;
+  if (!historyRes.completo) {
+    linhas.push(
+      `Padrão por hora do dia: NÃO calculado — a leitura dos 14 dias de glicemia veio incompleta (${history.length} leituras lidas). Não tire conclusão de padrão horário.`
+    );
+  } else if (history.length >= 20) {
     const piores = worstHours(computeHourlyPattern(history, tz, targets.targetMax));
     if (piores.length) {
       linhas.push(
-        `Padrão por hora do dia (14 dias, fuso do usuário) — janelas com mais leituras ACIMA da meta: ${piores
+        `Padrão por hora do dia (14 dias, ${history.length} leituras, fuso do usuário) — janelas com mais leituras ACIMA da meta: ${piores
           .map((b) => `${b.hour}h (média ${b.avg} mg/dL, ${b.pctAbove}% acima da meta em ${b.count} leituras)`)
           .join("; ")}.`
       );

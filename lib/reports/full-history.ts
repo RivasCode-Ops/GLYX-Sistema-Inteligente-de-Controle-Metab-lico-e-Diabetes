@@ -1,3 +1,4 @@
+import { consolidarRegistrosDeDose, contarTomadas, marcacaoDoRegistro } from "@/lib/medications/tomadas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { localDateKey } from "@/lib/time/local-day";
@@ -98,7 +99,15 @@ export type MedicationRow = {
   created_at: string;
 };
 
-export type MedicationLogRow = { medication_id: string | null; taken_at: string };
+export type MedicationLogRow = {
+  medication_id: string | null;
+  taken_at: string;
+  /** `false` = "Pulei hoje" (D16): listado como pulada, não conta como dose. */
+  confirmed?: boolean | null;
+  adherence_status?: string | null;
+  /** Histórico de correções (D14), preenchido pelo banco; ausente antes da migration. */
+  correcoes?: unknown[] | null;
+};
 
 export type InsulinRow = {
   applied_at: string;
@@ -360,19 +369,21 @@ export function aggregateWaterByDay(
     .sort((a, b) => a.day.localeCompare(b.day));
 }
 
-export type MedicationLogDay = { day: string; entries: { name: string; takenAt: string }[] };
+export type MedicationLogDay = { day: string; entries: { name: string; takenAt: string; marca: string | null }[] };
 
 export function groupMedicationLogsByDay(
   logs: MedicationLogRow[],
   nameById: Map<string, string>,
   timezone: string | null | undefined
 ): MedicationLogDay[] {
-  const byDay = new Map<string, { name: string; takenAt: string }[]>();
-  for (const l of logs) {
+  const byDay = new Map<string, { name: string; takenAt: string; marca: string | null }[]>();
+  // Repetição idêntica do histórico antigo aparece uma vez; pulada e adicional
+  // aparecem marcadas (D14/D16).
+  for (const l of consolidarRegistrosDeDose(logs).registros) {
     const day = localDateKey(l.taken_at, timezone);
     const name = (l.medication_id ? nameById.get(l.medication_id) : null) ?? "(medicamento removido)";
     const list = byDay.get(day) ?? [];
-    list.push({ name, takenAt: l.taken_at });
+    list.push({ name, takenAt: l.taken_at, marca: marcacaoDoRegistro(l) });
     byDay.set(day, list);
   }
   return [...byDay.entries()]
@@ -605,10 +616,13 @@ export async function buildFullHistoryReport(
       userId,
       "created_at"
     ),
+    // `*` e não a lista de colunas: `correcoes` (marca "horário corrigido") só existe
+    // depois da migration 20261015101000, e nomeá-la num banco anterior derrubaria o
+    // relatório inteiro (42703). Mesma solução da tela de medicação.
     fetchAll<MedicationLogRow>(
       supabase,
       "medication_logs",
-      "medication_id, taken_at",
+      "*",
       userId,
       "taken_at"
     ),
@@ -799,7 +813,8 @@ export async function buildFullHistoryReport(
     water: aggregateWaterByDay(waterRows, tz),
     medications,
     medicationLogDays: groupMedicationLogsByDay(medicationLogs, nameById, tz),
-    medicationLogCount: medicationLogs.length,
+    // Doses TOMADAS: sem "Pulei hoje" e sem repetição idêntica (D14/D16).
+    medicationLogCount: contarTomadas(medicationLogs),
     insulin,
     exercises,
     strength,

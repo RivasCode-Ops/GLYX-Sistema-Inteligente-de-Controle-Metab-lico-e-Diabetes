@@ -5,6 +5,7 @@ import type { TimingStrictness } from "@/lib/medications/adherence-status";
 import { decideSnooze, MAX_SNOOZE_ATTEMPTS } from "@/lib/medications/snooze-rules";
 import { localDateKey } from "@/lib/time/local-day";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 // Chamado pelo service worker quando o usuário toca "Adiar" na notificação
 // de alarme — agenda um novo aviso em N minutos, sem exigir abrir o app.
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
     if (error.code === "23505") {
       return NextResponse.json({ ok: true, duplicate: true, attempt: decisao.attempt });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: publicDbError(error, "api/medications/snooze/route") }, { status: 500 });
   }
 
   return NextResponse.json({

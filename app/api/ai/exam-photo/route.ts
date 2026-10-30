@@ -7,6 +7,7 @@ import { defaultTitleFor, visionPromptFor } from "@/lib/exams/prompts";
 import { examPhotoResultSchema, parseExamType } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
 import { parseModelJson } from "@/lib/ai/parse-json";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_PAGES = 3;
@@ -148,7 +149,7 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return NextResponse.json({ error: publicDbError(insertErr, "api/ai/exam-photo/route") }, { status: 500 });
   }
 
   return NextResponse.json({ examId: exam?.id ?? null, title, examType, summary });

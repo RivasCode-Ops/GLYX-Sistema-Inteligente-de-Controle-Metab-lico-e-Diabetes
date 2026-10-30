@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 
 export default function RootError({
@@ -12,6 +13,8 @@ export default function RootError({
 }) {
   useEffect(() => {
     console.error(error);
+    // Antes ficava só no console do aparelho (GLYX-35).
+    Sentry.captureException(error, { tags: { boundary: "root" } });
   }, [error]);
 
   return (

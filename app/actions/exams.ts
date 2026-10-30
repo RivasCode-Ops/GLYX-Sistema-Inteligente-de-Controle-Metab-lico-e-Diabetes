@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { examTypeSchema } from "@/lib/exams/types";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const schema = z.object({
   title: z.string().min(1),
@@ -37,7 +38,7 @@ export async function saveExamDraft(formData: FormData): Promise<ActionResult> {
     parsed_summary: null,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/exams") };
 
   revalidatePath("/exames");
   return { ok: true };

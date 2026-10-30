@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { resolveStrengthEntry, type CatalogExercise } from "@/lib/exercicios/catalog";
 import { getCatalogExercise } from "@/lib/queries/exercise-catalog";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const schema = z.object({
   // Opcional porque o par (id do catálogo, texto livre) é excludente: quem
@@ -62,7 +63,7 @@ export async function logStrengthSet(formData: FormData): Promise<ActionResult> 
     muscle_group: resolved.muscleGroup,
     ...measures,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/strength") };
 
   revalidatePath("/exercicios/recuperacao");
   revalidatePath("/exercicios");
@@ -86,7 +87,7 @@ export async function deleteStrengthLog(formData: FormData): Promise<ActionResul
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/strength") };
 
   revalidatePath("/exercicios/recuperacao");
   return { ok: true };

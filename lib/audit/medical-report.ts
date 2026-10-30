@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { computePeriodAdherence } from "@/lib/medications/adherence";
+import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import type { MetabolicAuditRow } from "@/lib/audit/types";
 import { fetchAllRows } from "@/lib/queries/fetch-all";
@@ -21,6 +22,8 @@ export type ReportMedAdherence = {
   loggedDoses: number;
   /** Registros que não casaram com nenhuma dose agendada (dose extra ou duplicidade). */
   extraLogs: number;
+  /** Doses previstas marcadas "Pulei hoje" (D16) — não entram em `loggedDoses`. */
+  skippedDoses: number;
 };
 
 export type MedicalReportData = {
@@ -122,25 +125,28 @@ export async function buildMedicalReportData(
 
   const { data: meds } = await supabase
     .from("medications")
-    .select("id, name, dosage, reminder_times")
+    .select(
+      "id, name, dosage, reminder_times, cadence, cadence_weekday, cadence_interval_days, cadence_anchor_on"
+    )
     .eq("user_id", userId)
     .eq("active", true)
     .eq("kind", "med")
     .not("reminder_times", "is", null);
 
   const medIds = (meds ?? []).map((m) => m.id as string);
-  const logsByMed = new Map<string, { taken_at: string }[]>();
+  const logsByMed = new Map<string, { taken_at: string; confirmed: boolean | null }[]>();
   if (medIds.length) {
     const { data: logs } = await supabase
       .from("medication_logs")
-      .select("medication_id, taken_at")
+      .select("medication_id, taken_at, confirmed")
       .eq("user_id", userId)
       .in("medication_id", medIds)
       .gte("taken_at", startISO)
       .lt("taken_at", endISO);
-    for (const l of (logs ?? []) as { medication_id: string; taken_at: string }[]) {
+    for (const l of (logs ?? []) as { medication_id: string; taken_at: string; confirmed: boolean | null }[]) {
       const list = logsByMed.get(l.medication_id) ?? [];
-      list.push({ taken_at: l.taken_at });
+      // `confirmed` vai junto: "Pulei hoje" não pode virar dose tomada (D16).
+      list.push({ taken_at: l.taken_at, confirmed: l.confirmed });
       logsByMed.set(l.medication_id, list);
     }
   }
@@ -157,7 +163,8 @@ export async function buildMedicalReportData(
       logsByMed.get(m.id as string) ?? [],
       tz,
       audit.period_start,
-      audit.period_end
+      audit.period_end,
+      (dia) => ehDiaDeDose(m as CamposDeCadencia, dia)
     );
     return {
       name: m.name as string,
@@ -166,6 +173,7 @@ export async function buildMedicalReportData(
       expectedDoses: adherence.expectedDoses,
       loggedDoses: adherence.takenDoses,
       extraLogs: adherence.unmatchedLogs,
+      skippedDoses: adherence.skippedDoses,
     };
   });
 

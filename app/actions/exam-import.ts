@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 // Importa para os registros do app um valor extraído de um exame — sempre
 // disparado por um clique explícito do usuário na tela do exame.
@@ -43,7 +44,7 @@ export async function importExamValue(formData: FormData): Promise<ActionResult>
       },
       { onConflict: "user_id,logged_on" }
     );
-    if (error) return { error: error.message };
+    if (error) return { error: publicDbError(error, "actions/exam-import") };
   } else {
     const { error } = await supabase.from("glucose_readings").insert({
       user_id: user.id,
@@ -51,7 +52,7 @@ export async function importExamValue(formData: FormData): Promise<ActionResult>
       context: "jejum",
       source: "manual",
     });
-    if (error) return { error: error.message };
+    if (error) return { error: publicDbError(error, "actions/exam-import") };
   }
 
   revalidatePath("/dashboard");

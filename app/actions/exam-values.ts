@@ -3,8 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseExamValues } from "@/lib/exams/parse-values";
+import { regravarValores, toExamValueRows } from "@/lib/exams/save-values";
+import { publicDbError } from "@/lib/errors/public-error";
 
-export type ActionResult = { ok?: true; error?: string; extraidos?: number };
+export type ActionResult = {
+  ok?: true;
+  error?: string;
+  extraidos?: number;
+  /** Deu certo, mas com uma ressalva que a pessoa precisa ver. */
+  aviso?: string;
+};
 
 /**
  * Extrai os resultados do texto do laudo e grava um por analito.
@@ -14,10 +22,8 @@ export type ActionResult = { ok?: true; error?: string; extraidos?: number };
  * que não está escrito. A IA fica para o que a regra não pegar — laudo em
  * prosa, PDF mal convertido — e entra depois.
  *
- * Reexecutável: apaga os valores anteriores DESTE exame antes de inserir. Um
- * exame tem os resultados do laudo dele, não a soma de todas as tentativas de
- * extração; e sem isso o unique (exam_id, analyte) faria a segunda tentativa
- * falhar em vez de corrigir.
+ * Reexecutável: o exame fica com os resultados do laudo dele, não com a soma de
+ * todas as tentativas. A gravação é a lógica de `regravarValores`.
  */
 export async function extrairValoresDoExame(formData: FormData): Promise<ActionResult> {
   const examId = String(formData.get("exam_id") ?? "");
@@ -51,32 +57,16 @@ export async function extrairValoresDoExame(formData: FormData): Promise<ActionR
     };
   }
 
-  await supabase.from("exam_values").delete().eq("exam_id", examId).eq("user_id", user.id);
-
-  const { error } = await supabase.from("exam_values").insert(
-    valores.map((v) => ({
-      exam_id: examId,
-      user_id: user.id,
-      // Sem slug canônico o resultado continua sendo gravado, com um slug
-      // derivado do rótulo: perder o valor porque o vocabulário não previu a
-      // grafia seria pior que não ter série dele.
-      analyte: v.analyte ?? `livre:${v.label.toLowerCase().slice(0, 40)}`,
-      label: v.label,
-      value_num: v.valueNum,
-      value_text: v.valueText,
-      unit: v.unit,
-      ref_min: v.refMin,
-      ref_max: v.refMax,
-      ref_text: v.refText,
-      collected_on: exame.collected_on,
-    }))
+  const resultado = await regravarValores(
+    supabase,
+    examId,
+    user.id,
+    toExamValueRows(valores, examId, user.id, exame.collected_on)
   );
-
-  if (error) return { error: error.message };
 
   revalidatePath("/exames");
   revalidatePath(`/exames/${examId}`);
-  return { ok: true, extraidos: valores.length };
+  return resultado;
 }
 
 /**
@@ -105,11 +95,12 @@ export async function definirDataDaColeta(formData: FormData): Promise<ActionRes
     .update({ collected_on: data })
     .eq("id", examId)
     .eq("user_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/exam-values") };
 
   // Os valores já extraídos carregam a data para a série ser lida sem join —
-  // então eles precisam acompanhar a correção.
-  await supabase
+  // então eles precisam acompanhar a correção. Se não acompanharem, a série
+  // fica com a data velha sem nada dizer: por isso o erro é devolvido.
+  const { error: errValores } = await supabase
     .from("exam_values")
     .update({ collected_on: data })
     .eq("exam_id", examId)
@@ -117,5 +108,13 @@ export async function definirDataDaColeta(formData: FormData): Promise<ActionRes
 
   revalidatePath("/exames");
   revalidatePath(`/exames/${examId}`);
+  if (errValores) {
+    console.error("[exam-values] data da coleta não propagou para os valores", errValores);
+    return {
+      ok: true,
+      aviso:
+        "A data do exame foi salva, mas os valores já extraídos continuam com a data anterior. Salve a data de novo.",
+    };
+  }
   return { ok: true };
 }

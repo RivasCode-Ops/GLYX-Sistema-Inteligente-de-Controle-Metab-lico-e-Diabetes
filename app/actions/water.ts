@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isBeverageKind, type BeverageKind } from "@/lib/health/beverages";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -27,7 +28,7 @@ export async function logBeverage(
     .from("water_logs")
     .insert({ user_id: user.id, amount_ml: Math.round(amountMl), kind });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/water") };
 
   revalidatePath("/dashboard");
   return { ok: true };

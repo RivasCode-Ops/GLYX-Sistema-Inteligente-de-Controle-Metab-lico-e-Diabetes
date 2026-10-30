@@ -99,7 +99,13 @@ describe("migrations reexecutáveis", () => {
   });
 
   it.each(arquivos.map((m) => m.nome))("%s: todo seed tem on conflict", (nome) => {
-    const sql = semComentarios(arquivos.find((m) => m.nome === nome)!.sql);
+    // Corpo de função (`as $tag$ … $tag$`) não roda quando a migration é
+    // aplicada — roda quando a função é chamada; um insert ali não é seed. O
+    // bloco `do $tag$ … $tag$` RODA na aplicação, e por isso continua contado.
+    const sql = semComentarios(arquivos.find((m) => m.nome === nome)!.sql).replace(
+      /\bas\s+(\$\w*\$)[\s\S]*?\1/gi,
+      ""
+    );
     const inserts = (sql.match(/insert\s+into/gi) ?? []).length;
     const conflitos = (sql.match(/on\s+conflict/gi) ?? []).length;
     expect(

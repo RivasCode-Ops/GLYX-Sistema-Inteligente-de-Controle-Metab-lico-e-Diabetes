@@ -5,6 +5,7 @@ import { z } from "zod";
 import { evaluateGlucoseAlert } from "@/lib/insights/rules";
 import { createClient } from "@/lib/supabase/server";
 import { wallClockToUTC } from "@/lib/time/local-day";
+import { publicDbError } from "@/lib/errors/public-error";
 
 const schema = z.object({
   value_mg_dl: z.coerce.number().min(20).max(600),
@@ -59,7 +60,7 @@ export async function addGlucoseReading(formData: FormData): Promise<ActionResul
     ...(recordedAt ? { recorded_at: recordedAt } : {}),
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/glucose") };
 
   await evaluateGlucoseAlert(
     supabase,
@@ -93,7 +94,7 @@ export async function deleteGlucoseReading(formData: FormData): Promise<ActionRe
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
-  if (error) return { error: error.message };
+  if (error) return { error: publicDbError(error, "actions/glucose") };
 
   revalidatePath("/dashboard");
   revalidatePath("/glicemia");

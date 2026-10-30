@@ -7,9 +7,13 @@ import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
+import { describeGlucoseAverage, glucoseAverage } from "@/lib/ai/glucose-average";
+import { findForbiddenLanguage } from "@/lib/safety/forbidden-language";
 import {
+  CHECK_UNAVAILABLE_NOTE,
   DOCTOR_NOTE,
   blockedText,
+  checkUnavailablePayload,
   renderVerdictBlock,
   toSafetyPayload,
 } from "@/lib/safety/present";
@@ -265,7 +269,25 @@ export async function POST(req: Request) {
   // Nome do produto E ingredientes entram como candidatos: "Berberine Complex"
   // casa pelo nome, e um multivitamínico genérico só casa pela lista.
   const candidatos = [productName, ...ingredients].filter((n) => n.trim().length > 0);
-  const verdict = await checkSubstanceSafety(supabase, user.id, candidatos);
+  let verdict;
+  try {
+    verdict = await checkSubstanceSafety(supabase, user.id, candidatos);
+  } catch (e) {
+    // Sem veredito não há o que redigir: o modelo não é chamado, e a tela
+    // recebe o estado "não executada" — nunca o cinza de "sem alerta" (P13).
+    console.error("[supplement-check] checagem de interação falhou", e);
+    await recordAiTokens(supabase, rate.usageId, extractionUsage, aiModel());
+    return NextResponse.json({
+      productName,
+      safety: checkUnavailablePayload(),
+      summary: `${CHECK_UNAVAILABLE_NOTE}\n\n${DOCTOR_NOTE}`,
+      concerningIngredients: [],
+      crossCheck: [],
+      doctorNote: DOCTOR_NOTE,
+      limitations,
+      llmSkipped: true,
+    });
+  }
 
   // O payload de segurança é montado aqui e vai na resposta em qualquer
   // caminho: a tela nunca depende do texto do modelo para mostrar o alerta.
@@ -331,21 +353,44 @@ export async function POST(req: Request) {
     aiModel()
   );
 
-  const prose = proseSchema.safeParse(
+  const parsedProse = proseSchema.safeParse(
     parseModelJson(proseCompletion.choices[0]?.message?.content)
   );
+
+  // O prompt proíbe "é seguro", "suspenda" etc., mas prompt é pedido, não
+  // garantia. A mesma lista que os testes aplicam ao código-fonte passa a valer
+  // para o texto que o modelo gerou de fato (GLYX-27 / P16). Texto reprovado
+  // inteiro cai no fallback determinístico — remendar frase solta deixaria o
+  // resto do parágrafo construído em cima dela.
+  const violacoes = parsedProse.success
+    ? findForbiddenLanguage(
+        [
+          parsedProse.data.summary,
+          parsedProse.data.doctorNote,
+          ...parsedProse.data.crossCheck,
+          ...parsedProse.data.concerningIngredients.map((c) => c.why),
+        ].join("\n")
+      )
+    : [];
+  if (violacoes.length) {
+    console.warn(
+      "[supplement-check] texto do modelo descartado por linguagem proibida:",
+      violacoes.map((v) => v.phrase)
+    );
+  }
+  const prose = parsedProse.success && !violacoes.length ? parsedProse.data : null;
 
   return NextResponse.json({
     productName,
     safety,
-    summary: prose.success
-      ? prose.data.summary
+    summary: prose
+      ? prose.summary
       : [safety.unknownNote, safety.noFindingNote, DOCTOR_NOTE].filter(Boolean).join("\n\n"),
-    concerningIngredients: prose.success ? prose.data.concerningIngredients : [],
-    crossCheck: prose.success ? prose.data.crossCheck : [],
-    doctorNote: prose.success ? prose.data.doctorNote : DOCTOR_NOTE,
+    concerningIngredients: prose ? prose.concerningIngredients : [],
+    crossCheck: prose ? prose.crossCheck : [],
+    doctorNote: prose ? prose.doctorNote : DOCTOR_NOTE,
     limitations,
-    llmSkipped: false,
+    llmSkipped: !prose,
   });
 }
 
@@ -354,17 +399,13 @@ async function contextoClinico(
   supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
   userId: string
 ): Promise<string> {
-  const [profileRes, glucoseRes, medsRes, examsRes] = await Promise.all([
+  const [profileRes, glucose, medsRes, examsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("diabetes_type, target_glucose_min, target_glucose_max, body_goal")
       .eq("id", userId)
       .maybeSingle(),
-    supabase
-      .from("glucose_readings")
-      .select("value_mg_dl")
-      .eq("user_id", userId)
-      .gte("recorded_at", new Date(Date.now() - 14 * 86_400_000).toISOString()),
+    glucoseAverage(supabase, userId),
     supabase.from("medications").select("name, dosage, kind").eq("user_id", userId).eq("active", true),
     supabase
       .from("exams")
@@ -375,19 +416,12 @@ async function contextoClinico(
   ]);
 
   const profile = profileRes.data;
-  const glucose = glucoseRes.data;
   const meds = medsRes.data;
   const exams = examsRes.data;
 
-  const glucoseAvg = glucose?.length
-    ? Math.round(glucose.reduce((s, g) => s + g.value_mg_dl, 0) / glucose.length)
-    : null;
-
   return [
     profile?.diabetes_type ? `Diagnóstico: ${profile.diabetes_type}.` : "",
-    glucoseAvg
-      ? `Glicemia média (14 dias): ${glucoseAvg} mg/dL.`
-      : "Sem leituras recentes de glicemia.",
+    describeGlucoseAverage(glucose),
     profile
       ? `Meta glicêmica: ${profile.target_glucose_min}-${profile.target_glucose_max} mg/dL.`
       : "",

@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { destinoAposRegistro } from "@/lib/medications/conflito-registro";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import {
   addMedication,
+  confirmarFrequencia,
   attachMedicationLabel,
   deactivateMedication,
   logMedicationTaken,
@@ -25,12 +28,35 @@ import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { Medication } from "@/types/database";
 import { demoMedications } from "@/lib/demo/data";
 import { DOSE_UNITS, doseUnitLabel } from "@/lib/medications/dose-units";
-import { formatarHora } from "@/lib/time/format";
+import { FUSO_PADRAO, formatarDiaISO, formatarHora } from "@/lib/time/format";
+import { localDateKey } from "@/lib/time/local-day";
+import { CampoFrequencia } from "@/components/medicacao/campo-frequencia";
+import { FormularioDeAcao, type ResultadoDeAcao } from "@/components/medicacao/formulario-de-acao";
 import { stockLabel, stockState } from "@/lib/medications/stock";
+import {
+  MENSAGENS_CADENCIA,
+  codigoDoErroDeCadencia,
+  configuracaoInconsistente,
+  descreverCadencia,
+  frequenciaAConfirmar,
+  frequenciaNaEdicao,
+  inicioNoFuturo,
+  type CodigoErroCadencia,
+} from "@/lib/medications/cadence";
 
 // "Meus medicamentos" = a tela de GERIR: cadastro (foto ou manual), análise de
 // suplemento, alarmes, busca, estoque, foto e edição. A ação diária (o que
 // tomar agora) fica em "Doses de hoje" (/medicacao).
+
+/**
+ * Recusa volta como MENSAGEM, mostrada ao lado do formulário (FormularioDeAcao):
+ * redirecionar para esta mesma rota com ?erro= não mostrava o aviso no build de
+ * produção. Só frases conhecidas chegam à tela; o resto vira "tente de novo".
+ * Fica fora do componente: as ações do servidor não podem fechar sobre funções.
+ */
+function mensagem(erro: string): string {
+  return codigoDoErroDeCadencia(erro) ? erro : "tente de novo em instantes.";
+}
 
 /** Busca sem acento/maiúscula: "insulína" acha "Insulina NPH". */
 function normaliza(s: string): string {
@@ -43,9 +69,9 @@ function normaliza(s: string): string {
 export default async function MeusMedicamentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; erro?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, erro } = await searchParams;
   const busca = (q ?? "").trim();
   let meds: Medication[] = [];
   let todayLogs: TodayLog[] = [];
@@ -53,14 +79,32 @@ export default async function MeusMedicamentosPage({
   let timezone: string | null = null;
   const demoMode = !isSupabaseConfigured();
 
-  async function addMedicationAction(formData: FormData): Promise<void> {
+  async function addMedicationAction(_anterior: ResultadoDeAcao, formData: FormData): Promise<ResultadoDeAcao> {
     "use server";
-    await addMedication(formData);
+    // D1: sem frequência escolhida o cadastro é recusado — o motivo aparece.
+    const r = await addMedication(formData);
+    if (r.error) return { aviso: mensagem(r.error) };
+    revalidatePath("/medicacao/medicamentos");
+    return null;
   }
 
-  async function logMedicationTakenAction(formData: FormData): Promise<void> {
+  async function confirmarFrequenciaAction(_anterior: ResultadoDeAcao, formData: FormData): Promise<ResultadoDeAcao> {
     "use server";
-    await logMedicationTaken(formData);
+    const r = await confirmarFrequencia(formData);
+    if (r.error) return { aviso: mensagem(r.error) };
+    revalidatePath("/medicacao/medicamentos");
+    return null;
+  }
+
+  async function logMedicationTakenAction(_anterior: ResultadoDeAcao, formData: FormData): Promise<ResultadoDeAcao> {
+    "use server";
+    // Conflito: a pergunta (corrigir ou outra) fica em /medicacao. Falha: o motivo
+    // aparece lá. A tela navega para o destino (FormularioDeAcao).
+    const r = await logMedicationTaken(formData);
+    const ir = destinoAposRegistro(r, false, "/medicacao/medicamentos");
+    if (ir) return { ir };
+    revalidatePath("/medicacao/medicamentos");
+    return null;
   }
 
   async function updateStockAction(formData: FormData): Promise<void> {
@@ -73,9 +117,15 @@ export default async function MeusMedicamentosPage({
     await deactivateMedication(formData);
   }
 
-  async function updateMedicationAction(formData: FormData): Promise<void> {
+  async function updateMedicationAction(_anterior: ResultadoDeAcao, formData: FormData): Promise<ResultadoDeAcao> {
     "use server";
-    await updateMedication(formData);
+    // A frequência pode ser recusada (semanal sem dia, intervalo sem início) e a
+    // ativação de alarme também (D3). Engolir o erro faria a alteração sumir sem
+    // aviso — e o alarme seguiria no comportamento antigo achando que foi salvo.
+    const r = await updateMedication(formData);
+    if (r.error) return { aviso: mensagem(r.error) };
+    revalidatePath("/medicacao/medicamentos");
+    return null;
   }
 
   async function attachLabelAction(formData: FormData): Promise<void> {
@@ -118,7 +168,7 @@ export default async function MeusMedicamentosPage({
         const [logsRes, snoozesRes] = await Promise.all([
           supabase
             .from("medication_logs")
-            .select("medication_id, taken_at")
+            .select("medication_id, taken_at, confirmed")
             .eq("user_id", user.id)
             .gte("taken_at", startOfDayISO),
           supabase
@@ -145,11 +195,23 @@ export default async function MeusMedicamentosPage({
     }
   }
 
+  // Data local de hoje, para o aviso de início futuro (D2).
+  const hoje = localDateKey(new Date().toISOString(), timezone ?? FUSO_PADRAO);
+
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <Link href="/medicacao" className="inline-block text-sm text-emerald-400 hover:underline">
         ← Doses de hoje
       </Link>
+
+      {erro ? (
+        <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          Não salvei:{" "}
+          {Object.hasOwn(MENSAGENS_CADENCIA, erro)
+            ? MENSAGENS_CADENCIA[erro as CodigoErroCadencia]
+            : "tente de novo em instantes."}
+        </p>
+      ) : null}
 
       <CollapsibleSection
         title="➕ Adicionar remédio ou suplemento"
@@ -170,7 +232,7 @@ export default async function MeusMedicamentosPage({
               responsabilidade médica.
             </p>
           ) : null}
-          <form action={addMedicationAction} className="grid gap-4 sm:grid-cols-2">
+          <FormularioDeAcao acao={addMedicationAction} className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-1">
               <Label htmlFor="name">Nome</Label>
               <Input id="name" name="name" required placeholder="ex.: Metformina, Whey…" />
@@ -230,6 +292,10 @@ export default async function MeusMedicamentosPage({
                 Nesses horários, os dispositivos com alarme ativado tocam com o nome e a dose.
               </p>
             </div>
+            <CampoFrequencia
+              rotuloVazio="Escolha…"
+              ajuda="Obrigatória quando há horário de alarme. Na opção “a cada N dias”, o alarme começa na data da primeira dose."
+            />
             <div className="grid gap-1">
               <Label htmlFor="stock_units">Unidades em estoque (opcional)</Label>
               <Input
@@ -256,7 +322,7 @@ export default async function MeusMedicamentosPage({
             <div className="sm:col-span-2">
               <Button type="submit">Salvar</Button>
             </div>
-          </form>
+          </FormularioDeAcao>
         </div>
       </CollapsibleSection>
 
@@ -322,6 +388,9 @@ export default async function MeusMedicamentosPage({
           <ul className="space-y-3">
             {items.map((m) => {
               const estoque = stockState(m);
+              const aConfirmar = frequenciaAConfirmar(m);
+              const inconsistente = configuracaoInconsistente(m);
+              const inicio = inicioNoFuturo(m, hoje);
               return (
                 <li key={m.id}>
                   <Card>
@@ -369,6 +438,34 @@ export default async function MeusMedicamentosPage({
                               {stockLabel(estoque, m.kind === "supplement")}
                             </p>
                           ) : null}
+                          {inconsistente ? (
+                            <p className="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+                              Configuração inconsistente: marcado como uso livre, mas tem horário. Nenhum
+                              alarme é enviado para este item. Para ativar, escolha a frequência e a
+                              programação em “Editar”.
+                            </p>
+                          ) : null}
+                          {inicio ? (
+                            <p className="mt-1 text-[11px] text-zinc-400">
+                              Primeira dose em {formatarDiaISO(inicio)} — nenhum alarme antes dessa data.
+                            </p>
+                          ) : null}
+                          {aConfirmar && !demoMode ? (
+                            <FormularioDeAcao
+                              acao={confirmarFrequenciaAction}
+                              className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2 py-1 text-[11px] text-sky-200"
+                            >
+                              <input type="hidden" name="medication_id" value={m.id} />
+                              <span>
+                                Frequência a confirmar — hoje o alarme toca{" "}
+                                {m.cadence ? descreverCadencia(m) : "todo dia"}, como sempre tocou.
+                              </span>
+                              <Button type="submit" variant="outline" size="sm" className="h-6 px-2 text-[11px]">
+                                Está certo: {m.cadence ? descreverCadencia(m) : "todo dia"}
+                              </Button>
+                              <span className="text-sky-300/70">ou mude em “Editar”.</span>
+                            </FormularioDeAcao>
+                          ) : null}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -380,12 +477,13 @@ export default async function MeusMedicamentosPage({
                               tinha botão de registrar em lugar nenhum do app.
                               Duas telas com regras diferentes deixaram um buraco
                               no meio. Aqui o botão é incondicional. */}
-                          <form action={logMedicationTakenAction}>
+                          <FormularioDeAcao acao={logMedicationTakenAction}>
                             <input type="hidden" name="medication_id" value={m.id} />
+                            <input type="hidden" name="pedido" value={crypto.randomUUID()} />
                             <Button type="submit" variant="outline" size="sm">
                               Registrar dose
                             </Button>
-                          </form>
+                          </FormularioDeAcao>
                           {(() => {
                             const medLogs = todayLogs.filter((l) => l.medication_id === m.id);
                             const medSnoozes = todaySnoozes.filter((s) => s.medication_id === m.id);
@@ -471,8 +569,8 @@ export default async function MeusMedicamentosPage({
                           <summary className="cursor-pointer list-none text-xs text-zinc-500 transition hover:text-emerald-300">
                             ✏️ Editar nome, dose ou horários
                           </summary>
-                          <form
-                            action={updateMedicationAction}
+                          <FormularioDeAcao
+                            acao={updateMedicationAction}
                             className="mt-3 grid gap-3 rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-3 sm:grid-cols-2"
                           >
                             <input type="hidden" name="medication_id" value={m.id} />
@@ -496,6 +594,35 @@ export default async function MeusMedicamentosPage({
                               <Label className="text-xs">Alarmes de dose</Label>
                               <ReminderTimesField defaultTimes={m.reminder_times ?? []} />
                             </div>
+                            <CampoFrequencia
+                              valores={{ ...m, cadence: frequenciaNaEdicao(m) }}
+                              rotuloVazio={
+                                inconsistente
+                                  ? "Escolha para ativar o alarme"
+                                  : aConfirmar
+                                  ? "A confirmar — não muda se ficar assim"
+                                  : !m.cadence
+                                    ? "Não declarada — não muda se ficar assim"
+                                    : "Manter como está"
+                              }
+                            />
+                            {inconsistente ? (
+                              <div className="grid gap-1 sm:col-span-2">
+                                <Label className="text-xs">Programação do alarme</Label>
+                                <select
+                                  name="timing_strictness"
+                                  defaultValue=""
+                                  className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2 text-sm text-zinc-100"
+                                >
+                                  <option value="">Manter sem alarme (uso livre)</option>
+                                  <option value="flexivel">Ativar alarme — horário flexível</option>
+                                  <option value="rigido">Ativar alarme — horário rígido</option>
+                                </select>
+                                <p className="text-[11px] text-zinc-600">
+                                  Para ativar, escolha também a frequência acima.
+                                </p>
+                              </div>
+                            ) : null}
                             <div className="grid gap-1">
                               <Label className="text-xs">Tipo</Label>
                               <select
@@ -512,7 +639,7 @@ export default async function MeusMedicamentosPage({
                                 Salvar alterações
                               </Button>
                             </div>
-                          </form>
+                          </FormularioDeAcao>
                         </details>
                       ) : null}
                     </CardContent>

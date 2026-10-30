@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MATCH_BEFORE_MS, computeDoseStatus, doseWindows } from "@/lib/medications/adherence";
+import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
 import { getContextReceipt } from "@/lib/queries/context-receipt";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
@@ -68,12 +69,14 @@ export async function getCardAgora(
         .maybeSingle(),
       supabase
         .from("medications")
-        .select("id, name, reminder_times, kind, stock_units, stock_updated_on")
+        .select(
+          "id, name, reminder_times, kind, stock_units, stock_updated_on, cadence, cadence_weekday, cadence_interval_days, cadence_anchor_on"
+        )
         .eq("user_id", userId)
         .eq("active", true),
       supabase
         .from("medication_logs")
-        .select("medication_id, taken_at")
+        .select("medication_id, taken_at, confirmed")
         .eq("user_id", userId)
         .gte("taken_at", inicioDoDia),
       supabase
@@ -106,7 +109,8 @@ export async function getCardAgora(
   // Atraso e "em dia" saem da REGRA ÚNICA de casamento dose↔registro
   // (`lib/medications/adherence.ts`), a mesma da tela do dia e do relatório
   // médico. Uma terceira contagem aqui seria a divergência de novo.
-  const [y, mo, d] = localDateKey(agora.toISOString(), tz).split("-").map(Number);
+  const hoje = localDateKey(agora.toISOString(), tz);
+  const [y, mo, d] = hoje.split("-").map(Number);
   const lateMedications: CardContext["lateMedications"] = [];
   let medicationsOnTime = 0;
 
@@ -115,6 +119,8 @@ export async function getCardAgora(
       /^\d{1,2}:\d{2}$/.test(t)
     );
     if (!horarios.length) continue;
+    // Semanal fora do dia não é "atrasado": é dia sem dose (lib/medications/cadence.ts).
+    if (!ehDiaDeDose(m as CamposDeCadencia, hoje)) continue;
     const medLogs = logs.filter((l) => l.medication_id === m.id);
     const medSnoozes = snoozes.filter((s) => s.medication_id === m.id);
     const usados = new Set<string>();

@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { apagarUsoDeIa } from "@/lib/privacy/apagar-uso-ia";
 import {
   PRIVATE_PHOTO_BUCKETS,
+  PROFILE_RESET_NULL_COLUMNS,
   USER_DATA_DELETE_ORDER,
 } from "@/lib/privacy/user-data";
 import {
@@ -14,21 +17,35 @@ import {
 
 export type PrivacyActionResult = { ok?: true; error?: string };
 
+const STORAGE_PAGINA = 1000;
+
+/**
+ * Apaga a pasta do usuário num bucket, PAGINANDO. A versão anterior listava
+ * no máximo 1000 arquivos e apagava só esses — o resto ficava no Storage
+ * depois de "apagar todos os meus dados".
+ */
 async function purgeUserStorageFolder(
   supabase: SupabaseClient,
   bucket: string,
   userId: string
 ): Promise<string | null> {
-  const { data: entries, error: listError } = await supabase.storage.from(bucket).list(userId, {
-    limit: 1000,
-  });
-  if (listError) return `Falha ao listar fotos em ${bucket}: ${listError.message}`;
-  if (!entries?.length) return null;
+  // Sempre a primeira página: o que foi apagado sai da listagem seguinte.
+  for (let rodada = 0; rodada < 1000; rodada += 1) {
+    const { data: entries, error: listError } = await supabase.storage
+      .from(bucket)
+      .list(userId, { limit: STORAGE_PAGINA, offset: 0 });
+    if (listError) return `Falha ao listar fotos em ${bucket}.`;
+    if (!entries?.length) return null;
 
-  const paths = entries.map((f) => `${userId}/${f.name}`);
-  const { error: removeError } = await supabase.storage.from(bucket).remove(paths);
-  if (removeError) return `Falha ao apagar fotos em ${bucket}: ${removeError.message}`;
-  return null;
+    const paths = entries.map((f) => `${userId}/${f.name}`);
+    const { data: removidos, error: removeError } = await supabase.storage.from(bucket).remove(paths);
+    if (removeError) return `Falha ao apagar fotos em ${bucket}.`;
+    // Nada removido e a listagem segue cheia: a próxima rodada veria a mesma
+    // página. Para em vez de girar.
+    if (!removidos?.length) return `Falha ao apagar fotos em ${bucket}.`;
+    if (entries.length < STORAGE_PAGINA) return null;
+  }
+  return `Fotos demais em ${bucket}: a limpeza parou por segurança. Tente de novo.`;
 }
 
 // Direito de eliminação (LGPD): apaga registros + fotos privadas.
@@ -49,30 +66,26 @@ export async function deleteAllMyData(): Promise<PrivacyActionResult> {
 
   for (const table of USER_DATA_DELETE_ORDER) {
     const { error } = await supabase.from(table).delete().eq("user_id", user.id);
-    if (error) return { error: `Falha ao apagar ${table}: ${error.message}` };
+    if (error) return { error: `Falha ao apagar ${table}.` };
   }
 
-  // Mantém a conta Auth, mas remove PII clínica do perfil.
+  const usoErro = await apagarUsoDeIa(createAdminClient(), user.id);
+  if (usoErro) return { error: usoErro };
+
+  // Mantém a conta Auth, mas remove PII clínica do perfil. A lista vem do
+  // inventário, e um teste reprova coluna nova do perfil fora dela.
+  const limpeza = Object.fromEntries(PROFILE_RESET_NULL_COLUMNS.map((c) => [c, null]));
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
-      full_name: null,
-      diabetes_type: null,
+      ...limpeza,
       target_glucose_min: DEFAULT_TARGET_MIN_MG_DL,
       target_glucose_max: DEFAULT_TARGET_MAX_MG_DL,
-      sex: null,
-      birth_year: null,
-      height_cm: null,
-      activity_level: null,
-      body_goal: null,
-      target_weight_kg: null,
-      family_history: null,
-      primary_focus: null,
       onboarding_done: false,
     })
     .eq("id", user.id);
   if (profileError) {
-    return { error: `Dados apagados, mas falha ao limpar perfil: ${profileError.message}` };
+    return { error: "Dados apagados, mas falha ao limpar o perfil. Tente de novo." };
   }
 
   revalidatePath("/", "layout");

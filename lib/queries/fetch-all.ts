@@ -50,13 +50,23 @@ export type FetchAllOptions = {
   before?: string;
 };
 
-export async function fetchAllRows<T>(
+/**
+ * Resultado com a completude explícita.
+ *
+ * `fetchAllRows` interrompe em erro e devolve o que já veio — e o comentário
+ * dizia "quem chama decide o que dizer sobre isso", mas quem chama não tinha
+ * como saber. Histórico parcial ficava indistinguível de completo. Aqui o
+ * chamador recebe `completo: false` e o motivo, e decide o que mostrar.
+ */
+export type FetchAllResult<T> = { rows: T[]; completo: boolean; erro: string | null };
+
+export async function fetchAllRowsDetalhado<T>(
   supabase: SupabaseClient,
   table: string,
   columns: string,
   userId: string,
   options: FetchAllOptions
-): Promise<T[]> {
+): Promise<FetchAllResult<T>> {
   const { orderColumn, ascending = true, since, before } = options;
   const rows: T[] = [];
 
@@ -73,15 +83,26 @@ export async function fetchAllRows<T>(
     if (before) q = q.lt(orderColumn, before);
 
     const { data, error } = await q;
-    // Erro interrompe e devolve o que já veio, em vez de estourar a página
-    // inteira: histórico parcial com o resto da tela funcionando é melhor que
-    // tela de erro. Quem chama decide o que dizer sobre isso.
-    if (error) break;
+    if (error) return { rows, completo: false, erro: error.message };
 
     const page = (data ?? []) as unknown as T[];
     rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
+    if (page.length < PAGE_SIZE) return { rows, completo: true, erro: null };
   }
 
-  return rows;
+  return { rows, completo: false, erro: `limite de ${MAX_PAGINAS} páginas atingido` };
+}
+
+/**
+ * Versão que devolve só as linhas, mantida para os chamadores anteriores.
+ * Código novo deve usar `fetchAllRowsDetalhado` e tratar `completo`.
+ */
+export async function fetchAllRows<T>(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+  userId: string,
+  options: FetchAllOptions
+): Promise<T[]> {
+  return (await fetchAllRowsDetalhado<T>(supabase, table, columns, userId, options)).rows;
 }

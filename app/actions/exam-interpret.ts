@@ -5,6 +5,7 @@ import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/a
 import { aiModel } from "@/lib/env";
 import { interpretExamText } from "@/lib/exams/interpret";
 import { createClient } from "@/lib/supabase/server";
+import { publicDbError } from "@/lib/errors/public-error";
 
 export type ExamInterpretActionResult = {
   ok?: true;
@@ -66,7 +67,7 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
     .eq("id", examId)
     .eq("user_id", user.id);
 
-  if (upErr) return { error: upErr.message };
+  if (upErr) return { error: publicDbError(upErr, "actions/exam-interpret") };
 
   revalidatePath("/exames");
   revalidatePath(`/exames/${examId}`);

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { persistMetabolicAudit, runMetabolicAudit } from "@/lib/audit/run";
+import {
+  AuditoriaIncompletaError,
+  MENSAGEM_AUDITORIA_INCOMPLETA,
+  persistMetabolicAudit,
+  runMetabolicAudit,
+} from "@/lib/audit/run";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -25,10 +30,18 @@ export async function POST(req: Request) {
     /* body opcional */
   }
 
-  const report = await runMetabolicAudit(supabase, user.id, windowDays);
+  let report;
+  try {
+    report = await runMetabolicAudit(supabase, user.id, windowDays);
+  } catch (e) {
+    if (e instanceof AuditoriaIncompletaError) {
+      return NextResponse.json({ error: MENSAGEM_AUDITORIA_INCOMPLETA }, { status: 503 });
+    }
+    throw e;
+  }
   const saved = await persistMetabolicAudit(supabase, user.id, report);
   if (saved.error) {
-    return NextResponse.json({ error: saved.error }, { status: 500 });
+    return NextResponse.json({ error: "Não foi possível gravar a auditoria." }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, id: saved.id, report });

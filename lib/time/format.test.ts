@@ -51,6 +51,69 @@ describe("formatação com fuso explícito", () => {
 });
 
 /**
+ * P48: `dateStyle`/`timeStyle` não podem conviver com campos avulsos (`day`,
+ * `hour`…) — o Intl lança `TypeError: Invalid option`. O helper punha os estilos
+ * sempre, e o relatório completo dava erro 500 para quem tinha remédio.
+ */
+describe("formatarDataHora com opções do chamador (P48)", () => {
+  it("o próprio Intl recusa estilo junto com campo avulso", () => {
+    expect(() =>
+      new Date(LEITURA).toLocaleString("pt-BR", {
+        timeZone: "UTC",
+        dateStyle: "short",
+        hour: "2-digit",
+      })
+    ).toThrow(TypeError);
+  });
+
+  it("formato do relatório completo (fmtDateTime)", () => {
+    expect(
+      formatarDataHora(LEITURA, null, {
+        timeZone: "America/Sao_Paulo",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    ).toBe("08/09/2026, 00:24");
+  });
+
+  it("formato do gráfico de tendência da glicemia, no fuso padrão", () => {
+    expect(
+      formatarDataHora(LEITURA, null, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    ).toBe("8 de set., 00:24");
+  });
+
+  it("só o fuso nas opções mantém o formato curto (rodapé do relatório)", () => {
+    expect(formatarDataHora(LEITURA, null, { timeZone: "UTC" })).toBe("08/09/2026, 03:24");
+  });
+
+  it("sem opções segue igual (demais consumidores)", () => {
+    expect(formatarDataHora(LEITURA)).toBe("08/09/2026, 00:24");
+    expect(formatarDataHora(LEITURA, "UTC")).toBe("08/09/2026, 03:24");
+  });
+
+  it("estilo pedido pelo chamador continua valendo", () => {
+    expect(formatarDataHora(LEITURA, null, { dateStyle: "long" })).toBe(
+      "8 de setembro de 2026 às 00:24"
+    );
+  });
+
+  it("entrada inválida aparece como inválida, sem data inventada", () => {
+    expect(formatarDataHora("não é data")).toBe("Invalid Date");
+    expect(formatarDataHora("não é data", null, { day: "2-digit", hour: "2-digit" })).toBe(
+      "Invalid Date"
+    );
+  });
+});
+
+/**
  * Trava de regressão: nenhuma formatação de INSTANTE pode ficar sem fuso.
  *
  * É teste e não convenção porque a convenção já falhou 42 vezes. Duas

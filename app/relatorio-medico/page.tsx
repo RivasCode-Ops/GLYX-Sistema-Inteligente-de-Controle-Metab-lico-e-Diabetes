@@ -271,6 +271,7 @@ export default async function RelatorioMedicoPage() {
                   <th className="border-b border-zinc-300 py-1">Esperado ({report.audit.window_days}d)</th>
                   <th className="border-b border-zinc-300 py-1">Registrado no app</th>
                   <th className="border-b border-zinc-300 py-1">Fora do horário</th>
+                  <th className="border-b border-zinc-300 py-1">Marcadas como puladas</th>
                 </tr>
               </thead>
               <tbody>
@@ -281,6 +282,7 @@ export default async function RelatorioMedicoPage() {
                     <td className="border-b border-zinc-200 py-1">{med.expectedDoses}</td>
                     <td className="border-b border-zinc-200 py-1">{med.loggedDoses}</td>
                     <td className="border-b border-zinc-200 py-1">{med.extraLogs || "—"}</td>
+                    <td className="border-b border-zinc-200 py-1">{med.skippedDoses || "—"}</td>
                   </tr>
                 ))}
               </tbody>

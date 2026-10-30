@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
-import { isUnusableCompletion, parseMealJson, sumMealItems } from "@/lib/ai/parse-meal";
+import { isUnusableCompletion, mealEstimateError, validateMealEstimate } from "@/lib/ai/parse-meal";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -108,25 +108,24 @@ export async function POST(req: Request) {
     );
   }
 
-  const parsed = parseMealJson(choice?.message?.content ?? "{}");
-  const totals = sumMealItems(parsed);
-  // Carga glicêmica é por item agora (a bebida pode pesar diferente do
-  // prato) — a média dá só um resumo geral pra quem quiser um número único.
-  const avgGlycemicLoad = totals.items.length
-    ? Math.round(
-        totals.items.reduce((acc, it) => acc + (it.glycemic_load_estimate ?? 0), 0) /
-          totals.items.length
-      )
-    : 0;
+  const estimate = validateMealEstimate(choice?.message?.content);
+  if (!estimate.ok) {
+    console.warn("[meal-photo] estimativa reprovada:", estimate.motivo, estimate.detalhe);
+    const { error, status } = mealEstimateError(estimate.motivo, "foto");
+    return NextResponse.json({ error }, { status });
+  }
+  const parsed = estimate.raw;
 
   // Só analisa — o usuário revisa e decide se conta no consumo diário
   // (ação separada salva, com a mesma foto reenviada pelo cliente).
+  // Carga glicêmica é por item (a bebida pode pesar diferente do prato); a do
+  // conjunto é a média só dos itens que têm uma — item sem carga não conta 0.
   return NextResponse.json({
     meal: {
-      ...totals,
-      glycemic_load_estimate: avgGlycemicLoad,
-      notes: parsed.notes ?? "",
-      eating_order_tip: parsed.eating_order_tip ?? "",
+      ...estimate.totals,
+      glycemic_load_estimate: estimate.glycemicLoad,
+      notes: typeof parsed.notes === "string" ? parsed.notes : "",
+      eating_order_tip: typeof parsed.eating_order_tip === "string" ? parsed.eating_order_tip : "",
     },
     saved: false,
   });

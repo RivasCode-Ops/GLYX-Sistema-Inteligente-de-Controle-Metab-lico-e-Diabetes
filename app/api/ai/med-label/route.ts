@@ -6,7 +6,7 @@ import { parseModelJson } from "@/lib/ai/parse-json";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
-import { toSafetyPayload, type SafetyPayload } from "@/lib/safety/present";
+import { checkUnavailablePayload, toSafetyPayload, type SafetyPayload } from "@/lib/safety/present";
 import { createClient } from "@/lib/supabase/server";
 import { DOSE_UNITS } from "@/lib/medications/dose-units";
 
@@ -133,18 +133,21 @@ export async function POST(req: Request) {
     );
   }
 
-  // Suplemento lido por foto vai direto para a tela de cadastro. Sem a checagem
-  // aqui, o usuário salvaria berberina ao lado da insulina e só descobriria o
-  // risco se fosse perguntar — que é como o incidente aconteceu. A checagem é
+  // Item lido por foto vai direto para a tela de cadastro. Sem a checagem aqui,
+  // o usuário salvaria berberina ao lado da insulina e só descobriria o risco se
+  // fosse perguntar — que é como o incidente aconteceu. A checagem é
   // determinística e não passa por modelo; falha dela não impede o cadastro,
   // mas nunca é apresentada como ausência de risco.
-  let safety: SafetyPayload | null = null;
-  if (parsed.kind === "supplement") {
-    try {
-      safety = toSafetyPayload(await checkSubstanceSafety(supabase, user.id, [parsed.name]));
-    } catch {
-      /* cadastro segue; a tela mostra o alerta só quando ele existe de fato */
-    }
+  //
+  // Roda para QUALQUER `kind`. Antes era só "supplement", e quem decide o
+  // `kind` é o modelo: berberina classificada como "med" passava sem checagem
+  // (GLYX-27 / P14). A base de interação cobre remédio também.
+  let safety: SafetyPayload;
+  try {
+    safety = toSafetyPayload(await checkSubstanceSafety(supabase, user.id, [parsed.name]));
+  } catch (e) {
+    console.error("[med-label] checagem de interação falhou", e);
+    safety = checkUnavailablePayload();
   }
 
   return NextResponse.json({ result: parsed, safety });

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { decidirAcessoDaConta } from "@/lib/auth/account-gate";
 
 const PUBLIC_PREFIXES = [
   "/login",
@@ -75,12 +76,24 @@ export async function updateSession(request: NextRequest, cabecalhos?: Headers) 
   }
 
   if (user && !isPublic) {
-    const { data: profile } = await supabase
+    const leitura = await supabase
       .from("profiles")
       .select("disabled")
       .eq("id", user.id)
       .maybeSingle();
-    if (profile?.disabled) {
+    const decisao = decidirAcessoDaConta(leitura);
+    if (decisao === "indisponivel") {
+      // Falha fechada (lib/auth/account-gate.ts): sem saber se a conta está
+      // ativa, não se libera. 503, não "conta desativada".
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Serviço temporariamente indisponível." }, { status: 503 });
+      }
+      return new NextResponse(
+        "GLYX temporariamente indisponível. Tente de novo em instantes.",
+        { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "30" } }
+      );
+    }
+    if (decisao === "desativada") {
       if (path.startsWith("/api/")) {
         return NextResponse.json({ error: "Conta desativada." }, { status: 403 });
       }
