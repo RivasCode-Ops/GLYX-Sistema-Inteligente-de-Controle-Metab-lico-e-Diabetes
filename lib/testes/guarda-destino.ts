@@ -27,6 +27,14 @@ export const VARIAVEL_DE_EXCECAO = "GLYX_TESTE_HOSTS_PERMITIDOS";
 
 /** Nome com cara de destino: o valor, se for URL, precisa apontar para host permitido. */
 const NOME_DE_DESTINO = /URL|BASE|DSN|SITE|WEBHOOK|ENDPOINT|HOST/;
+/**
+ * Variáveis que o PRÓPRIO runner de CI define (`GITHUB_API_URL`, `GITHUB_SERVER_URL`,
+ * `RUNNER_*`, `ACTIONS_*`). Nenhum código do app as lê — conferido em 30/10/2026 —,
+ * então não são destino do app; sem esta exceção a guarda reprovava todo job do
+ * GitHub Actions antes do primeiro teste. Ficam fora só da checagem de HOST: o
+ * identificador de produção e o JWT continuam conferidos nelas.
+ */
+const NOME_DA_PLATAFORMA_DE_CI = /^(GITHUB|RUNNER|ACTIONS)_/;
 /** Segredo ou destino: igualdade com o `.env.local` é proibida. Orçamento "1" igual ao de produção não leva a lugar nenhum. */
 const NOME_SENSIVEL = /KEY|SECRET|TOKEN|PASSWORD|URL|DSN|SITE|BASE|INVITE|VAPID|WEBHOOK|ENDPOINT|HOST|EMAIL/;
 
@@ -92,7 +100,11 @@ export function conferirDestinos({ env, pasta, exigirCobertura }: OpcoesGuarda):
   for (const [nome, valor] of Object.entries(env)) {
     if (!valor || nome === VARIAVEL_DE_EXCECAO) continue;
     for (const id of IDS_DE_PRODUCAO) if (valor.includes(id)) falhas.push(`${nome}: contém identificador de produção`);
-    if (NOME_DE_DESTINO.test(nome) && /^[a-z][a-z0-9+.-]*:\/\//i.test(valor)) {
+    if (
+      NOME_DE_DESTINO.test(nome) &&
+      !NOME_DA_PLATAFORMA_DE_CI.test(nome) &&
+      /^[a-z][a-z0-9+.-]*:\/\//i.test(valor)
+    ) {
       let host = "";
       try {
         host = new URL(valor).hostname;

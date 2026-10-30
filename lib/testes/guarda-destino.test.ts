@@ -71,6 +71,29 @@ describe("guarda de destino (GLYX-46)", () => {
     ]);
   });
 
+  it("variáveis do runner do GitHub Actions não reprovam a suíte (o CI de 30/10)", () => {
+    const runner = {
+      GITHUB_API_URL: "https://api.github.com",
+      GITHUB_SERVER_URL: "https://github.com",
+      GITHUB_GRAPHQL_URL: "https://api.github.com/graphql",
+      ACTIONS_RESULTS_URL: "https://results-receiver.actions.githubusercontent.com/",
+      RUNNER_TEMP: "/home/runner/work/_temp",
+    };
+    expect(conferir({ ...TESTE, ...runner })).toEqual([]);
+  });
+
+  it("a exceção do runner é só de host: produção continua barrada nelas", () => {
+    expect(
+      conferir({ ...TESTE, GITHUB_SERVER_URL: "https://glyx-sistema-inteligente-de-control.vercel.app" })
+    ).toEqual(["GITHUB_SERVER_URL: contém identificador de produção"]);
+  });
+
+  it("nome do app parecido com o do runner continua conferido", () => {
+    expect(conferir({ ...TESTE, MY_GITHUB_API_URL: "https://api.github.com" })).toEqual([
+      "MY_GITHUB_API_URL: host fora da lista permitida (api.github.com)",
+    ]);
+  });
+
   it("barra JWT de projeto hospedado", () => {
     expect(conferir({ ...TESTE, NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt({ iss: "supabase", ref: "abcdefghijklmnop" }) })).toEqual([
       "NEXT_PUBLIC_SUPABASE_ANON_KEY: JWT de projeto hospedado (ref presente)",
