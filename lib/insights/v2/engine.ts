@@ -27,10 +27,17 @@ export async function runCorrelationEngine(
   userId: string,
   windowDays: number = 14
 ): Promise<CorrelationFinding[]> {
+  // Fuso do perfil: o dia de cada série é o dia local do usuário (B7).
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", userId)
+    .maybeSingle();
   const { byDayGlucose, byDaySleep, byDayCarbs, byDayExercise } = await loadInsightDatasets(
     supabase,
     userId,
-    windowDays
+    windowDays,
+    (perfil as { timezone?: string | null } | null)?.timezone
   );
 
   const findings: CorrelationFinding[] = [];

@@ -48,7 +48,23 @@ export type FetchAllOptions = {
   since?: string;
   /** Filtro `<` opcional, aplicado sobre `orderColumn`. */
   before?: string;
+  /**
+   * Traz também as linhas de demonstração (`source = 'mock'`). Padrão: não —
+   * nenhuma análise mistura semente de demo com medição real (Etapa 2, B12).
+   * Só quem CONTA o demo à parte (o relatório completo, que o declara no
+   * cabeçalho) liga isto.
+   */
+  incluirDemonstracao?: boolean;
 };
+
+/** Tabelas com coluna `source` que pode conter dado de demonstração. */
+const TABELAS_COM_DEMONSTRACAO = new Set(["glucose_readings", "health_snapshots"]);
+
+/**
+ * Filtro "sem demonstração" para consultas diretas a essas tabelas. `or` com
+ * `is.null` porque `source <> 'mock'` é NULL (e some) em linha sem fonte.
+ */
+export const FILTRO_SEM_DEMONSTRACAO = "source.is.null,source.neq.mock";
 
 /**
  * Resultado com a completude explícita.
@@ -67,7 +83,8 @@ export async function fetchAllRowsDetalhado<T>(
   userId: string,
   options: FetchAllOptions
 ): Promise<FetchAllResult<T>> {
-  const { orderColumn, ascending = true, since, before } = options;
+  const { orderColumn, ascending = true, since, before, incluirDemonstracao = false } = options;
+  const semDemo = !incluirDemonstracao && TABELAS_COM_DEMONSTRACAO.has(table);
   const rows: T[] = [];
 
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
@@ -81,6 +98,7 @@ export async function fetchAllRowsDetalhado<T>(
 
     if (since) q = q.gte(orderColumn, since);
     if (before) q = q.lt(orderColumn, before);
+    if (semDemo) q = q.or(FILTRO_SEM_DEMONSTRACAO);
 
     const { data, error } = await q;
     if (error) return { rows, completo: false, erro: error.message };

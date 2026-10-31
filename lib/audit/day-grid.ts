@@ -5,8 +5,10 @@ import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import type { HealthSnapshotSource } from "@/lib/health/types";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
-const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit", "mock"];
+// Sem "mock": demonstração fica fora de toda análise (B12).
+const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit"];
 
 type ProfileTargets = {
   timezone: string | null;
@@ -92,6 +94,7 @@ export async function loadAuditDayGrid(
       .from("health_snapshots")
       .select("snapshot_date, source, sleep_hours")
       .eq("user_id", userId)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .gte("snapshot_date", dayStart),
     supabase
       .from("insulin_logs")

@@ -4,7 +4,7 @@ import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
 import { getContextReceipt } from "@/lib/queries/context-receipt";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
-import { localDateKey } from "@/lib/time/local-day";
+import { localDateKey, startOfLocalDayISO } from "@/lib/time/local-day";
 import { elegerCard, type CardAgora, type CardContext } from "@/lib/painel/card-agora";
 import type { ContextReceipt } from "@/lib/ai/context-receipt";
 
@@ -37,7 +37,9 @@ export async function getCardAgora(
 ): Promise<CardAgoraResult> {
   const tz = entrada.profile?.timezone || "America/Sao_Paulo";
   const agora = new Date();
-  const inicioDoDia = new Date(`${localDateKey(agora.toISOString(), tz)}T00:00:00Z`).toISOString();
+  // Meia-noite LOCAL (B7). Era a meia-noite UTC da data local: em São Paulo, o
+  // "hoje" começava às 21h de ontem e doses da véspera contavam como de hoje.
+  const inicioDoDia = startOfLocalDayISO(tz, agora);
   const janelaInsulina = new Date(
     agora.getTime() - JANELA_INSULINA_RAPIDA_H * 3600_000
   ).toISOString();

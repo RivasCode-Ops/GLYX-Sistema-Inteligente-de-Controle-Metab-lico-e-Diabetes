@@ -14,6 +14,7 @@ import { progressSummary } from "@/lib/body/progress";
 import { projectionMessage } from "@/lib/body/goals";
 import { dailyTargets, GOAL_LABEL } from "@/lib/health/energy";
 import { parseModelJson } from "@/lib/ai/parse-json";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 const resultSchema = z.object({
   headline: z.string(),
@@ -61,6 +62,7 @@ export async function POST() {
       .from("health_snapshots")
       .select("sleep_hours")
       .eq("user_id", user.id)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .gte("snapshot_date", since14d.slice(0, 10))
       .not("sleep_hours", "is", null),
     supabase

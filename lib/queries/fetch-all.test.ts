@@ -32,6 +32,25 @@ describe("leitura paginada além do teto de 1000", () => {
     expect(rows).toHaveLength(1500);
   });
 
+  it("demonstração fica fora por padrão; linha sem fonte continua (B12)", async () => {
+    const base = leituras(4);
+    base[0].source = "mock";
+    base[1].source = "libre";
+    base[2].source = null;
+    const { cliente } = clientePaginadoFalso({ glucose_readings: base, meals: [{ ...base[0] }] });
+    const rows = await fetchAllRows<{ id: string }>(cliente, "glucose_readings", "*", "u1", {
+      orderColumn: "id",
+    });
+    expect(rows.map((r) => r.id)).toEqual([base[1].id, base[2].id, base[3].id]);
+    const tudo = await fetchAllRows(cliente, "glucose_readings", "*", "u1", {
+      orderColumn: "id",
+      incluirDemonstracao: true,
+    });
+    expect(tudo).toHaveLength(4);
+    // Tabela sem coluna de fonte de demonstração não recebe o filtro.
+    expect(await fetchAllRows(cliente, "meals", "*", "u1", { orderColumn: "id" })).toHaveLength(1);
+  });
+
   it("o cliente falso imita o teto: consulta sem range recebe só mil", async () => {
     const { cliente } = clientePaginadoFalso({ glucose_readings: leituras(2500) });
     const { data } = await cliente.from("glucose_readings").select("*").eq("user_id", "u1");

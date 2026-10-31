@@ -43,6 +43,16 @@ export function clientePaginadoFalso(
       },
       not: () => b,
       in: () => b,
+      // Só o que os chamadores usam: lista de `coluna.is.null` / `coluna.neq.valor`.
+      or: (expr: string) => {
+        const termos = expr.split(",").map((t) => t.split("."));
+        linhas = linhas.filter((l) =>
+          termos.some(([c, op, v]) =>
+            op === "is" && v === "null" ? l[c] == null : op === "neq" ? l[c] != null && String(l[c]) !== v : false
+          )
+        );
+        return b;
+      },
       order: (c: string, o?: { ascending?: boolean }) => {
         const asc = o?.ascending ?? true;
         linhas.sort((x, y) => (String(x[c]) < String(y[c]) ? -1 : String(x[c]) > String(y[c]) ? 1 : 0) * (asc ? 1 : -1));

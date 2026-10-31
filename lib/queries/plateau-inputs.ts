@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { dailyTargets, PROTEIN_G_PER_KG } from "@/lib/health/energy";
 import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
+import { computePeriodAdherence, type DoseLog } from "@/lib/medications/adherence";
+import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
+import { localDateKey } from "@/lib/time/local-day";
 
 /**
  * As entradas do checklist de platô que ainda não existiam em consulta nenhuma:
@@ -44,7 +48,16 @@ export async function getPlateauInputs(dias = 28): Promise<PlateauInputs> {
   const desde = new Date();
   desde.setDate(desde.getDate() - dias);
   const desdeIso = desde.toISOString();
-  const desdeDia = desdeIso.slice(0, 10);
+
+  // Fuso antes do resto: o dia de cada série é o dia local (B7).
+  const { data: fusoRow } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+  const tz = (fusoRow as { timezone?: string | null } | null)?.timezone || "America/Sao_Paulo";
+  const desdeDia = localDateKey(desdeIso, tz);
+  const hojeDia = localDateKey(new Date().toISOString(), tz);
 
   const [perfilRes, pesoRes, refeicoesRes, sonoRes, medsRes, dosesRes] = await Promise.all([
     supabase
@@ -68,17 +81,17 @@ export async function getPlateauInputs(dias = 28): Promise<PlateauInputs> {
       .from("health_snapshots")
       .select("sleep_hours")
       .eq("user_id", user.id)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .gte("snapshot_date", desdeDia),
     supabase
       .from("medications")
-      .select("reminder_times")
+      .select("id, reminder_times, cadence, cadence_weekday, cadence_interval_days, cadence_anchor_on")
       .eq("user_id", user.id)
       .eq("active", true),
     supabase
       .from("medication_logs")
-      .select("id")
+      .select("medication_id, taken_at, confirmed")
       .eq("user_id", user.id)
-      .eq("confirmed", true) // "Pulei hoje" não é dose tomada (D16)
       .gte("taken_at", desdeIso),
   ]);
 
@@ -95,7 +108,7 @@ export async function getPlateauInputs(dias = 28): Promise<PlateauInputs> {
   // dias puniria quem registra só parte da semana: apareceria como "come
   // pouco" alguém que apenas anota pouco — e o checklist apontaria alimentação
   // por falta de registro, que é acusar sem medir.
-  const diasComRefeicao = new Set(refeicoes.map((r) => r.eaten_at.slice(0, 10)));
+  const diasComRefeicao = new Set(refeicoes.map((r) => localDateKey(r.eaten_at, tz)));
   const diasRegistrados = diasComRefeicao.size;
 
   const totalKcal = refeicoes.reduce((s, r) => s + (r.calories ?? 0), 0);
@@ -126,16 +139,31 @@ export async function getPlateauInputs(dias = 28): Promise<PlateauInputs> {
     .filter((h): h is number => h != null && h > 0);
   const sonoHoras = noites.length ? noites.reduce((a, b) => a + b, 0) / noites.length : null;
 
-  // Adesão da janela: registros contra o previsto pelos horários cadastrados
-  // HOJE. É aproximação, e o texto do checklist diz isso em voz alta — remédio
-  // incluído no meio da janela infla o denominador para trás.
-  const horariosPorDia = ((medsRes.data ?? []) as { reminder_times: string[] | null }[]).reduce(
-    (s, m) => s + (m.reminder_times ?? []).length,
-    0
-  );
-  const previstas = horariosPorDia * dias;
-  const registradas = (dosesRes.data ?? []).length;
-  const adesao = previstas > 0 ? Math.min(1, registradas / previstas) : null;
+  // Adesão da janela pela regra única (B8): janela por dose, cadência (semanal
+  // não espera 7 doses), "Pulei hoje" fora (D16). Continua aproximação pelos
+  // horários cadastrados HOJE — remédio incluído no meio da janela infla o
+  // denominador para trás, e o texto do checklist diz isso.
+  const logsPorRemedio = new Map<string, DoseLog[]>();
+  for (const l of (dosesRes.data ?? []) as { medication_id: string; taken_at: string; confirmed: boolean | null }[]) {
+    const lista = logsPorRemedio.get(l.medication_id) ?? [];
+    lista.push({ taken_at: l.taken_at, confirmed: l.confirmed });
+    logsPorRemedio.set(l.medication_id, lista);
+  }
+  let previstas = 0;
+  let tomadas = 0;
+  for (const m of (medsRes.data ?? []) as ({ id: string; reminder_times: string[] | null } & CamposDeCadencia)[]) {
+    const a = computePeriodAdherence(
+      m.reminder_times ?? [],
+      logsPorRemedio.get(m.id) ?? [],
+      tz,
+      desdeDia,
+      hojeDia,
+      (dia) => ehDiaDeDose(m, dia)
+    );
+    previstas += a.expectedDoses;
+    tomadas += Math.min(a.takenDoses, a.expectedDoses);
+  }
+  const adesao = previstas > 0 ? Math.min(1, tomadas / previstas) : null;
 
   return {
     proteinaPorKg,

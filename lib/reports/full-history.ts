@@ -502,7 +502,13 @@ function fetchAll<T>(
   userId: string,
   orderColumn: string
 ): Promise<T[]> {
-  return fetchAllRows<T>(supabase, table, columns, userId, { orderColumn });
+  // A glicemia de demonstração vem junto para ser CONTADA à parte e declarada
+  // no cabeçalho (`isRealGlucoseSource` a separa de todo número). Snapshots de
+  // demonstração não têm esse tratamento e ficam de fora já na consulta (B12).
+  return fetchAllRows<T>(supabase, table, columns, userId, {
+    orderColumn,
+    incluirDemonstracao: table === "glucose_readings",
+  });
 }
 
 export type FullHistoryProfile = {

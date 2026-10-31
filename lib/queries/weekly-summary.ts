@@ -17,6 +17,7 @@ import { buildWeeklySummary, type WeeklySummary } from "@/lib/audit/weekly-summa
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 export const WEEK_DAYS = 7;
 
@@ -77,6 +78,7 @@ async function loadWindow(
       .from("health_snapshots")
       .select("snapshot_date, sleep_hours")
       .eq("user_id", userId)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .gte("snapshot_date", startDay)
       .lte("snapshot_date", endDay)
       .not("sleep_hours", "is", null),

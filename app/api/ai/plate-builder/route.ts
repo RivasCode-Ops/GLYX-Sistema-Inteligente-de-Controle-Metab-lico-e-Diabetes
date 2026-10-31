@@ -7,6 +7,7 @@ import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { parseModelJson } from "@/lib/ai/parse-json";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 const MAX_PHOTOS = 4;
 const MAX_TOTAL_BYTES = 3.5 * 1024 * 1024; // corpo da request na Vercel ~4.5MB
@@ -78,6 +79,7 @@ export async function POST(req: Request) {
     .from("glucose_readings")
     .select("value_mg_dl, recorded_at")
     .eq("user_id", user.id)
+    .or(FILTRO_SEM_DEMONSTRACAO)
     .order("recorded_at", { ascending: false })
     .limit(1)
     .maybeSingle();

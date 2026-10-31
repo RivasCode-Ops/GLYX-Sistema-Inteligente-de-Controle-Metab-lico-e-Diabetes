@@ -10,7 +10,8 @@ import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { computeHourlyPattern, worstHours } from "@/lib/insights/hourly-pattern";
 import { localDateKey, startOfLocalDayISO } from "@/lib/time/local-day";
 import { descreverCadencia, ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
-import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
+import { computePeriodAdherence, type DoseLog } from "@/lib/medications/adherence";
+import { FILTRO_SEM_DEMONSTRACAO, fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
 
 // Contexto compacto dos dados recentes do usuário para o copiloto de IA:
 // glicemia, refeições, insulina extra, bebidas, água e exercício. Sem isso o
@@ -43,7 +44,7 @@ export async function buildUserContext(
   const ultimos7Dias = Array.from({ length: 7 }, (_, k) =>
     localDateKey(new Date(Date.now() - k * 86_400_000).toISOString(), tz)
   );
-  const fiveDaysAgoDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+  const fiveDaysAgoDate = localDateKey(new Date(Date.now() - 5 * 86_400_000).toISOString(), tz);
 
   const [
     glucoseRes,
@@ -64,6 +65,7 @@ export async function buildUserContext(
         .from("glucose_readings")
         .select("value_mg_dl, recorded_at, source")
         .eq("user_id", userId)
+        .or(FILTRO_SEM_DEMONSTRACAO)
         .order("recorded_at", { ascending: false })
         .limit(8),
       supabase
@@ -125,6 +127,7 @@ export async function buildUserContext(
         .from("health_snapshots")
         .select("snapshot_date, source, sleep_hours")
         .eq("user_id", userId)
+        .or(FILTRO_SEM_DEMONSTRACAO)
         .gte("snapshot_date", fiveDaysAgoDate)
         .not("sleep_hours", "is", null),
       supabase
@@ -154,18 +157,22 @@ export async function buildUserContext(
 
   const meds = medsRes.data ?? [];
   const medIds = meds.map((m) => m.id as string);
-  const medLogCounts = new Map<string, number>();
+  // Registros crus por remédio; a contagem é da regra única de adesão (B8):
+  // janela por dose, um registro por dose, "Pulei hoje" fora (D16). A contagem
+  // bruta anterior inflava com clique duplicado e dose extra.
+  const medLogsById = new Map<string, DoseLog[]>();
   if (medIds.length) {
     const { data: medLogs } = await supabase
       .from("medication_logs")
-      .select("medication_id")
+      .select("medication_id, taken_at, confirmed")
       .eq("user_id", userId)
-      .eq("confirmed", true) // "Pulei hoje" não é dose tomada (D16)
       .in("medication_id", medIds)
       .gte("taken_at", sevenDaysAgo);
     for (const l of medLogs ?? []) {
       const id = l.medication_id as string;
-      medLogCounts.set(id, (medLogCounts.get(id) ?? 0) + 1);
+      const lista = medLogsById.get(id) ?? [];
+      lista.push({ taken_at: l.taken_at as string, confirmed: l.confirmed as boolean | null });
+      medLogsById.set(id, lista);
     }
   }
 
@@ -213,9 +220,16 @@ export async function buildUserContext(
         .map((m) => {
           const times = (m.reminder_times as string[] | null) ?? [];
           // Dose esperada só em dia de dose: um semanal não "espera" sete.
-          const diasDeDose = ultimos7Dias.filter((dia) => ehDiaDeDose(m as CamposDeCadencia, dia)).length;
-          const expected = times.length * diasDeDose;
-          const logged = medLogCounts.get(m.id as string) ?? 0;
+          const adesao = computePeriodAdherence(
+            times,
+            medLogsById.get(m.id as string) ?? [],
+            tz,
+            ultimos7Dias[ultimos7Dias.length - 1],
+            ultimos7Dias[0],
+            (dia) => ehDiaDeDose(m as CamposDeCadencia, dia)
+          );
+          const expected = adesao.expectedDoses;
+          const logged = adesao.takenDoses;
           return `${sanitizeForPrompt(m.name, 60)}${m.dosage ? ` (${sanitizeForPrompt(m.dosage, 30)})` : ""} — ${times.length}× por dia de dose, ${descreverCadencia(m as CamposDeCadencia)}, ${logged}/${expected} doses registradas`;
         })
         .join("; ")}.`

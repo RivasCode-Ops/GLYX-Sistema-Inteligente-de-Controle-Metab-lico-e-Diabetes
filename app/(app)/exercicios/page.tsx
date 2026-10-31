@@ -14,6 +14,7 @@ import type { BodyGoal } from "@/lib/health/energy";
 import { demoExercises } from "@/lib/demo/data";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import { formatarData } from "@/lib/time/format";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 /**
  * A janela é de 8 semanas porque a tela pergunta três coisas de horizontes
@@ -58,6 +59,7 @@ export default async function ExerciciosOverviewPage() {
             .from("glucose_readings")
             .select("value_mg_dl")
             .eq("user_id", user.id)
+            .or(FILTRO_SEM_DEMONSTRACAO)
             .order("recorded_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
