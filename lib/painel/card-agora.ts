@@ -19,6 +19,7 @@
  */
 
 import { formatarHora } from "@/lib/time/format";
+import { FRESH_MAX_MINUTES, describeAge } from "@/lib/health/reading-freshness";
 
 export type CardLevel = "critico" | "atencao" | "neutro";
 
@@ -141,8 +142,30 @@ export function glucoseBlind(ctx: CardContext): boolean {
   return ctx.lastGlucose == null || ctx.receiptMissing.includes("glicemia");
 }
 
+/**
+ * Idade máxima da leitura para o card crítico de hipoglicemia (Etapa 1, B1).
+ *
+ * Antes não havia limite: o card só considerava a glicemia "ausente" quando o
+ * recibo dizia que não havia leitura em 14 DIAS — uma leitura baixa de ontem
+ * elegia "Glicemia baixa" hoje, mostrando só a hora, sem a data. 60 min cobre o
+ * ciclo de quem mede no dedo (corrigir e medir de novo em 15 min) sem acusar
+ * hipo com dado de horas atrás. É regra de apresentação, não clínica; o valor
+ * fica para validação do proprietário (D7).
+ */
+export const HIPO_LEITURA_MAX_MINUTOS = 60;
+
+/** Minutos desde a leitura, ou null se não há horário. */
+function idadeDaLeituraMin(ctx: CardContext): number | null {
+  if (!ctx.lastGlucoseAt) return null;
+  const t = Date.parse(ctx.lastGlucoseAt);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((ctx.now.getTime() - t) / 60000));
+}
+
 function hipoCondicao(ctx: CardContext): boolean {
   if (glucoseBlind(ctx) || ctx.lastGlucose == null) return false;
+  const idade = idadeDaLeituraMin(ctx);
+  if (idade != null && idade > HIPO_LEITURA_MAX_MINUTOS) return false;
   const limiar = ctx.hypoPlan?.thresholdMgDl ?? ctx.targetRange.low;
   if (ctx.lastGlucose < limiar) return true;
   // Acima do limiar mas caindo: a condição do briefing para "queda acentuada".
@@ -156,7 +179,11 @@ function hipoCondicao(ctx: CardContext): boolean {
 export function elegerCard(ctx: CardContext): CardAgora {
   const evidenciaGlicemia = () => {
     const valor = `${ctx.lastGlucose} mg/dL`;
-    const hora = ctx.lastGlucoseAt ? ` às ${HORA(ctx.lastGlucoseAt, ctx.timezone)}` : "";
+    // A idade vai junto quando a leitura não é "de agora": só a hora fazia uma
+    // leitura de ontem parecer de hoje.
+    const idade = idadeDaLeituraMin(ctx);
+    const idadeTxt = idade != null && idade > FRESH_MAX_MINUTES ? ` (${describeAge(idade)})` : "";
+    const hora = ctx.lastGlucoseAt ? ` às ${HORA(ctx.lastGlucoseAt, ctx.timezone)}${idadeTxt}` : "";
     const tend = ctx.glucoseTrend === "down" ? " · caindo" : "";
     return `${valor}${hora}${tend}`;
   };

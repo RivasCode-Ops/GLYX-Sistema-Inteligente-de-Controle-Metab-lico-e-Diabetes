@@ -79,14 +79,30 @@ test.describe("portões de autenticação (negativo)", () => {
     expect(res.status()).toBe(401);
   });
 
-  test("convite inválido é recusado", async ({ request }) => {
-    const res = await request.post("/api/auth/verify-invite", {
-      data: { code: "codigo-errado-e2e" },
+  test("convite inválido é recusado no cadastro", async ({ request }) => {
+    // A rota /api/auth/verify-invite saiu (Etapa 1, A8): sem chamador no app, ela
+    // só servia de oráculo para adivinhar o código. O teste vai direto ao
+    // cadastro, que confere o código mesmo sem service role.
+    const res = await request.post("/api/auth/register", {
+      data: {
+        email: "convite-invalido-e2e@teste.invalid",
+        password: "senha-de-teste-e2e",
+        inviteCode: "codigo-errado-e2e",
+        consent: true,
+      },
       headers: { "Content-Type": "application/json" },
     });
     expect(res.status()).toBe(403);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(false);
+  });
+
+  test("rota antiga de verificação de convite não existe mais", async ({ request }) => {
+    const res = await request.post("/api/auth/verify-invite", {
+      data: { code: "codigo-errado-e2e" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(res.status()).toBe(404);
   });
 
   test("página de registro exige campo de convite", async ({ request }) => {

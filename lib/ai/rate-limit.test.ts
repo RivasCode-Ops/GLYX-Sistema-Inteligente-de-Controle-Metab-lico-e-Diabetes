@@ -83,7 +83,7 @@ describe("cota de IA pela RPC atômica (GLYX-24)", () => {
       rpc: { consumir_cota_ia: { data: [{ permitido: true, usage_id: "x", mais_antigo: null }], error: null } },
     });
     await checkAndRecordAiUsage(f.client, "user-1", "body_photo");
-    expect(f.chamadasRpc[0]).toEqual({
+    expect(f.chamadasRpc.find((c) => c.fn === "consumir_cota_ia")).toEqual({
       fn: "consumir_cota_ia",
       args: { p_kind: "body_photo", p_limite: 5, p_janela_segundos: 3600 },
     });
@@ -122,6 +122,51 @@ describe("cota de IA pela RPC atômica (GLYX-24)", () => {
     await recordAiTokens(f.client, "u-rpc", { prompt_tokens: 10, completion_tokens: 5 }, "modelo");
     expect(f.chamadasRpc[0].fn).toBe("registrar_tokens_ia");
     expect(f.updates).toHaveLength(0);
+  });
+});
+
+describe("teto global antes da cota individual (Etapa 1, C7)", () => {
+  it("acima do teto, recusa sem consumir cota nem chegar ao provedor", async () => {
+    const f = fakeSupabase({ rpc: { ia_dentro_do_teto: { data: false, error: null } } });
+    const r = await checkAndRecordAiUsage(f.client, "user-1", "chat");
+    expect(r).toMatchObject({ allowed: false, motivoGlobal: "teto_global" });
+    expect(f.chamadasRpc.map((c) => c.fn)).toEqual(["ia_dentro_do_teto"]);
+    expect(f.inserts).toHaveLength(0);
+  });
+
+  it("dentro do teto, segue para a cota individual com a tabela de preços do app", async () => {
+    const f = fakeSupabase({
+      rpc: {
+        ia_dentro_do_teto: { data: true, error: null },
+        consumir_cota_ia: { data: [{ permitido: true, usage_id: "u", mais_antigo: null }], error: null },
+      },
+    });
+    const r = await checkAndRecordAiUsage(f.client, "user-1", "chat");
+    expect(r).toEqual({ allowed: true, usageId: "u" });
+    expect(f.chamadasRpc[0].args).toMatchObject({ p_teto_dia: 1, p_teto_mes: 20 });
+    expect(f.chamadasRpc[0].args.p_precos).toHaveProperty("anthropic");
+  });
+
+  it("falha na checagem do teto recusa (falha fechada)", async () => {
+    const f = fakeSupabase({
+      rpc: { ia_dentro_do_teto: { data: null, error: { code: "57014", message: "timeout" } } },
+    });
+    const r = await checkAndRecordAiUsage(f.client, "user-1", "chat");
+    expect(r).toMatchObject({ allowed: false, motivoGlobal: "falha_na_checagem" });
+  });
+
+  it("chave de desligar recusa sem tocar o banco", async () => {
+    const antes = process.env.AI_DISABLED;
+    process.env.AI_DISABLED = "1";
+    try {
+      const f = fakeSupabase({});
+      const r = await checkAndRecordAiUsage(f.client, "user-1", "chat");
+      expect(r).toMatchObject({ allowed: false, motivoGlobal: "ia_desligada" });
+      expect(f.chamadasRpc).toHaveLength(0);
+    } finally {
+      if (antes === undefined) delete process.env.AI_DISABLED;
+      else process.env.AI_DISABLED = antes;
+    }
   });
 });
 

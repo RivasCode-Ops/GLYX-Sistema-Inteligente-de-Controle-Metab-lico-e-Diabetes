@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { AiUsageCard } from "@/components/perfil/ai-usage-card";
+import { AiSuggestionConsent } from "@/components/perfil/ai-suggestion-consent";
 import { ChangePasswordCard } from "@/components/perfil/change-password-card";
 import { DataPrivacySection } from "@/components/perfil/data-privacy-section";
 import { OtherAccountsNotice } from "@/components/admin/other-accounts-notice";
@@ -31,12 +32,24 @@ export default async function PerfilContaPage() {
   }
 
   let otherAccounts: OtherAccountsSummary | null = null;
+  let sugestaoIa = { ativo: false, disponivel: false };
   const supabase = await createClient();
   if (supabase) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
+      // Sem a coluna (migration 20261031102000 não aplicada), a consulta falha:
+      // a tela mostra "desligada" e não oferece o botão.
+      const { data: consent, error: erroConsent } = await supabase
+        .from("profiles")
+        .select("ia_sugestao_automatica")
+        .eq("id", user.id)
+        .maybeSingle();
+      sugestaoIa = {
+        ativo: Boolean(consent?.ia_sugestao_automatica),
+        disponivel: !erroConsent,
+      };
       const { data: p } = await supabase
         .from("profiles")
         .select("is_admin")
@@ -58,6 +71,7 @@ export default async function PerfilContaPage() {
       {otherAccounts ? <OtherAccountsNotice summary={otherAccounts} /> : null}
       <ChangePasswordCard />
       <AiUsageCard />
+      <AiSuggestionConsent ativo={sugestaoIa.ativo} disponivel={sugestaoIa.disponivel} />
       <DataPrivacySection />
     </div>
   );

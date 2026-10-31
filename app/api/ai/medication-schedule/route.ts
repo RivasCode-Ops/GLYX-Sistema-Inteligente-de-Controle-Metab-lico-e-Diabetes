@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
@@ -112,6 +113,9 @@ Responda APENAS um JSON válido com "suggestions": array de objetos, um por item
       time: String(s.time),
       rationale: s.rationale ? String(s.rationale) : "",
     }));
+
+  const barrada = respostaBarradaOuNull("ai/medication-schedule", suggestions);
+  if (barrada) return barrada;
 
   return NextResponse.json({ suggestions });
 }

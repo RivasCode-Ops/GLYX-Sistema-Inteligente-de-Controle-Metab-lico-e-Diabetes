@@ -1,6 +1,6 @@
 import type { ErrorEvent } from "@sentry/nextjs";
 import { describe, expect, it } from "vitest";
-import { scrubBreadcrumb, scrubEvent, scrubUrl } from "./sentry-scrub";
+import { scrubBreadcrumb, scrubEvent, scrubText, scrubUrl } from "./sentry-scrub";
 
 // GLYX-35: o que vai ao Sentry não leva o conteúdo da pessoa.
 
@@ -72,5 +72,48 @@ describe("scrubBreadcrumb e scrubUrl", () => {
 
   it("URL sem query fica igual", () => {
     expect(scrubUrl("https://glyx.app/medicacao")).toBe("https://glyx.app/medicacao");
+  });
+});
+
+describe("texto livre, extra e contextos (Etapa 1, A9)", () => {
+  it("a linha recusada pelo Postgres e o valor da chave saem do texto da exceção", () => {
+    const e = scrubEvent({
+      type: undefined,
+      exception: {
+        values: [
+          {
+            type: "PostgrestError",
+            value:
+              'new row violates check constraint "x". Failing row contains (54, Insulina Lantus, 2026-10-30). Key (email)=(pessoa@exemplo.com) already exists',
+          },
+        ],
+      },
+    } as ErrorEvent);
+    const v = e.exception?.values?.[0].value ?? "";
+    expect(v).toContain("Failing row contains ([omitido])");
+    expect(v).toContain("Key (email)=([omitido])");
+    expect(v).not.toMatch(/Lantus|54|pessoa@/);
+    expect(e.exception?.values?.[0].type).toBe("PostgrestError");
+  });
+
+  it("e-mail, JWT, chave secreta e glicemia saem de qualquer texto", () => {
+    const t = scrubText("ana@x.com eyJa.eyJb.c sk-abcdefghijkl sb_secret_abcdefghij glicemia 54 mg/dL");
+    expect(t).toBe("[e-mail] [jwt] [chave] [chave] glicemia [valor] mg/dL");
+  });
+
+  it("extra mantém códigos simples, limpa textos e descarta corpo e objetos", () => {
+    const e = scrubEvent({
+      type: undefined,
+      extra: { codigo: "23514", tentativas: 2, body: "{...}", detalhe: "user ana@x.com", objeto: { a: 1 } },
+    } as ErrorEvent);
+    expect(e.extra).toEqual({ codigo: "23514", tentativas: 2, detalhe: "user [e-mail]" });
+  });
+
+  it("contextos de ambiente ficam; os demais saem", () => {
+    const e = scrubEvent({
+      type: undefined,
+      contexts: { runtime: { name: "node" }, trace: { trace_id: "t" }, response: { body: "x" }, perfil: { a: 1 } },
+    } as unknown as ErrorEvent);
+    expect(Object.keys(e.contexts ?? {}).sort()).toEqual(["runtime", "trace"]);
   });
 });

@@ -88,6 +88,17 @@ export async function deleteAllMyData(): Promise<PrivacyActionResult> {
     return { error: "Dados apagados, mas falha ao limpar o perfil. Tente de novo." };
   }
 
+  // Apagar tudo revoga o consentimento da sugestão automática por IA (Etapa 1,
+  // A1). Em atualização separada: antes da migration 20261031102000 a coluna não
+  // existe, e isso não pode derrubar a exclusão.
+  const { error: consentError } = await supabase
+    .from("profiles")
+    .update({ ia_sugestao_automatica: false })
+    .eq("id", user.id);
+  if (consentError && consentError.code !== "PGRST204" && consentError.code !== "42703") {
+    return { error: "Dados apagados, mas falha ao desligar a sugestão automática por IA. Tente de novo." };
+  }
+
   revalidatePath("/", "layout");
   return { ok: true };
 }

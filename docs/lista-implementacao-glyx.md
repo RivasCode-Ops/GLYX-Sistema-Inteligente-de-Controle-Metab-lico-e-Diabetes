@@ -930,5 +930,20 @@ Detalhes: [`PLANO-IMPLEMENTACAO.md`](PLANO-IMPLEMENTACAO.md) §1, §3.3, §4 e �
 
 ---
 
+## Etapa 1 do programa da IA gestora (segurança) — 30/10/2026 (local, não publicada)
+
+Branch `etapa-1-seguranca`, não commitado. Plano: [`programa-ia-gestora/PLANO-DE-EXECUCAO.md`](programa-ia-gestora/PLANO-DE-EXECUCAO.md); achados: `auditoria-2026-10-30/`.
+
+| | Situação |
+|---|---|
+| **Corrigido** | A1 sugestão de refeição só com consentimento (desligado por padrão, chave em Perfil › Conta) · A3 `push_dispatch_log` sem forja nem bloqueio de alarme · A5 histórico do chat lido do banco · A6 filtro de linguagem proibida em todas as saídas de IA (stream retido) · A8 limite de tentativas de convite, recusa neutra, `verify-invite` removida · A9 Sentry sem dado clínico em mensagem/extra/contexto · A14 fuso validado nos 3 jobs restantes · B1 card de hipo mostra a idade da leitura (até 60 min) · B17 painel nunca cai no demo · C7/P52 teto global diário/mensal de IA + `AI_DISABLED` · E10 limite de 5000 leituras por envio |
+| **Descartado** | A4 — o sync manual já ignora o disjuntor por desenho |
+| **Migrations novas (não aplicadas)** | `20261031100000` A3 → `101000` A14 → `102000` A1 → `103000` C7 → `104000` A8. O código funciona antes delas (recuos) |
+| **Testado no banco (PG 17.6, banco vazio + 84 migrations)** | 8/8 testes SQL, incluindo `etapa1_seguranca.sql` (A3 6, C7 3, A8 5, A1/A14 5 cenários) |
+| **Local** | tipos e lint limpos; 118 arquivos / 1455 testes |
+| **Ambiente local** | chamar função sem EXECUTE como `anon`/`authenticated` derruba o Postgres local (segfault, também com função trivial); permissões conferidas por `has_function_privilege` |
+| **Pendente** | decisões P52 (valores 1/20 US$), D7 (60 min), D13/D5/D6; preço OpenAI a conferir; produção (merge, cada migration), A2, I1 |
+
+---
 **Riva's Alexandre**  © 2026
 Todos os direitos reservados. Lista mestra do GLYX.

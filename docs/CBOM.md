@@ -5,7 +5,7 @@
 
 | primitiva | usos | onde |
 |---|---:|---|
-| `sha256` | 9 | lib/auth/constant-time.ts:18<br>lib/auth/constant-time.ts:19<br>lib/cgm/dexcom.ts:47<br>lib/cgm/dexcom.ts:62<br>lib/cgm/librelinkup.ts:32<br>lib/cgm/librelinkup.ts:255 |
+| `sha256` | 10 | lib/auth/constant-time.ts:18<br>lib/auth/constant-time.ts:19<br>lib/auth/invite-attempts.ts:17<br>lib/cgm/dexcom.ts:47<br>lib/cgm/dexcom.ts:62<br>lib/cgm/librelinkup.ts:32 |
 | `timingSafeEqual` | 7 | lib/auth/constant-time.ts:1<br>lib/auth/constant-time.ts:9<br>lib/auth/constant-time.ts:20<br>lib/cgm/dexcom.ts:1<br>lib/cgm/dexcom.ts:66<br>lib/health/google-fit-oauth.ts:1 |
 | `randomUUID` | 4 | app/(app)/medicacao/medicamentos/page.tsx:482<br>app/(app)/medicacao/page.tsx:242<br>lib/storage/upload-private-photo.ts:44<br>components/medicacao/daily-doses-card.tsx:167 |
 | `aes-256-gcm` | 2 | lib/cgm/librelinkup.ts:275<br>lib/cgm/librelinkup.ts:285 |

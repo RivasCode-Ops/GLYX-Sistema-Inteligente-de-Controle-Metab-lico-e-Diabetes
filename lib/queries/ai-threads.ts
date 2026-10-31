@@ -105,6 +105,32 @@ export async function appendMessages(
 export type ThreadHistory = { threadId: string; messages: StoredMessage[] };
 
 /**
+ * Últimas mensagens gravadas de UMA conversa do usuário, em ordem de leitura.
+ *
+ * É daqui que o chat tira o histórico desde a Etapa 1 (A5). Antes o navegador
+ * reenviava o histórico a cada turno e o servidor o repassava ao modelo: dava
+ * para mandar falas "assistant" inventadas e o modelo as tomava como ditas por
+ * ele — inclusive uma "já confirmei que é seguro". Agora só a pergunta nova vem
+ * do cliente; o que o assistente disse vem do banco.
+ */
+export async function getThreadMessages(
+  supabase: SupabaseClient,
+  userId: string,
+  threadId: string,
+  limit: number = HISTORY_LIMIT
+): Promise<StoredMessage[]> {
+  // `seq`, não `created_at`: pergunta e resposta compartilham o mesmo `now()`.
+  const { data } = await supabase
+    .from("ai_messages")
+    .select("role, content, seq")
+    .eq("thread_id", threadId)
+    .eq("user_id", userId)
+    .order("seq", { ascending: false })
+    .limit(limit);
+  return toChronological((data ?? []) as { role: string; content: string }[]);
+}
+
+/**
  * Conversa mais recente do usuário, para o chat reabrir de onde parou.
  *
  * Devolve as últimas `HISTORY_LIMIT` mensagens em ordem cronológica. Busca em
@@ -130,19 +156,8 @@ export async function getLatestThread(): Promise<ThreadHistory | null> {
 
   if (!thread) return null;
 
-  // Ordena por `seq`, não por `created_at`: pergunta e resposta são gravadas na
-  // mesma transação e compartilham o mesmo `now()`, então o timestamp empata e
-  // não desempata — era isso que fazia a resposta aparecer antes da pergunta.
-  const { data: messages } = await supabase
-    .from("ai_messages")
-    .select("role, content, seq")
-    .eq("thread_id", thread.id)
-    .eq("user_id", user.id)
-    .order("seq", { ascending: false })
-    .limit(HISTORY_LIMIT);
-
   return {
     threadId: thread.id as string,
-    messages: toChronological((messages ?? []) as { role: string; content: string }[]),
+    messages: await getThreadMessages(supabase, user.id, thread.id as string),
   };
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
@@ -85,6 +86,8 @@ export async function POST(req: Request) {
     const { error, status } = mealEstimateError(estimate.motivo, "texto");
     return NextResponse.json({ error }, { status });
   }
+  const barrada = respostaBarradaOuNull("ai/meal-text", estimate.raw);
+  if (barrada) return barrada;
 
   return NextResponse.json({
     meal: {

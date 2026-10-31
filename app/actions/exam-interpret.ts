@@ -6,6 +6,7 @@ import { aiModel } from "@/lib/env";
 import { interpretExamText } from "@/lib/exams/interpret";
 import { createClient } from "@/lib/supabase/server";
 import { publicDbError } from "@/lib/errors/public-error";
+import { AVISO_RESPOSTA_BARRADA, linguagemProibidaEm } from "@/lib/safety/ai-output-guard";
 
 export type ExamInterpretActionResult = {
   ok?: true;
@@ -52,6 +53,16 @@ export async function runExamInterpretation(examId: string): Promise<ExamInterpr
       error:
         "Não consegui gerar um resumo a partir deste texto. Tente colar um trecho maior do laudo.",
     };
+  }
+
+  // Guarda de saída antes de gravar (Etapa 1, A6).
+  const proibidas = linguagemProibidaEm(result.data);
+  if (proibidas.length) {
+    console.warn(
+      "[actions/exam-interpret] interpretação barrada por linguagem proibida:",
+      proibidas.map((h) => h.phrase)
+    );
+    return { error: AVISO_RESPOSTA_BARRADA };
   }
 
   const summary = {

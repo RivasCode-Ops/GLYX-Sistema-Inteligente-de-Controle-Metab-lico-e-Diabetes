@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
 import { isUnusableCompletion, mealEstimateError, validateMealEstimate } from "@/lib/ai/parse-meal";
@@ -115,6 +116,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error }, { status });
   }
   const parsed = estimate.raw;
+  const barrada = respostaBarradaOuNull("ai/meal-photo", parsed);
+  if (barrada) return barrada;
 
   // Só analisa — o usuário revisa e decide se conta no consumo diário
   // (ação separada salva, com a mesma foto reenviada pelo cliente).

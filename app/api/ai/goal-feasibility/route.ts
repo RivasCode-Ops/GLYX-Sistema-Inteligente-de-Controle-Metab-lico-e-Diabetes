@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
@@ -147,6 +148,8 @@ REGRAS:
   if (!parsed.success) {
     return NextResponse.json({ error: "Formato inesperado do modelo. Tente novamente." }, { status: 502 });
   }
+  const barrada = respostaBarradaOuNull("ai/goal-feasibility", parsed.data);
+  if (barrada) return barrada;
 
   return NextResponse.json({
     ...parsed.data,

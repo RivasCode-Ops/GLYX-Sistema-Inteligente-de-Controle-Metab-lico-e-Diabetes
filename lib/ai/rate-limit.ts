@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { mensagemDoTeto, verificarTetoGlobal, type VereditoDoTeto } from "./budget";
 
 export type AiKind =
   | "chat"
@@ -31,7 +32,13 @@ const JANELA_SEGUNDOS = 60 * 60;
 
 export type RateLimitResult =
   | { allowed: true; usageId: string | null }
-  | { allowed: false; limit: number; retryAfterMinutes: number };
+  | {
+      allowed: false;
+      limit: number;
+      retryAfterMinutes: number;
+      /** Presente quando quem barrou foi o teto global ou a chave de desligar, não a cota por usuário. */
+      motivoGlobal?: Exclude<VereditoDoTeto, { permitido: true }>["motivo"];
+    };
 
 /** A RPC ainda não existe no banco (migration 20261015102000 não aplicada). */
 function rpcAusente(error: { code?: string } | null): boolean {
@@ -58,6 +65,13 @@ export async function checkAndRecordAiUsage(
   kind: AiKind
 ): Promise<RateLimitResult> {
   const limit = HOURLY_LIMITS[kind];
+
+  // Teto global antes da cota individual: acima do orçamento, ninguém consome
+  // cota nem chega ao provedor (Etapa 1, C7).
+  const teto = await verificarTetoGlobal(supabase);
+  if (!teto.permitido) {
+    return { allowed: false, limit, retryAfterMinutes: 60, motivoGlobal: teto.motivo };
+  }
 
   const { data, error } = await supabase.rpc("consumir_cota_ia", {
     p_kind: kind,
@@ -150,5 +164,6 @@ export async function recordAiTokens(
 }
 
 export function rateLimitMessage(r: Extract<RateLimitResult, { allowed: false }>): string {
+  if (r.motivoGlobal) return mensagemDoTeto(r.motivoGlobal);
   return `Limite de ${r.limit} usos de IA por hora atingido. Tente novamente em ~${r.retryAfterMinutes} min.`;
 }

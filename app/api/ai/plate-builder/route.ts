@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
@@ -167,6 +168,9 @@ REGRAS OBRIGATÓRIAS:
       { status: 502 }
     );
   }
+
+  const barrada = respostaBarradaOuNull("ai/plate-builder", parsed.data);
+  if (barrada) return barrada;
 
   return NextResponse.json(parsed.data);
 }
