@@ -4,6 +4,7 @@ import { BolusCalculatorForm } from "@/components/medicacao/bolus-calculator-for
 import { isSupabaseConfigured } from "@/lib/env";
 import { bolusGlucosePrefill, type BolusPrefill } from "@/lib/medications/bolus-prefill";
 import { createClient } from "@/lib/supabase/server";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 export default async function CalculadoraDosePage() {
   let carbRatio: number | null = null;
@@ -29,6 +30,7 @@ export default async function CalculadoraDosePage() {
             .from("glucose_readings")
             .select("value_mg_dl, recorded_at")
             .eq("user_id", user.id)
+            .or(FILTRO_SEM_DEMONSTRACAO)
             .order("recorded_at", { ascending: false })
             .limit(1)
             .maybeSingle(),

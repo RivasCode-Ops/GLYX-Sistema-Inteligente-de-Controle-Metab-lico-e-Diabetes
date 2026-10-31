@@ -148,6 +148,7 @@ export const PROFILE_KEPT_COLUMNS: Record<string, string> = {
   onboarding_done: "volta a false no reset",
   target_glucose_min: "volta ao padrão no reset",
   target_glucose_max: "volta ao padrão no reset",
+  ia_sugestao_automatica: "volta a false no reset — apagar tudo revoga o consentimento da sugestão por IA",
   created_at: "metadado da conta",
   updated_at: "metadado da conta",
 };

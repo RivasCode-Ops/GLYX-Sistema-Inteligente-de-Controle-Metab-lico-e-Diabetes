@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
@@ -132,6 +133,12 @@ export async function POST(req: Request) {
       { status: 422 }
     );
   }
+
+  // Guarda de saída antes de gravar (A6): texto barrado não vai para o banco.
+  // O texto transcrito do laudo fica de fora da varredura: é o documento, não
+  // fala do modelo, e um laudo pode conter "sem risco" sem que seja conduta.
+  const barrada = respostaBarradaOuNull("ai/exam-photo", { ...parsed.data, extractedText: "" });
+  if (barrada) return barrada;
 
   const { extractedText, suggestedTitle, ...summary } = parsed.data;
   const title = titleInput || suggestedTitle || defaultTitleFor(examType);

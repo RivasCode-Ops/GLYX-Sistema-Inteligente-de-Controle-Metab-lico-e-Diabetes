@@ -3,9 +3,11 @@ import { Lightbulb } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { getNextStepInsight, type NextStepTone } from "@/lib/insights/next-step";
 import { cn } from "@/lib/utils";
+import type { GlucoseZone } from "@/lib/health/glucose-thresholds";
 
 type Props = {
   latestGlucose: number | null;
+  glucoseZone?: GlucoseZone | null;
   carbsToday: number;
   activeMinutes: number;
 };
@@ -17,8 +19,8 @@ const TONE_ICON: Record<NextStepTone, string> = {
   neutral: "text-sky-400",
 };
 
-export function NextStepCard({ latestGlucose, carbsToday, activeMinutes }: Props) {
-  const insight = getNextStepInsight({ latestGlucose, carbsToday, activeMinutes });
+export function NextStepCard({ latestGlucose, glucoseZone, carbsToday, activeMinutes }: Props) {
+  const insight = getNextStepInsight({ latestGlucose, zone: glucoseZone, carbsToday, activeMinutes });
 
   return (
     <Card>

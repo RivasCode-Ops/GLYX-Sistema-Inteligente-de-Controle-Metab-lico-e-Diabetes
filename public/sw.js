@@ -60,6 +60,12 @@ self.addEventListener("push", (event) => {
       { action: "taken", title: "✅ Já tomei" },
       { action: "snooze", title: "⏰ Adiar 15min" },
     ];
+    // "Pulei hoje" (B3) só onde cabe uma terceira ação: tirar "Adiar" para
+    // encaixá-lo trocaria um atalho usado por outro. Onde não cabe, o botão
+    // está na tela de doses.
+    if (self.Notification && Notification.maxActions >= 3) {
+      options.actions.push({ action: "skipped", title: "Pulei hoje" });
+    }
   }
 
   // Com o app aberto, avisa a página para tocar o alarme próprio. O som da
@@ -124,6 +130,28 @@ self.addEventListener("notificationclick", (event) => {
           // sessão expirada neste aparelho: abre o app para registrar
           return clients.openWindow("/medicacao");
         })
+        .catch(() => clients.openWindow("/medicacao"))
+    );
+    return;
+  }
+
+  if (event.action === "skipped" && info.medId) {
+    event.waitUntil(
+      fetch("/api/medications/skipped", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ medication_id: info.medId, pedido: info.pedido || undefined }),
+      })
+        .then((res) =>
+          res.ok
+            ? self.registration.showNotification("Anotado: pulou esta dose", {
+                body: "Fica no histórico como pulada, não como esquecida.",
+                icon: "/icon-192",
+                vibrate: [100],
+              })
+            : clients.openWindow("/medicacao")
+        )
         .catch(() => clients.openWindow("/medicacao"))
     );
     return;

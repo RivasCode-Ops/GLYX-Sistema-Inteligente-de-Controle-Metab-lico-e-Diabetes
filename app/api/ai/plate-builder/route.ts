@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
@@ -6,6 +7,7 @@ import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { parseModelJson } from "@/lib/ai/parse-json";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 const MAX_PHOTOS = 4;
 const MAX_TOTAL_BYTES = 3.5 * 1024 * 1024; // corpo da request na Vercel ~4.5MB
@@ -77,6 +79,7 @@ export async function POST(req: Request) {
     .from("glucose_readings")
     .select("value_mg_dl, recorded_at")
     .eq("user_id", user.id)
+    .or(FILTRO_SEM_DEMONSTRACAO)
     .order("recorded_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -167,6 +170,9 @@ REGRAS OBRIGATÓRIAS:
       { status: 502 }
     );
   }
+
+  const barrada = respostaBarradaOuNull("ai/plate-builder", parsed.data);
+  if (barrada) return barrada;
 
   return NextResponse.json(parsed.data);
 }

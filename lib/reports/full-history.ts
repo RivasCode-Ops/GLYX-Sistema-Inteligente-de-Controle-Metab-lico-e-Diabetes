@@ -1,6 +1,6 @@
 import { consolidarRegistrosDeDose, contarTomadas, marcacaoDoRegistro } from "@/lib/medications/tomadas";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
+import { isAboveTarget, isBelowTarget, resolveGlucoseTargets, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 import { localDateKey } from "@/lib/time/local-day";
 import { BODY_FIELD_KEYS, type BodyMeasurement, type BodyMeasurementKey } from "@/lib/body/fields";
 import { BEVERAGE_META, isBeverageKind, isHydrating } from "@/lib/health/beverages";
@@ -255,8 +255,8 @@ export function aggregateGlucoseByDay(
         sum += v;
         if (v < min) min = v;
         if (v > max) max = v;
-        if (v < targetMin) below += 1;
-        else if (v > targetMax) above += 1;
+        if (isBelowTarget(v, targetMin)) below += 1;
+        else if (isAboveTarget(v, targetMax)) above += 1;
         if (v >= SEVERE_HYPER_MG_DL) severe += 1;
       }
       const inRange = values.length - below - above;
@@ -269,7 +269,7 @@ export function aggregateGlucoseByDay(
         below,
         above,
         severe,
-        tirPercent: round((inRange / values.length) * 100),
+        tirPercent: round((inRange / values.length) * 100, 1),
       };
     })
     .sort((a, b) => a.day.localeCompare(b.day));
@@ -305,7 +305,7 @@ export function summarizeGlucose(days: GlucoseDay[]): GlucoseOverall | null {
     below,
     above,
     severe,
-    tirPercent: round((inRange / count) * 100),
+    tirPercent: round((inRange / count) * 100, 1),
     daysWithData: days.length,
   };
 }
@@ -502,7 +502,13 @@ function fetchAll<T>(
   userId: string,
   orderColumn: string
 ): Promise<T[]> {
-  return fetchAllRows<T>(supabase, table, columns, userId, { orderColumn });
+  // A glicemia de demonstração vem junto para ser CONTADA à parte e declarada
+  // no cabeçalho (`isRealGlucoseSource` a separa de todo número). Snapshots de
+  // demonstração não têm esse tratamento e ficam de fora já na consulta (B12).
+  return fetchAllRows<T>(supabase, table, columns, userId, {
+    orderColumn,
+    incluirDemonstracao: table === "glucose_readings",
+  });
 }
 
 export type FullHistoryProfile = {

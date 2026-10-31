@@ -5,6 +5,8 @@ import { getTodayHealthBest } from "@/lib/queries/health-today";
 import { startOfLocalDayISO } from "@/lib/time/local-day";
 import type { MetabolicAlert } from "@/types/database";
 import { classifyGlucose, type GlucoseZone } from "@/lib/health/glucose-thresholds";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
+import { somenteNaoLidos } from "@/lib/alerts/unread";
 
 export type DashboardSummary = {
   latestGlucose: number | null;
@@ -64,6 +66,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       // com leitura de três semanas.
       .select("value_mg_dl, recorded_at")
       .eq("user_id", user.id)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .order("recorded_at", { ascending: false })
       .limit(8),
     supabase
@@ -76,11 +79,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
       .select("duration_min")
       .eq("user_id", user.id)
       .gte("started_at", startOfDayISO),
-    supabase
-      .from("metabolic_alerts")
-      .select("*")
-      .eq("user_id", user.id)
-      .is("read_at", null)
+    somenteNaoLidos(
+      supabase.from("metabolic_alerts").select("*").eq("user_id", user.id)
+    )
       .order("created_at", { ascending: false })
       .limit(5),
   ]);

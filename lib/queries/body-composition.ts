@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { resolveCanonical, type AliasRow } from "@/lib/safety/interaction-check";
 import {
   BODY_FIELD_KEYS,
   type BodyMeasurement,
@@ -90,6 +91,53 @@ export function usesGlucoseLoweringMeds(names: string[]): boolean {
     const name = raw.toLowerCase();
     return HYPO_RISK_PATTERNS.some((p) => name.includes(p));
   });
+}
+
+/**
+ * Mecanismos da base canônica (`substance_mechanisms`) que causam hipoglicemia
+ * sozinhos: insulina exógena e secretagogo. Sensibilizador, incretina e SGLT2
+ * reduzem glicemia mas, isolados, não costumam levar à hipo.
+ */
+export const HYPO_RISK_MECHANISMS = [
+  "insulina_exogena_basal",
+  "insulina_exogena_rapida",
+  "secretagogo",
+] as const;
+
+/**
+ * Detecção pela base canônica (Etapa 2, B14): o nome é resolvido em slug pelos
+ * aliases e o slug olhado nos mecanismos — a mesma resolução da checagem de
+ * interações. Substring solto errava nos dois sentidos ("Insulinex" virava
+ * insulina; "Diamicron" não virava secretagogo).
+ *
+ * Nome que a base NÃO conhece cai na lista conservadora de prefixos: na dúvida
+ * sobre um remédio digitado, vale o texto que protege contra hipoglicemia.
+ */
+export function usesGlucoseLoweringMedsCanonical(
+  names: string[],
+  aliases: AliasRow[],
+  hypoCanonicals: ReadonlySet<string>
+): boolean {
+  const r = resolveCanonical(names, aliases);
+  if ([...r.canonical].some((c) => hypoCanonicals.has(c))) return true;
+  return usesGlucoseLoweringMeds(r.unresolved);
+}
+
+async function loadHypoRiskBase(
+  supabase: SupabaseClient
+): Promise<{ aliases: AliasRow[]; hypoCanonicals: Set<string> } | null> {
+  const [aliasRes, mechRes] = await Promise.all([
+    supabase.from("substance_aliases").select("canonical, alias"),
+    supabase
+      .from("substance_mechanisms")
+      .select("canonical")
+      .in("mechanism", [...HYPO_RISK_MECHANISMS]),
+  ]);
+  if (aliasRes.error || mechRes.error) return null;
+  return {
+    aliases: (aliasRes.data ?? []) as AliasRow[],
+    hypoCanonicals: new Set(((mechRes.data ?? []) as { canonical: string }[]).map((m) => m.canonical)),
+  };
 }
 
 function toMeasurement(row: Record<string, unknown>): BodyMeasurement {
@@ -244,9 +292,12 @@ export async function loadBodySnapshot(
     .reduce((sum, s) => sum + (s.duration_min ?? 0), 0);
   const weeklyTargetMinutes = getWeeklyExerciseTarget(profile.bodyGoal).targetMinutes;
 
-  const glucoseLoweringMeds = usesGlucoseLoweringMeds(
-    ((medsRes.data ?? []) as { name: string }[]).map((m) => m.name)
-  );
+  const nomesDosRemedios = ((medsRes.data ?? []) as { name: string }[]).map((m) => m.name);
+  // Base indisponível: a lista conservadora inteira, nunca "sem risco".
+  const baseHipo = nomesDosRemedios.length ? await loadHypoRiskBase(supabase) : null;
+  const glucoseLoweringMeds = baseHipo
+    ? usesGlucoseLoweringMedsCanonical(nomesDosRemedios, baseHipo.aliases, baseHipo.hypoCanonicals)
+    : usesGlucoseLoweringMeds(nomesDosRemedios);
 
   const bars = buildDashboardBars({
     goals,

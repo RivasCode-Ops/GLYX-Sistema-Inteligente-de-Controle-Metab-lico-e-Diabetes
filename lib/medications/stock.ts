@@ -27,11 +27,21 @@
  * derivado de informação vencida não vira afirmação sobre o presente.
  */
 
-export type MedicationStock = {
+import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
+
+export type MedicationStock = CamposDeCadencia & {
   stock_units?: number | null;
   stock_updated_on?: string | null;
   reminder_times?: string[] | null;
 };
+
+/** Teto da projeção para frente: dez anos de estoque é "muito", não um número. */
+const MAX_DIAS_PROJECAO = 3650;
+
+function somarDiasISO(dia: string, n: number): string {
+  const [y, m, d] = dia.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
 
 export type StockState =
   | { kind: "sem_dado" }
@@ -43,17 +53,38 @@ export type StockState =
 /** Abaixo disto o aviso é útil; acima, é só informação. */
 export const LOW_STOCK_DAYS = 7;
 
+/**
+ * Projeção ciente da cadência (Etapa 2, B13): só dia de dose consome. Um
+ * semanal com 4 unidades dura ~4 semanas, não 4 dias — antes, toda a conta
+ * assumia dose diária e o semanal aparecia "acabado" na primeira semana.
+ * Sem cadência declarada, todo dia é dia de dose (o comportamento anterior).
+ */
 export function stockState(m: MedicationStock, now: Date = new Date()): StockState {
   if (m.stock_units == null || !m.stock_updated_on) return { kind: "sem_dado" };
 
-  const dosesPorDia = Math.max(m.reminder_times?.length ?? 1, 1);
+  const porDiaDeDose = Math.max(m.reminder_times?.length ?? 1, 1);
   const diasDesde = Math.max(
     0,
     Math.floor((now.getTime() - new Date(m.stock_updated_on).getTime()) / 86_400_000)
   );
-  const restante = Math.floor((m.stock_units - diasDesde * dosesPorDia) / dosesPorDia);
+  const inicio = m.stock_updated_on.slice(0, 10);
 
-  if (restante <= 0) return { kind: "informacao_vencida", daysSinceUpdate: diasDesde };
+  // Consumo desde a atualização: dias de dose em (atualização, hoje].
+  let unidades = m.stock_units;
+  for (let k = 1; k <= diasDesde; k++) {
+    if (ehDiaDeDose(m, somarDiasISO(inicio, k))) unidades -= porDiaDeDose;
+  }
+  if (unidades < porDiaDeDose) return { kind: "informacao_vencida", daysSinceUpdate: diasDesde };
+
+  // Dias de calendário que o restante cobre a partir de hoje.
+  let restante = 0;
+  for (let k = 1; k <= MAX_DIAS_PROJECAO; k++) {
+    if (ehDiaDeDose(m, somarDiasISO(inicio, diasDesde + k))) {
+      if (unidades < porDiaDeDose) break;
+      unidades -= porDiaDeDose;
+    }
+    restante = k;
+  }
   return { kind: "estimado", daysLeft: restante, low: restante <= LOW_STOCK_DAYS };
 }
 

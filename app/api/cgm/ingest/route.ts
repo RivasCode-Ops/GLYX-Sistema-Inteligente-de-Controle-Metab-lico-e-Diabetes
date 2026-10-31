@@ -6,6 +6,13 @@ import { normalizeLibreMeasurements } from "@/lib/cgm/normalize/libre";
 import type { UnifiedCgmReading } from "@/lib/cgm/types";
 import { createClient } from "@/lib/supabase/server";
 
+/**
+ * Teto de leituras por envio (Etapa 1, E10). O import do LibreView manda partes
+ * de 2000 (`components/glicemia/libre-csv-import.tsx`); 5000 dá folga sem aceitar
+ * um corpo ilimitado que estouraria memória e o tempo da função.
+ */
+const MAX_LEITURAS_POR_ENVIO = 5000;
+
 const bodySchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("unified"),
@@ -24,15 +31,15 @@ const bodySchema = z.discriminatedUnion("mode", [
         trend: z.string().nullable().optional(),
         metadata: z.record(z.any()).nullable().optional(),
       })
-    ),
+    ).max(MAX_LEITURAS_POR_ENVIO),
   }),
   z.object({
     mode: z.literal("dexcom"),
-    egvs: z.array(z.any()),
+    egvs: z.array(z.any()).max(MAX_LEITURAS_POR_ENVIO),
   }),
   z.object({
     mode: z.literal("libre"),
-    measurements: z.array(z.any()),
+    measurements: z.array(z.any()).max(MAX_LEITURAS_POR_ENVIO),
   }),
 ]);
 

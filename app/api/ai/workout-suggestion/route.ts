@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
@@ -78,6 +79,8 @@ Responda APENAS um JSON válido com: exercises (array com até 2 exercícios por
     exercises?: { muscle?: string; name?: string }[];
     tip?: string;
   };
+  const barrada = respostaBarradaOuNull("ai/workout-suggestion", parsedResult);
+  if (barrada) return barrada;
 
   return NextResponse.json({
     exercises: (parsedResult.exercises ?? []).map((e) => ({

@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import type { HealthSnapshotSource } from "@/lib/health/types";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
+import { localDateKey } from "@/lib/time/local-day";
 
-const PRIORITY: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit", "mock"];
+// Sem "mock": demonstração não é dado do usuário (B12).
+const PRIORITY: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit"];
 
 export type TodayHealth = {
   steps: number | null;
@@ -25,12 +28,23 @@ export async function getTodayHealthBest(): Promise<TodayHealth | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  // "Hoje" no fuso do perfil (B7): pela data UTC, depois das 21h em São Paulo
+  // a tela procurava o snapshot de amanhã e mostrava vazio.
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+  const today = localDateKey(
+    new Date().toISOString(),
+    (perfil as { timezone?: string | null } | null)?.timezone
+  );
 
   const { data, error } = await supabase
     .from("health_snapshots")
     .select("source, steps, sleep_hours, resting_hr")
     .eq("user_id", user.id)
+    .or(FILTRO_SEM_DEMONSTRACAO)
     .eq("snapshot_date", today);
 
   if (error) return null;

@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MATCH_BEFORE_MS, computeDoseStatus, doseWindows } from "@/lib/medications/adherence";
 import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
+import { stockState, type MedicationStock } from "@/lib/medications/stock";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
 import { getContextReceipt } from "@/lib/queries/context-receipt";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
-import { localDateKey } from "@/lib/time/local-day";
+import { localDateKey, startOfLocalDayISO } from "@/lib/time/local-day";
 import { elegerCard, type CardAgora, type CardContext } from "@/lib/painel/card-agora";
 import type { ContextReceipt } from "@/lib/ai/context-receipt";
 
@@ -21,6 +22,8 @@ const JANELA_INSULINA_RAPIDA_H = 5;
 
 /** Dias de estoque abaixo dos quais o card de reposição aparece. */
 const ESTOQUE_MINIMO_DIAS = 7;
+/** Episódio de hipo aberto há mais que isto não comanda mais o card. */
+const JANELA_EPISODIO_HIPO_H = 6;
 
 export type CardAgoraResult = { card: CardAgora; receipt: ContextReceipt };
 
@@ -37,7 +40,9 @@ export async function getCardAgora(
 ): Promise<CardAgoraResult> {
   const tz = entrada.profile?.timezone || "America/Sao_Paulo";
   const agora = new Date();
-  const inicioDoDia = new Date(`${localDateKey(agora.toISOString(), tz)}T00:00:00Z`).toISOString();
+  // Meia-noite LOCAL (B7). Era a meia-noite UTC da data local: em São Paulo, o
+  // "hoje" começava às 21h de ontem e doses da véspera contavam como de hoje.
+  const inicioDoDia = startOfLocalDayISO(tz, agora);
   const janelaInsulina = new Date(
     agora.getTime() - JANELA_INSULINA_RAPIDA_H * 3600_000
   ).toISOString();
@@ -55,6 +60,9 @@ export async function getCardAgora(
         .select("id, detected_at, glucose_mg_dl, acted_at")
         .eq("user_id", userId)
         .is("recheck_at", null)
+        // Só episódio recente: evento esquecido de dias atrás suprimia a
+        // sugestão de exercício para sempre e reabria a reavaliação (B2).
+        .gte("detected_at", new Date(agora.getTime() - JANELA_EPISODIO_HIPO_H * 3600_000).toISOString())
         .order("detected_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
@@ -144,20 +152,15 @@ export async function getCardAgora(
     }
   }
 
-  // Estoque: doses/dia = número de horários, mínimo 1 — mesma conta da tela de
-  // medicamentos.
+  // Estoque: a MESMA conta da tela de medicamentos (`stockState`, ciente da
+  // cadência — B13). Era uma cópia que assumia dose diária.
   const lowStock: CardContext["lowStock"] = [];
   for (const m of meds) {
-    const unidades = m.stock_units as number | null;
-    if (unidades == null || !m.stock_updated_on) continue;
-    const porDia = Math.max(((m.reminder_times as string[] | null) ?? []).length, 1);
-    const decorridos = Math.max(
-      0,
-      Math.floor((agora.getTime() - new Date(m.stock_updated_on as string).getTime()) / 86_400_000)
-    );
-    const dias = Math.floor((unidades - decorridos * porDia) / porDia);
+    const estado = stockState(m as MedicationStock, agora);
+    if (estado.kind === "sem_dado") continue;
+    const dias = estado.kind === "estimado" ? estado.daysLeft : 0;
     if (dias <= ESTOQUE_MINIMO_DIAS) {
-      lowStock.push({ name: m.name as string, units: unidades, daysLeft: Math.max(dias, 0) });
+      lowStock.push({ name: m.name as string, units: m.stock_units as number, daysLeft: dias });
     }
   }
 

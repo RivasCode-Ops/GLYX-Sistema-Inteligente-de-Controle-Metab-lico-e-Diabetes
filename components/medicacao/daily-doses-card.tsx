@@ -75,12 +75,15 @@ export function DailyDosesCard({
   snoozes,
   timezone,
   markTakenAction,
+  markSkippedAction,
 }: {
   meds: Medication[];
   logs: TodayLog[];
   snoozes: TodaySnooze[];
   timezone: string | null | undefined;
   markTakenAction: (anterior: ResultadoDeAcao, formData: FormData) => Promise<ResultadoDeAcao>;
+  /** "Pulei hoje" (B3). Ausente, o botão não aparece. */
+  markSkippedAction?: (anterior: ResultadoDeAcao, formData: FormData) => Promise<ResultadoDeAcao>;
 }) {
   const tz = timezone || "America/Sao_Paulo";
   const hoje = localDateKey(new Date().toISOString(), tz);
@@ -179,6 +182,17 @@ export function DailyDosesCard({
                       Registrar
                     </Button>
                   </FormularioDeAcao>
+                  {/* Pular só a dose que já venceu (ou foi adiada): "mais tarde"
+                      ainda não é decisão, e pulada já está marcada. */}
+                  {markSkippedAction && status.state !== "pulada" && status.state !== "agendada" ? (
+                    <FormularioDeAcao acao={markSkippedAction} className="shrink-0">
+                      <input type="hidden" name="medication_id" value={med.id} />
+                      <input type="hidden" name="pedido" value={crypto.randomUUID()} />
+                      <Button type="submit" variant="ghost" size="sm" className="text-zinc-400">
+                        Pulei hoje
+                      </Button>
+                    </FormularioDeAcao>
+                  ) : null}
                 </>
               )}
             </li>

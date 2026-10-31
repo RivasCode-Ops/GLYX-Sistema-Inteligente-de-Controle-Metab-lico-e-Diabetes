@@ -106,7 +106,19 @@ export default async function DashboardPage() {
 
   const summary = await getDashboardSummary();
   if (!summary) {
-    return <DashboardDemo />;
+    // Com Supabase configurado, resumo nulo é FALHA (sessão, banco, rede), não
+    // modo demo. Antes caía no painel fictício: um usuário real via glicemias e
+    // doses inventadas como se fossem dele (Etapa 1, B17). Agora a tela diz que
+    // não carregou.
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <p className="text-sm font-medium text-amber-400/90">Painel indisponível</p>
+        <p className="mt-2 text-sm text-zinc-400">
+          Não foi possível carregar seus dados agora. Nada foi apagado — recarregue a página em
+          instantes.
+        </p>
+      </div>
+    );
   }
 
   // Card de ação e recibo: o motor decide qual card, e a montagem do contexto

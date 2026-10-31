@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured } from "@/lib/env";
@@ -13,6 +14,7 @@ import { progressSummary } from "@/lib/body/progress";
 import { projectionMessage } from "@/lib/body/goals";
 import { dailyTargets, GOAL_LABEL } from "@/lib/health/energy";
 import { parseModelJson } from "@/lib/ai/parse-json";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
 const resultSchema = z.object({
   headline: z.string(),
@@ -60,6 +62,7 @@ export async function POST() {
       .from("health_snapshots")
       .select("sleep_hours")
       .eq("user_id", user.id)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .gte("snapshot_date", since14d.slice(0, 10))
       .not("sleep_hours", "is", null),
     supabase
@@ -222,6 +225,8 @@ Responde APENAS com JSON válido:
   if (!parsed.success) {
     return NextResponse.json({ error: "Formato inesperado do modelo. Tente novamente." }, { status: 502 });
   }
+  const barrada = respostaBarradaOuNull("ai/body-composition", parsed.data);
+  if (barrada) return barrada;
 
   return NextResponse.json({
     ...parsed.data,

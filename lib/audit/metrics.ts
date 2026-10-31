@@ -1,5 +1,6 @@
 import type { AuditMetrics } from "@/lib/audit/types";
-import { SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
+import { computeGlucoseMetrics, sampleStdDev } from "@/lib/health/glucose-metrics";
+import { isAboveTarget, isBelowTarget, SEVERE_HYPER_MG_DL } from "@/lib/health/glucose-thresholds";
 
 export type GlucoseSample = { value_mg_dl: number; recorded_at: string; day: string };
 export type MealSample = {
@@ -51,17 +52,22 @@ export function hasEnoughGlucoseData(m: {
   );
 }
 
+/** Coeficiente de variação a partir do qual a glicemia é considerada instável. */
+export const HIGH_CV_PERCENT = 36;
+
+/**
+ * CV de uma auditoria: o gravado pelo motor único quando existe; auditorias
+ * antigas (sem `cvPercent`) caem na razão desvio/média que tinham.
+ */
+export function cvOfMetrics(m: AuditMetrics): number | null {
+  if (m.cvPercent !== undefined) return m.cvPercent;
+  if (m.stdDev == null || m.avgGlucose == null || m.avgGlucose <= 0) return null;
+  return Math.round((m.stdDev / m.avgGlucose) * 1000) / 10;
+}
+
 function mean(nums: number[]): number | null {
   if (nums.length === 0) return null;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
-}
-
-function stdDev(nums: number[]): number | null {
-  if (nums.length < 2) return null;
-  const m = mean(nums);
-  if (m == null) return null;
-  const variance = nums.reduce((acc, n) => acc + (n - m) ** 2, 0) / nums.length;
-  return Math.sqrt(variance);
 }
 
 function round1(n: number): number {
@@ -84,15 +90,21 @@ export function computeAuditMetrics(input: AuditRawInputs): AuditMetrics {
   let hyperCount = 0;
   let severeHyperCount = 0;
   for (const v of values) {
-    if (v < input.targetMin) hypoCount += 1;
-    else if (v > input.targetMax) hyperCount += 1;
+    if (isBelowTarget(v, input.targetMin)) hypoCount += 1;
+    else if (isAboveTarget(v, input.targetMax)) hyperCount += 1;
     else inRange += 1;
     if (v >= SEVERE_HYPER_MG_DL) severeHyperCount += 1;
   }
 
   const tirPercent = values.length > 0 ? Math.round((inRange / values.length) * 1000) / 10 : null;
   const avgGlucose = mean(values);
-  const sd = stdDev(values);
+  const sd = sampleStdDev(values);
+  // Episódios e CV pelo mesmo motor do painel e do relatório (B5/B6): o score
+  // deixa de descontar a frequência do sensor.
+  const cgm = computeGlucoseMetrics(input.glucose, {
+    targetMin: input.targetMin,
+    targetMax: input.targetMax,
+  });
 
   const carbsByDay = new Map<string, number>();
   let spikeMealCount = 0;
@@ -132,6 +144,9 @@ export function computeAuditMetrics(input: AuditRawInputs): AuditMetrics {
     hypoCount,
     hyperCount,
     severeHyperCount,
+    hypoEpisodes: cgm.hipoEpisodes,
+    hyperEpisodes: cgm.hiperEpisodes,
+    cvPercent: cgm.cvPercent,
     avgGlucose: avgGlucose != null ? Math.round(avgGlucose) : null,
     stdDev: sd != null ? Math.round(sd) : null,
     avgCarbsPerDay: avgCarbsPerDay != null ? round1(avgCarbsPerDay) : null,

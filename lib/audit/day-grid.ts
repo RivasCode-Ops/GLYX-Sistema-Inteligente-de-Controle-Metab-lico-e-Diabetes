@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditRawInputs } from "@/lib/audit/metrics";
-import { countAlteredSignals } from "@/lib/exams/types";
+import { countOutOfReference } from "@/lib/exams/types";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
 import type { HealthSnapshotSource } from "@/lib/health/types";
 import { localDateKey, localDayRangeUTC } from "@/lib/time/local-day";
 import { fetchAllRowsDetalhado } from "@/lib/queries/fetch-all";
+import { FILTRO_SEM_DEMONSTRACAO } from "@/lib/queries/fetch-all";
 
-const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit", "mock"];
+// Sem "mock": demonstração fica fora de toda análise (B12).
+const SRC: HealthSnapshotSource[] = ["manual", "apple_health", "google_fit"];
 
 type ProfileTargets = {
   timezone: string | null;
@@ -92,6 +94,7 @@ export async function loadAuditDayGrid(
       .from("health_snapshots")
       .select("snapshot_date, source, sleep_hours")
       .eq("user_id", userId)
+      .or(FILTRO_SEM_DEMONSTRACAO)
       .gte("snapshot_date", dayStart),
     supabase
       .from("insulin_logs")
@@ -104,13 +107,13 @@ export async function loadAuditDayGrid(
       .eq("user_id", userId)
       .gte("logged_on", dayStart)
       .order("logged_on", { ascending: true }),
+    // B11: "alterado" pela faixa do LAUDO (exam_values.ref_min/ref_max, lidos
+    // por regra), não pelo status que a IA escreveu na interpretação.
     supabase
-      .from("exams")
-      .select("parsed_summary, created_at")
+      .from("exam_values")
+      .select("value_num, ref_min, ref_max")
       .eq("user_id", userId)
-      .gte("created_at", sinceIso)
-      .order("created_at", { ascending: false })
-      .limit(10),
+      .gte("created_at", sinceIso),
   ]);
 
   const glucose = gPag.rows.map((r) => ({
@@ -179,10 +182,9 @@ export async function loadAuditDayGrid(
     logged_on: r.logged_on as string,
   }));
 
-  let examAlteredCount = 0;
-  for (const exam of examRes.data ?? []) {
-    examAlteredCount += countAlteredSignals(exam.parsed_summary);
-  }
+  const examAlteredCount = countOutOfReference(
+    (examRes.data ?? []) as { value_num: number | null; ref_min: number | null; ref_max: number | null }[]
+  );
 
   return {
     timezone,

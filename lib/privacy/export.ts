@@ -44,6 +44,8 @@ export async function montarExportacao(
 
     const r = await fetchAllRowsDetalhado<Record<string, unknown>>(supabase, table, "*", userId, {
       orderColumn: EXPORT_ORDER_COLUMN[table] ?? "id",
+      // Exportação LGPD leva TUDO o que está na conta, demonstração inclusive.
+      incluirDemonstracao: true,
     });
     tabelas[table] = r.rows.map((row) => redigir(table, row));
     if (!r.completo) {

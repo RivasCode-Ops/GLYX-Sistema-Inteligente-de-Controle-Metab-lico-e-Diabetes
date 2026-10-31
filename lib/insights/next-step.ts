@@ -1,3 +1,10 @@
+import {
+  classifyGlucose,
+  DEFAULT_TARGET_MAX_MG_DL,
+  DEFAULT_TARGET_MIN_MG_DL,
+  type GlucoseZone,
+} from "@/lib/health/glucose-thresholds";
+
 export type NextStepTone = "danger" | "warning" | "success" | "neutral";
 
 export type NextStepInsight = {
@@ -9,11 +16,17 @@ export type NextStepInsight = {
 
 /**
  * Sugestão de "próximo passo" no dashboard, derivada por regra dos dados já
- * calculados (sem custo/latência de IA). Usa os mesmos limiares de
- * lib/queries/dashboard.ts (Atenção: <70 ou >=180; Moderado: >=140).
+ * calculados (sem custo/latência de IA).
+ *
+ * A zona vem de `classifyGlucose` com a faixa do PERFIL (Etapa 2, B10) — a
+ * mesma régua do cartão de glicemia ao lado. Antes eram 70/180/140 fixos: com
+ * meta 70–140, um 160 aparecia "acima da meta" no cartão e "um pouco acima"
+ * aqui; com meta 80–200, um 75 era "na meta" no cartão e "baixa" aqui.
  */
 export function getNextStepInsight(input: {
   latestGlucose: number | null;
+  /** Zona já classificada com a faixa do perfil; ausente, usa a faixa padrão. */
+  zone?: GlucoseZone | null;
   carbsToday: number;
   activeMinutes: number;
 }): NextStepInsight {
@@ -28,18 +41,25 @@ export function getNextStepInsight(input: {
     };
   }
 
-  if (latestGlucose < 70) {
+  const zone =
+    input.zone ??
+    classifyGlucose(latestGlucose, {
+      targetMin: DEFAULT_TARGET_MIN_MG_DL,
+      targetMax: DEFAULT_TARGET_MAX_MG_DL,
+    }).zone;
+
+  if (zone === "abaixo") {
     return {
-      text: "Glicemia baixa. Considere um lanche rápido com carboidrato e reavalie em 15 minutos.",
+      text: "Glicemia abaixo da meta. Considere um lanche rápido com carboidrato e reavalie em 15 minutos.",
       actionLabel: "Registrar refeição",
       actionHref: "/alimentacao/foto",
       tone: "danger",
     };
   }
 
-  if (latestGlucose >= 180) {
+  if (zone === "acima") {
     return {
-      text: "Glicemia bem acima da meta. Beba água e monitore de perto nas próximas horas.",
+      text: "Glicemia acima da meta. Beba água e monitore de perto nas próximas horas.",
       actionLabel: "Ver histórico",
       actionHref: "/glicemia/historico",
       tone: "danger",
@@ -63,9 +83,9 @@ export function getNextStepInsight(input: {
   // da insulina rápida (5 h no seed de mecanismos) consultada antes de
   // sugerir. Até lá, a orientação alimentar cobre os dois ramos — ela não tem
   // como piorar uma hipoglicemia.
-  if (latestGlucose >= 140) {
+  if (zone === "topo_da_meta") {
     return {
-      text: "Glicemia um pouco acima da meta. Vale controlar o carboidrato da próxima refeição.",
+      text: "Glicemia no topo da meta. Vale controlar o carboidrato da próxima refeição.",
       actionLabel: "Registrar refeição",
       actionHref: "/alimentacao/foto",
       tone: "warning",

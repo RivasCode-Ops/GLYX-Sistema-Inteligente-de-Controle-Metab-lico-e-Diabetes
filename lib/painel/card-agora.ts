@@ -19,6 +19,7 @@
  */
 
 import { formatarHora } from "@/lib/time/format";
+import { FRESH_MAX_MINUTES, describeAge } from "@/lib/health/reading-freshness";
 
 export type CardLevel = "critico" | "atencao" | "neutro";
 
@@ -43,6 +44,17 @@ export type CardAgora = {
   actions: CardAction[];
   /** true quando o texto pode ser reescrito pela LLM */
   narratable: boolean;
+  /**
+   * Ciclo de hipoglicemia (Etapa 2, B2): o evento que "Fiz" e a reavaliação
+   * fecham. Nulo quando o evento ainda não existe — "Fiz" então o cria com a
+   * leitura que disparou o card.
+   */
+  hypo?: {
+    eventId: string | null;
+    glucoseMgDl: number | null;
+    detectedAt: string | null;
+    emergencyText: string | null;
+  };
 };
 
 export type HypoPlan = {
@@ -141,8 +153,30 @@ export function glucoseBlind(ctx: CardContext): boolean {
   return ctx.lastGlucose == null || ctx.receiptMissing.includes("glicemia");
 }
 
+/**
+ * Idade máxima da leitura para o card crítico de hipoglicemia (Etapa 1, B1).
+ *
+ * Antes não havia limite: o card só considerava a glicemia "ausente" quando o
+ * recibo dizia que não havia leitura em 14 DIAS — uma leitura baixa de ontem
+ * elegia "Glicemia baixa" hoje, mostrando só a hora, sem a data. 60 min cobre o
+ * ciclo de quem mede no dedo (corrigir e medir de novo em 15 min) sem acusar
+ * hipo com dado de horas atrás. É regra de apresentação, não clínica; o valor
+ * fica para validação do proprietário (D7).
+ */
+export const HIPO_LEITURA_MAX_MINUTOS = 60;
+
+/** Minutos desde a leitura, ou null se não há horário. */
+function idadeDaLeituraMin(ctx: CardContext): number | null {
+  if (!ctx.lastGlucoseAt) return null;
+  const t = Date.parse(ctx.lastGlucoseAt);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((ctx.now.getTime() - t) / 60000));
+}
+
 function hipoCondicao(ctx: CardContext): boolean {
   if (glucoseBlind(ctx) || ctx.lastGlucose == null) return false;
+  const idade = idadeDaLeituraMin(ctx);
+  if (idade != null && idade > HIPO_LEITURA_MAX_MINUTOS) return false;
   const limiar = ctx.hypoPlan?.thresholdMgDl ?? ctx.targetRange.low;
   if (ctx.lastGlucose < limiar) return true;
   // Acima do limiar mas caindo: a condição do briefing para "queda acentuada".
@@ -156,7 +190,11 @@ function hipoCondicao(ctx: CardContext): boolean {
 export function elegerCard(ctx: CardContext): CardAgora {
   const evidenciaGlicemia = () => {
     const valor = `${ctx.lastGlucose} mg/dL`;
-    const hora = ctx.lastGlucoseAt ? ` às ${HORA(ctx.lastGlucoseAt, ctx.timezone)}` : "";
+    // A idade vai junto quando a leitura não é "de agora": só a hora fazia uma
+    // leitura de ontem parecer de hoje.
+    const idade = idadeDaLeituraMin(ctx);
+    const idadeTxt = idade != null && idade > FRESH_MAX_MINUTES ? ` (${describeAge(idade)})` : "";
+    const hora = ctx.lastGlucoseAt ? ` às ${HORA(ctx.lastGlucoseAt, ctx.timezone)}${idadeTxt}` : "";
     const tend = ctx.glucoseTrend === "down" ? " · caindo" : "";
     return `${valor}${hora}${tend}`;
   };
@@ -180,6 +218,13 @@ export function elegerCard(ctx: CardContext): CardAgora {
             : []),
         ],
         narratable: false,
+        hypo: {
+          // Evento já agido não é reaberto: "Fiz" de novo cria outro episódio.
+          eventId: ctx.openHypoEvent && !ctx.openHypoEvent.actedAt ? ctx.openHypoEvent.id : null,
+          glucoseMgDl: ctx.lastGlucose,
+          detectedAt: ctx.lastGlucoseAt,
+          emergencyText: ctx.hypoPlan.emergencyText,
+        },
       };
     }
     return {
@@ -213,6 +258,12 @@ export function elegerCard(ctx: CardContext): CardAgora {
         why: `Você cadastrou reavaliação em ${ctx.hypoPlan.recheckMinutes} minutos após agir.`,
         actions: [{ label: "Registrar medição", kind: "primary", intent: "/api/hypo/recheck" }],
         narratable: false,
+        hypo: {
+          eventId: ctx.openHypoEvent.id,
+          glucoseMgDl: ctx.openHypoEvent.glucoseMgDl,
+          detectedAt: ctx.openHypoEvent.detectedAt,
+          emergencyText: ctx.hypoPlan.emergencyText,
+        },
       };
     }
   }

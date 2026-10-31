@@ -35,6 +35,14 @@ export const auditMetricsSchema = z.object({
   hyperCount: z.number().int(),
   /** Leituras >= 250 mg/dL. Opcional: auditorias gravadas antes de 26/07/2026 não têm. */
   severeHyperCount: z.number().int().optional(),
+  /**
+   * Episódios (consenso de CGM: ≥ 15 min fora, encerra com 15 min dentro).
+   * Opcionais: auditorias gravadas antes de 30/10/2026 só têm contagem de leitura.
+   */
+  hypoEpisodes: z.number().int().optional(),
+  hyperEpisodes: z.number().int().optional(),
+  /** CV amostral em %, uma casa — mesma fórmula do painel. */
+  cvPercent: z.number().nullable().optional(),
   avgGlucose: z.number().nullable(),
   stdDev: z.number().nullable(),
   avgCarbsPerDay: z.number().nullable(),

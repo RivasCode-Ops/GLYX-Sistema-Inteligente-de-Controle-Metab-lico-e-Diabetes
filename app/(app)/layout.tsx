@@ -8,6 +8,7 @@ import { SetupBanner } from "@/components/setup-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { somenteNaoLidos } from "@/lib/alerts/unread";
 
 export default async function AppShellLayout({
   children,
@@ -32,11 +33,13 @@ export default async function AppShellLayout({
 
         // Contagem para o sino do cabeçalho. Falha aqui deixa o sino apagado,
         // que é o estado honesto de "não sei" — nunca um número inventado.
-        const { count } = await supabase
-          .from("metabolic_alerts")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString());
+        // Regra única de "não lido" (B16): cai a zero ao abrir os alertas.
+        const { count } = await somenteNaoLidos(
+          supabase
+            .from("metabolic_alerts")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+        );
         unreadAlerts = count ?? 0;
       }
     }

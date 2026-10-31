@@ -4,14 +4,20 @@ import { aiKeyEnvName, aiModel, isOpenAIConfigured } from "@/lib/env";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { buildUserContext } from "@/lib/ai/user-context";
 import { featureIndexForPrompt } from "@/lib/feature-index";
-import { appendMessages, ensureThread } from "@/lib/queries/ai-threads";
+import {
+  appendMessages,
+  ensureThread,
+  getThreadMessages,
+  type StoredMessage,
+} from "@/lib/queries/ai-threads";
+import { criarGuardaDeStream } from "@/lib/safety/ai-output-guard";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { AVISO_STREAM_INTERROMPIDO, validarPayloadDoChat } from "@/lib/ai/chat-payload";
 
 const SYSTEM = `Você é o copiloto metabólico GLYX: linguagem clínica, racional e segura em português do Brasil, falando com um usuário leigo.
 Você recebe um resumo dos dados recentes do usuário: glicemia, refeições (inclusive as que causaram pico), insulina extra aplicada, bebidas, exercício, faixa alvo, padrão de glicemia por hora do dia, o score mais recente do Mapa de risco (auditoria longitudinal) com seus principais fatores, alertas metabólicos já notificados nas últimas 48h, medicação/insulina programada com contagem de doses REGISTRADAS no app (não necessariamente tomadas — pode ser falha de registro, não presuma não-adesão) e sono dos últimos dias. Use-os para análises concretas e personalizadas:
-- CONECTE causa e efeito quando os dados permitirem (ex.: "sua glicemia de 210 às 15h veio ~1h depois do bolo frito de 60 g de carboidrato do almoço").
+- RELACIONE eventos no tempo quando os dados permitirem (ex.: "sua glicemia de 210 às 15h veio ~1h depois do bolo frito de 60 g de carboidrato do almoço"), sempre como associação observada — nunca afirme que algo "causou" ou "está causando" outra coisa; a causa é avaliação do médico.
 - Ao analisar horários, cite as janelas críticas do padrão por hora e proponha estratégias de CONTENÇÃO de pico para essas janelas: distribuição de carboidrato, ordem de comer (salada/proteína antes do carboidrato), caminhada de 10-15 min após a refeição, troca de preparo (assado vs. frito), hidratação.
 - A tabela de refeições guarda apenas macros somados por refeição, sem os itens individuais. Você não sabe a quantidade de nenhum alimento específico. Se perguntarem "quanto de X eu comi", responda que o app não guarda esse detalhe.
 - Cruze o score/fatores do Mapa de risco e os alertas recentes com o resto do contexto em vez de tratá-los como informação isolada — se o usuário pergunta algo relacionado, você já sabe se o app já sinalizou risco antes de perguntar.
@@ -49,7 +55,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: validado.erro }, { status: 400 });
   }
   const body = validado.data;
-  const messages = body.messages;
 
   if (!isOpenAIConfigured()) {
     return NextResponse.json({
@@ -74,14 +79,19 @@ export async function POST(req: Request) {
     /* segue sem contexto */
   }
 
-  // Só a última mensagem do usuário é nova; o resto do array é histórico que o
-  // cliente reenvia a cada turno e que já está gravado.
+  // Do navegador vem só a pergunta nova (e o id da conversa). O histórico — e,
+  // principalmente, o que o ASSISTENTE disse — vem do banco (Etapa 1, A5): o
+  // array `messages` do cliente podia trazer falas "assistant" inventadas, que o
+  // modelo tomaria como ditas por ele. O formato do payload segue o mesmo, para
+  // o cliente atual continuar funcionando.
   const lastUserMessage = validado.ultimaPergunta;
   let threadId: string | null = null;
+  let historico: StoredMessage[] = [];
   try {
     threadId = await ensureThread(supabase, user.id, body.threadId ?? null, lastUserMessage);
+    if (threadId) historico = await getThreadMessages(supabase, user.id, threadId);
   } catch {
-    /* sem thread o chat segue funcionando, só não guarda */
+    /* sem thread o chat segue funcionando, só não guarda nem lembra */
   }
 
   const openai = createAiClient();
@@ -96,8 +106,8 @@ export async function POST(req: Request) {
         // confiável, enquanto o resumo carrega texto livre do usuário.
         { role: "system" as const, content: featureIndexForPrompt() },
         ...(userContext ? [{ role: "system" as const, content: userContext }] : []),
-        // `role` já é user|assistant por validação, não por cast.
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ...historico.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user" as const, content: lastUserMessage },
       ],
       // 800 cortava a resposta no meio da palavra — uma explicação sobre risco
       // glicêmico terminou literalmente em "**Cair ab". Resposta clínica
@@ -115,28 +125,41 @@ export async function POST(req: Request) {
   const readable = new ReadableStream({
     async start(controller) {
       let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
-      let reply = "";
       let finishReason: string | null = null;
       let interrompida = false;
+      // Guarda de saída (Etapa 1, A6): o texto é liberado com atraso de
+      // RETENCAO_STREAM caracteres e o acumulado é conferido antes de cada
+      // liberação. Frase proibida interrompe a resposta antes de aparecer.
+      const guarda = criarGuardaDeStream();
+      const emitir = (texto: string) => {
+        if (texto) controller.enqueue(encoder.encode(texto));
+      };
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content;
-          if (delta) {
-            reply += delta;
-            controller.enqueue(encoder.encode(delta));
-          }
+          if (delta) emitir(guarda.receber(delta));
           if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
           if (chunk.usage) usage = chunk.usage;
+          // Barrada: não adianta continuar lendo o modelo.
+          if (guarda.bloqueado()) break;
         }
       } catch {
         interrompida = true;
       }
+      emitir(guarda.finalizar());
+      if (guarda.bloqueado()) {
+        console.warn(
+          "[ai/chat] resposta barrada por linguagem proibida:",
+          guarda.frases().map((f) => f.phrase)
+        );
+      }
+      let reply = guarda.entregue();
 
       // Conexão com o provedor caiu no meio. Antes, o texto parcial ia para a
       // tela e para o histórico como se fosse a resposta inteira — o mesmo
       // risco do corte por tamanho logo abaixo: o que falta costuma ser a
       // ressalva do fim. Agora quem lê sabe, e o histórico guarda o aviso.
-      if (interrompida) {
+      if (interrompida && !guarda.bloqueado()) {
         reply += AVISO_STREAM_INTERROMPIDO;
         controller.enqueue(encoder.encode(AVISO_STREAM_INTERROMPIDO));
       }
@@ -146,7 +169,7 @@ export async function POST(req: Request) {
       // palavra. O provedor sempre disse `finish_reason: "length"`; ninguém
       // olhava. Num app de saúde o pedaço que falta costuma ser a ressalva do
       // fim, então quem lê precisa saber que faltou.
-      if (finishReason === "length" && reply) {
+      if (finishReason === "length" && reply && !guarda.bloqueado()) {
         const aviso = "\n\n_(resposta interrompida por limite de tamanho — peça para continuar)_";
         reply += aviso;
         controller.enqueue(encoder.encode(aviso));

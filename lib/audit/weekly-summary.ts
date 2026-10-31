@@ -16,7 +16,13 @@
  *    conduta é do médico. Hipoglicemia sempre aparece, mesmo isolada.
  */
 
-import { hasEnoughGlucoseData, MIN_DAYS_FOR_ANALYSIS, MIN_READINGS_FOR_ANALYSIS } from "@/lib/audit/metrics";
+import {
+  cvOfMetrics,
+  hasEnoughGlucoseData,
+  HIGH_CV_PERCENT,
+  MIN_DAYS_FOR_ANALYSIS,
+  MIN_READINGS_FOR_ANALYSIS,
+} from "@/lib/audit/metrics";
 import type { AuditMetrics } from "@/lib/audit/types";
 
 export type WeeklyDelta = {
@@ -51,6 +57,9 @@ export type WeeklySummary = {
   avgGlucose: WeeklyDelta;
   hypoCount: WeeklyDelta;
   hyperCount: WeeklyDelta;
+  /** Episódios (B5): a unidade que o resumo destaca. Nulos em auditoria antiga. */
+  hypoEpisodes: WeeklyDelta;
+  hyperEpisodes: WeeklyDelta;
   severeHyperCount: WeeklyDelta;
   activeDays: WeeklyDelta;
   avgCarbsPerDay: WeeklyDelta;
@@ -60,8 +69,7 @@ export type WeeklySummary = {
 
 /** Variação de TIR abaixo disso é oscilação normal de semana, não tendência. */
 export const TIR_MEANINGFUL_POINTS = 3;
-/** Coeficiente de variação a partir do qual a glicemia é considerada instável. */
-export const HIGH_CV_PERCENT = 36;
+export { HIGH_CV_PERCENT };
 
 function delta(
   current: number | null | undefined,
@@ -76,11 +84,6 @@ function delta(
     delta: c != null && p != null ? Math.round((c - p) * 10) / 10 : null,
     lowerIsBetter,
   };
-}
-
-function coefficientOfVariation(m: AuditMetrics): number | null {
-  if (m.stdDev == null || m.avgGlucose == null || m.avgGlucose <= 0) return null;
-  return Math.round((m.stdDev / m.avgGlucose) * 100);
 }
 
 function signed(n: number): string {
@@ -98,7 +101,20 @@ function buildHighlights(summary: {
 
   // 1. Hipoglicemia vem sempre primeiro e sempre aparece, mesmo isolada: é o
   // único evento da lista com risco imediato.
-  if (metrics.hypoCount > 0) {
+  // Conta episódios quando houver; leitura isolada abaixo (sem formar episódio)
+  // continua aparecendo — a regra "hipo sempre aparece" não pode sumir com a
+  // mudança de unidade.
+  const hypoEpisodes = metrics.hypoEpisodes;
+  if (hypoEpisodes != null && hypoEpisodes > 0) {
+    out.push({
+      id: "hypos",
+      tone: "atencao",
+      text:
+        hypoEpisodes === 1
+          ? `1 episódio abaixo da sua meta mínima nesta semana (${metrics.hypoCount} leitura(s)). Vale anotar o horário e o que aconteceu antes — episódios repetidos são assunto de consulta.`
+          : `${hypoEpisodes} episódios abaixo da sua meta mínima nesta semana (${metrics.hypoCount} leituras). Anote os horários: um padrão (sempre de madrugada, sempre após exercício) é a informação que o médico precisa.`,
+    });
+  } else if (metrics.hypoCount > 0) {
     out.push({
       id: "hypos",
       tone: "atencao",
@@ -141,12 +157,12 @@ function buildHighlights(summary: {
   }
 
   // 3. Variabilidade: duas semanas com a mesma média podem ser muito diferentes.
-  const cv = coefficientOfVariation(metrics);
+  const cv = cvOfMetrics(metrics);
   if (cv != null && cv >= HIGH_CV_PERCENT) {
     out.push({
       id: "variability",
       tone: "atencao",
-      text: `Oscilação alta entre leituras (variação de ~${cv}% em torno da média). Duas semanas com a mesma média podem ser bem diferentes: quanto mais estável, melhor você se sente.`,
+      text: `Oscilação alta entre leituras (variação de ~${Math.round(cv)}% em torno da média). Duas semanas com a mesma média podem ser bem diferentes: quanto mais estável, melhor você se sente.`,
     });
   }
 
@@ -210,6 +226,8 @@ export function buildWeeklySummary(input: {
     avgGlucose: delta(metrics.avgGlucose, previousMetrics?.avgGlucose),
     hypoCount,
     hyperCount: delta(metrics.hyperCount, previousMetrics?.hyperCount, true),
+    hypoEpisodes: delta(metrics.hypoEpisodes, previousMetrics?.hypoEpisodes, true),
+    hyperEpisodes: delta(metrics.hyperEpisodes, previousMetrics?.hyperEpisodes, true),
     severeHyperCount: delta(metrics.severeHyperCount, previousMetrics?.severeHyperCount, true),
     activeDays,
     avgCarbsPerDay: delta(metrics.avgCarbsPerDay, previousMetrics?.avgCarbsPerDay),
@@ -258,6 +276,9 @@ export function weeklySummaryText(s: WeeklySummary): string {
     "GLICEMIA",
     line("Tempo no alvo", s.tirPercent, "%"),
     line("Glicemia média", s.avgGlucose, " mg/dL"),
+    ...(s.hypoEpisodes.current != null
+      ? [line("Episódios abaixo da meta", s.hypoEpisodes), line("Episódios acima da meta", s.hyperEpisodes)]
+      : []),
     line("Leituras abaixo da meta", s.hypoCount),
     line("Leituras acima da meta", s.hyperCount),
     line("Leituras ≥ 250 mg/dL", s.severeHyperCount),
