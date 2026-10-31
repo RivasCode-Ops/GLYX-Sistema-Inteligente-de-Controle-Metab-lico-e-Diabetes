@@ -932,7 +932,7 @@ Detalhes: [`PLANO-IMPLEMENTACAO.md`](PLANO-IMPLEMENTACAO.md) §1, §3.3, §4 e �
 
 ## Etapa 1 do programa da IA gestora (segurança) — 30/10/2026 (local, não publicada)
 
-Branch `etapa-1-seguranca`, não commitado. Plano: [`programa-ia-gestora/PLANO-DE-EXECUCAO.md`](programa-ia-gestora/PLANO-DE-EXECUCAO.md); achados: `auditoria-2026-10-30/`.
+Branch `etapa-1-seguranca`, commit `10b1fbe` (local, sem push). Plano: [`programa-ia-gestora/PLANO-DE-EXECUCAO.md`](programa-ia-gestora/PLANO-DE-EXECUCAO.md); achados: `auditoria-2026-10-30/`.
 
 | | Situação |
 |---|---|
@@ -943,6 +943,23 @@ Branch `etapa-1-seguranca`, não commitado. Plano: [`programa-ia-gestora/PLANO-D
 | **Local** | tipos e lint limpos; 118 arquivos / 1455 testes |
 | **Ambiente local** | chamar função sem EXECUTE como `anon`/`authenticated` derruba o Postgres local (segfault, também com função trivial); permissões conferidas por `has_function_privilege` |
 | **Pendente** | decisões P52 (valores 1/20 US$), D7 (60 min), D13/D5/D6; preço OpenAI a conferir; produção (merge, cada migration), A2, I1 |
+
+---
+
+## Etapa 2 do programa da IA gestora (verdade única) — 30/10/2026 (local, não publicada)
+
+Branch `etapa-2-verdade-unica` (a partir de `10b1fbe`), 5 commits locais `29d1bdb`…`ba56a05`, sem push. Teto de IA mantido em US$ 1/dia e 20/mês (P52 decidido pelo Rivas).
+
+| | Situação |
+|---|---|
+| **Uma régua** | B4 "acima da meta" = `> meta` em todos os motores (180 em 70–180 está na meta; `classifyGlucose` e métricas de CGM usavam `>=`) · B6 CV amostral, uma casa, um lugar · B5 score e resumo semanal por episódio (pesos mantidos) · B7 dia local em insights, card "agora" (começava na meia-noite UTC), saúde de hoje, contexto da IA e platô · B12 `source='mock'` fora de toda análise (exportação LGPD e relatório completo incluem explicitamente) · B8 adesão da IA e do platô pela regra única · B13 estoque ciente da cadência, card usa a mesma função · B10 próximo passo com a faixa do perfil · B14 risco de hipo pela base canônica de mecanismos |
+| **Vereditos por regra** | C10 viabilidade de meta (veredito e marcos do código; o modelo só redige) · B11 exames alterados pela faixa do laudo (`exam_values`), não pelo status da IA |
+| **Ciclos completos** | B2 "Fiz" e reavaliação gravam (apontavam para formulários inexistentes) e o evento nasce na ingestão · B3 "Pulei hoje" na tela e na notificação · B16 uma regra de não lido; `read_at` gravado ao abrir os alertas · D1 apagar insulina, medição e foto corporal |
+| **Migrations novas (não aplicadas)** | `20261031110000` B9 pico pós-refeição com a meta do perfil e base de até 30 min → `111000` B2 gatilho que abre `hypo_events`. O código funciona antes delas |
+| **Testado no banco (PG 17.6, banco vazio + 86 migrations)** | 9/9 testes SQL, incluindo `etapa2_verdade_unica.sql` (B2 6, B9 4 cenários) |
+| **Local** | tipos e lint limpos; 123 arquivos / 1495 testes, incluindo o de coerência entre motores (mesmo TIR, hipo, episódios e CV em painel, auditoria, resumo e histórico) |
+| **Para validação clínica (D7)** | `>` vs `>=` na meta (escolhido o consenso Battelino 2019) · pesos do score com unidade episódio · critérios do veredito de meta (IMC 18,5, 6 meses no ritmo seguro) · base do pico em 30 min |
+| **Pendente** | produção (merge e cada migration, das duas etapas); roteiro manual nas telas tocadas; "Pulei hoje" na notificação só aparece onde o navegador mostra 3 ações |
 
 ---
 **Riva's Alexandre**  © 2026
