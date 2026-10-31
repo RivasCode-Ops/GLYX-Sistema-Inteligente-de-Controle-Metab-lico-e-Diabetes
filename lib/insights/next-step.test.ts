@@ -63,9 +63,18 @@ describe("getNextStepInsight", () => {
     expect(
       getNextStepInsight({ latestGlucose: 160, zone: "acima", carbsToday: 10, activeMinutes: 0 }).tone
     ).toBe("danger");
-    // Meta 80–200: 75 é "abaixo" mesmo sendo ≥ 70.
+    // Meta 80–200: 75 é "abaixo" da meta, mas não é hipo — atenção, sem
+    // orientação de carboidrato (correção de 31/10/2026).
+    const r75 = getNextStepInsight({ latestGlucose: 75, zone: "abaixo", carbsToday: 10, activeMinutes: 0 });
+    expect(r75.tone).toBe("warning");
+    expect(r75.text).not.toMatch(/carboidrato/);
+    // Meta 110–180: 100 não pode receber conduta de hipoglicemia.
     expect(
-      getNextStepInsight({ latestGlucose: 75, zone: "abaixo", carbsToday: 10, activeMinutes: 0 }).tone
+      getNextStepInsight({ latestGlucose: 100, zone: "abaixo", carbsToday: 10, activeMinutes: 0 }).text
+    ).not.toMatch(/lanche rápido/);
+    // Abaixo de 70: conduta de hipo, qualquer que seja a meta.
+    expect(
+      getNextStepInsight({ latestGlucose: 62, zone: "abaixo", carbsToday: 10, activeMinutes: 0 }).tone
     ).toBe("danger");
     // Meta 80–250: 190 está na meta — sem alarme.
     expect(

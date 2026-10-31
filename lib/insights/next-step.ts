@@ -1,5 +1,6 @@
 import {
   classifyGlucose,
+  DEFAULT_HYPO_MG_DL,
   DEFAULT_TARGET_MAX_MG_DL,
   DEFAULT_TARGET_MIN_MG_DL,
   type GlucoseZone,
@@ -48,12 +49,25 @@ export function getNextStepInsight(input: {
       targetMax: DEFAULT_TARGET_MAX_MG_DL,
     }).zone;
 
-  if (zone === "abaixo") {
+  // Orientação de carboidrato rápido é conduta de HIPOGLICEMIA: só abaixo do
+  // limiar de hipo (70, o mesmo de antes de 30/10). A meta mínima do perfil
+  // pode ir a 130 — usá-la aqui mandava tratar hipo uma leitura de 100
+  // (correção de 31/10/2026). Entre o limiar e a meta mínima: só atenção.
+  if (latestGlucose < DEFAULT_HYPO_MG_DL) {
     return {
-      text: "Glicemia abaixo da meta. Considere um lanche rápido com carboidrato e reavalie em 15 minutos.",
+      text: "Glicemia baixa. Considere um lanche rápido com carboidrato e reavalie em 15 minutos.",
       actionLabel: "Registrar refeição",
       actionHref: "/alimentacao/foto",
       tone: "danger",
+    };
+  }
+
+  if (zone === "abaixo") {
+    return {
+      text: "Glicemia um pouco abaixo da sua meta, ainda fora da faixa de hipoglicemia. Acompanhe e registre a próxima medição.",
+      actionLabel: "Registrar leitura",
+      actionHref: "/glicemia",
+      tone: "warning",
     };
   }
 

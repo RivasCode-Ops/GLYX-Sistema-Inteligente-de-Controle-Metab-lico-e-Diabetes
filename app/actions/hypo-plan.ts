@@ -79,15 +79,32 @@ export async function markHypoActed(formData: FormData): Promise<ActionResult> {
   if (!user) return { error: "Sessão expirada." };
 
   const agora = new Date();
-  const eventId = (formData.get("event_id") as string | null) || null;
+  let eventId = (formData.get("event_id") as string | null) || null;
+
+  // Sem id vindo do card, ainda pode haver episódio aberto (toque duplo, card
+  // desatualizado): reaproveita em vez de criar outro.
+  if (!eventId) {
+    const { data: aberto } = await supabase
+      .from("hypo_events")
+      .select("id")
+      .eq("user_id", user.id)
+      .is("recheck_at", null)
+      .gte("detected_at", new Date(agora.getTime() - 6 * 3600_000).toISOString())
+      .order("detected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    eventId = (aberto?.id as string | undefined) ?? null;
+  }
 
   if (eventId) {
+    // Agir de novo no mesmo episódio (leitura ainda baixa depois da 1ª
+    // correção) atualiza o horário da ação: a reavaliação conta da última.
     const { error } = await supabase
       .from("hypo_events")
       .update({ acted_at: agora.toISOString() })
       .eq("id", eventId)
       .eq("user_id", user.id)
-      .is("acted_at", null);
+      .is("recheck_at", null);
     if (error) return { error: publicDbError(error, "actions/hypo-plan") };
   } else {
     // Sem evento ainda (gatilho de criação não aplicado, ou a leitura chegou
@@ -130,14 +147,32 @@ export async function recordHypoRecheck(formData: FormData): Promise<ActionResul
     return { error: "Informe a glicemia medida (20 a 600 mg/dL)." };
   }
 
+  const agora = new Date().toISOString();
   const { error } = await supabase
     .from("hypo_events")
-    .update({ recheck_at: new Date().toISOString(), recheck_mg_dl: Math.round(valor) })
+    .update({ recheck_at: agora, recheck_mg_dl: Math.round(valor) })
     .eq("id", eventId)
     .eq("user_id", user.id)
     .is("recheck_at", null);
   if (error) return { error: publicDbError(error, "actions/hypo-plan") };
 
+  // A medição da reavaliação é uma leitura de verdade: vai para a glicemia.
+  // Antes ela só fechava o episódio — um 52 digitado aqui sumia, e o painel
+  // seguia sem card de hipo. Como leitura nova, o card a vê: se ainda estiver
+  // baixa, o ciclo recomeça (e, com o gatilho de 20261031111000, um novo
+  // episódio nasce sozinho).
+  const { error: erroLeitura } = await supabase.from("glucose_readings").insert({
+    user_id: user.id,
+    value_mg_dl: Math.round(valor),
+    context: "reavaliacao_hipo",
+    source: "manual",
+    recorded_at: agora,
+  });
+  if (erroLeitura) {
+    return { error: "Reavaliação guardada, mas a leitura não entrou na glicemia. Registre-a em Glicemia." };
+  }
+
   revalidatePath("/dashboard");
+  revalidatePath("/glicemia");
   return { ok: true };
 }

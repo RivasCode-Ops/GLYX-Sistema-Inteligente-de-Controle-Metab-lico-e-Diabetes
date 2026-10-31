@@ -17,6 +17,24 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
+/**
+ * Eventos fora da faixa: episódios + leituras isoladas. Sem os campos novos
+ * (auditoria gravada antes), a contagem de leitura — o comportamento antigo.
+ */
+export function eventos(
+  episodios: number | undefined,
+  isoladas: number | undefined,
+  leituras: number
+): { total: number; texto: string } {
+  if (episodios === undefined) return { total: leituras, texto: `${leituras} leitura(s)` };
+  const iso = isoladas ?? 0;
+  const partes = [
+    ...(episodios ? [`${episodios} episódio(s)`] : []),
+    ...(iso ? [`${iso} leitura(s) isolada(s)`] : []),
+  ];
+  return { total: episodios + iso, texto: partes.join(" e ") || "0 evento" };
+}
+
 function pushFactor(
   factors: AuditFactor[],
   factor: Omit<AuditFactor, "scoreImpact"> & { scoreImpact: number }
@@ -99,38 +117,33 @@ export function scoreFromMetrics(
     }
   }
 
-  // B5: a unidade é o EPISÓDIO (27 leituras de uma hiper de 2 h são 1 evento).
-  // Pesos, limites e o corte de "crítico" ficaram os mesmos, só trocou a
-  // unidade — recalibrar é decisão clínica pendente (D7/B15). Métricas sem
-  // episódio (auditoria antiga) caem na contagem de leitura.
-  const hypoEpisodes = metrics.hypoEpisodes ?? metrics.hypoCount;
-  if (hypoEpisodes > 0) {
-    const impact = clamp(hypoEpisodes * 6, 6, 24);
+  // B5: a unidade é o EVENTO — episódio de sensor (27 leituras de uma hiper de
+  // 2 h são 1) OU leitura isolada de glicosímetro (sem vizinha a ≤ 30 min, não
+  // forma episódio mas é evento). Só episódio fazia o 48 medido no dedo sumir
+  // do score (correção de 31/10/2026). Pesos e cortes os mesmos de antes
+  // (recalibrar é D7/B15). Auditoria antiga, sem os campos, cai na contagem.
+  const eventosHipo = eventos(metrics.hypoEpisodes, metrics.hypoIsoladas, metrics.hypoCount);
+  if (eventosHipo.total > 0) {
+    const impact = clamp(eventosHipo.total * 6, 6, 24);
     score -= pushFactor(factors, {
       id: "hypos",
       label: "Episódios de hipoglicemia",
-      severity: hypoEpisodes >= 3 ? "critical" : "warning",
+      severity: eventosHipo.total >= 3 ? "critical" : "warning",
       weight: 3,
-      evidence:
-        metrics.hypoEpisodes != null
-          ? `${hypoEpisodes} episódio(s) abaixo da meta mínima (${metrics.hypoCount} leituras).`
-          : `${hypoEpisodes} leitura(s) abaixo da meta mínima.`,
+      evidence: `${eventosHipo.texto} abaixo da meta mínima (${metrics.hypoCount} leituras).`,
       scoreImpact: impact,
     });
   }
 
-  const hyperEpisodes = metrics.hyperEpisodes ?? metrics.hyperCount;
-  if (hyperEpisodes > 0) {
-    const impact = clamp(Math.round(hyperEpisodes * 2.5), 4, 22);
+  const eventosHiper = eventos(metrics.hyperEpisodes, metrics.hyperIsoladas, metrics.hyperCount);
+  if (eventosHiper.total > 0) {
+    const impact = clamp(Math.round(eventosHiper.total * 2.5), 4, 22);
     score -= pushFactor(factors, {
       id: "hypers",
       label: "Episódios acima da meta",
-      severity: hyperEpisodes >= 8 ? "critical" : "warning",
+      severity: eventosHiper.total >= 8 ? "critical" : "warning",
       weight: 2,
-      evidence:
-        metrics.hyperEpisodes != null
-          ? `${hyperEpisodes} episódio(s) acima da meta máxima (${metrics.hyperCount} leituras).`
-          : `${hyperEpisodes} leitura(s) acima da meta máxima.`,
+      evidence: `${eventosHiper.texto} acima da meta máxima (${metrics.hyperCount} leituras).`,
       scoreImpact: impact,
     });
   }

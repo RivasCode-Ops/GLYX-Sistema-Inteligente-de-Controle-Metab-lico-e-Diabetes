@@ -146,6 +146,8 @@ export function computeAuditMetrics(input: AuditRawInputs): AuditMetrics {
     severeHyperCount,
     hypoEpisodes: cgm.hipoEpisodes,
     hyperEpisodes: cgm.hiperEpisodes,
+    hypoIsoladas: cgm.hipoIsoladas,
+    hyperIsoladas: cgm.hiperIsoladas,
     cvPercent: cgm.cvPercent,
     avgGlucose: avgGlucose != null ? Math.round(avgGlucose) : null,
     stdDev: sd != null ? Math.round(sd) : null,

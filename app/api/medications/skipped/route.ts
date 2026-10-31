@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { registrarDose } from "@/lib/medications/register-dose";
+import { doseDoPulo } from "@/lib/medications/pulo";
 
 // "Pulei hoje" pela notificação (Etapa 2, B3). Mesma regra da tela
 // (`logMedicationSkipped`): grava `confirmed = false` — dose pulada é
@@ -11,6 +12,8 @@ import { registrarDose } from "@/lib/medications/register-dose";
 const schema = z.object({
   medication_id: z.string().uuid(),
   pedido: z.string().uuid().nullish(),
+  /** Dose que a notificação anunciou: é ESSA que foi pulada, não a mais próxima do toque. */
+  scheduled_for: z.string().datetime().nullish(),
 });
 
 export async function POST(req: Request) {
@@ -30,10 +33,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
 
+  const dose = doseDoPulo(parsed.data.scheduled_for);
   const r = await registrarDose(supabase, user.id, {
     medicationId: parsed.data.medication_id,
     confirmed: false,
-    doseInformada: null,
+    takenAt: dose,
+    doseInformada: dose ? dose.toISOString() : null,
     pedido: parsed.data.pedido ?? null,
   });
 

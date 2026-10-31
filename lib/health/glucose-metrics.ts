@@ -93,6 +93,14 @@ export type GlucoseMetrics = {
   episodes: Episode[];
   hipoEpisodes: number;
   hiperEpisodes: number;
+  /**
+   * Leituras fora da faixa SEM vizinha a menos de `MAX_GAP_MINUTES` — o padrão
+   * de quem mede no dedo. Não formam episódio (não há como afirmar 15 min
+   * contínuos), mas também não podem sumir: um 48 de glicosímetro é evento.
+   * Oscilação breve de sensor (vizinhas a 5 min) NÃO conta aqui.
+   */
+  hipoIsoladas: number;
+  hiperIsoladas: number;
   /** Distribuição de episódios por hora local — 24 posições. */
   hipoByHour: number[];
   hiperByHour: number[];
@@ -173,6 +181,19 @@ function detectEpisodes(
   return out;
 }
 
+/** Leituras fora da faixa sem nenhuma vizinha (antes ou depois) a até MAX_GAP_MINUTES. */
+function contarIsoladas(sorted: GlucosePoint[], fora: (v: number) => boolean): number {
+  const t = (i: number) => new Date(sorted[i].recorded_at).getTime();
+  let n = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    if (!fora(sorted[i].value_mg_dl)) continue;
+    const antesPerto = i > 0 && (t(i) - t(i - 1)) / 60_000 <= MAX_GAP_MINUTES;
+    const depoisPerto = i < sorted.length - 1 && (t(i + 1) - t(i)) / 60_000 <= MAX_GAP_MINUTES;
+    if (!antesPerto && !depoisPerto) n += 1;
+  }
+  return n;
+}
+
 export function computeGlucoseMetrics(
   points: GlucosePoint[],
   targets: GlucoseTargets,
@@ -189,6 +210,8 @@ export function computeGlucoseMetrics(
     episodes: [],
     hipoEpisodes: 0,
     hiperEpisodes: 0,
+    hipoIsoladas: 0,
+    hiperIsoladas: 0,
     hipoByHour: Array(24).fill(0),
     hiperByHour: Array(24).fill(0),
     coverage: { daysWithData: 0, daysInPeriod: 0, percent: null, gaps: [] },
@@ -238,6 +261,8 @@ export function computeGlucoseMetrics(
     episodes: [...hipo, ...hiper].sort((a, b) => a.startAt.localeCompare(b.startAt)),
     hipoEpisodes: hipo.length,
     hiperEpisodes: hiper.length,
+    hipoIsoladas: contarIsoladas(sorted, (v) => isBelowTarget(v, targets.targetMin)),
+    hiperIsoladas: contarIsoladas(sorted, (v) => isAboveTarget(v, targets.targetMax)),
     hipoByHour,
     hiperByHour,
     coverage: {
