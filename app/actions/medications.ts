@@ -22,6 +22,7 @@ import {
   type Intencao,
 } from "@/lib/medications/register-dose";
 import { doseDoPulo } from "@/lib/medications/pulo";
+import { MAX_UNIDADES_ESTOQUE, totalAposReposicao, type MedicationStock } from "@/lib/medications/stock";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const LABEL_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
@@ -388,6 +389,57 @@ export async function updateMedicationStock(formData: FormData): Promise<ActionR
 
   revalidatePath("/medicacao");
   return { ok: true };
+}
+
+/**
+ * Repor estoque a partir do aviso (estoque-repor, 31/10/2026). Duas formas:
+ * "comprei mais X" soma ao que a conta diz que resta (ciente da cadência), e
+ * "contei e tenho X" grava o total. O aviso de reposição pedia para atualizar
+ * o estoque e não oferecia como.
+ */
+export async function reporEstoque(formData: FormData): Promise<ActionResult & { total?: number }> {
+  const supabase = await createClient();
+  if (!supabase) return { error: "Configure o Supabase (.env.local)." };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const p = z
+    .object({
+      medication_id: z.string().uuid(),
+      modo: z.enum(["somar", "total"]),
+      unidades: z.coerce.number().int().min(0).max(MAX_UNIDADES_ESTOQUE),
+    })
+    .safeParse({
+      medication_id: formData.get("medication_id"),
+      modo: formData.get("modo"),
+      unidades: formData.get("unidades"),
+    });
+  if (!p.success) return { error: `Informe uma quantidade de 0 a ${MAX_UNIDADES_ESTOQUE}.` };
+  if (p.data.modo === "somar" && p.data.unidades === 0) return { error: "Informe quantas unidades comprou." };
+
+  const { data: med, error: erroLeitura } = await supabase
+    .from("medications")
+    .select("stock_units, stock_updated_on, reminder_times, cadence, cadence_weekday, cadence_interval_days, cadence_anchor_on")
+    .eq("id", p.data.medication_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (erroLeitura) return { error: publicDbError(erroLeitura, "actions/medications") };
+  if (!med) return { error: "Item não encontrado." };
+
+  const total = totalAposReposicao(med as MedicationStock, p.data.modo, p.data.unidades);
+  const { error } = await supabase
+    .from("medications")
+    .update({ stock_units: total, stock_updated_on: new Date().toISOString().slice(0, 10) })
+    .eq("id", p.data.medication_id)
+    .eq("user_id", user.id);
+  if (error) return { error: publicDbError(error, "actions/medications") };
+
+  revalidatePath("/medicacao");
+  revalidatePath("/medicacao/medicamentos");
+  revalidatePath("/dashboard");
+  return { ok: true, total };
 }
 
 export async function deactivateMedication(formData: FormData): Promise<ActionResult> {

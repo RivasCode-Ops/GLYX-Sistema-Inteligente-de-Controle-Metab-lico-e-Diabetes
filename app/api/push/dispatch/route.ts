@@ -5,6 +5,7 @@ import { reportCronOutcome, reportException } from "@/lib/observability";
 import { entregarPush } from "@/lib/push/send";
 import { consolidarDespachos } from "@/lib/push/dispatch-outcome";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { urlDoAviso } from "@/lib/push/url-do-aviso";
 
 // Chamado pelo pg_cron do Supabase a cada 5 min com os alarmes vencidos.
 // O banco decide QUEM e QUANDO e reivindica cada alarme (`push_dispatch_log`,
@@ -58,7 +59,8 @@ export async function POST(req: Request) {
       {
         title: item.title,
         body: item.body,
-        url: "/medicacao",
+        // Reposição abre a tela de repor DAQUELE item; o resto, /medicacao.
+        url: urlDoAviso(item.tag),
         critical: item.critical ?? true,
         medId: item.medId ?? null,
         scheduledFor: item.scheduledFor ?? null,

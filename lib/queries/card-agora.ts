@@ -144,6 +144,7 @@ export async function getCardAgora(
       if (status.state === "tomada") medicationsOnTime += 1;
       if (status.state === "pendente") {
         lateMedications.push({
+          medId: m.id as string,
           name: m.name as string,
           scheduledAt: w.scheduledUTC.toISOString(),
           minutesLate: Math.floor((agora.getTime() - w.scheduledUTC.getTime()) / 60_000),
@@ -160,7 +161,7 @@ export async function getCardAgora(
     if (estado.kind === "sem_dado") continue;
     const dias = estado.kind === "estimado" ? estado.daysLeft : 0;
     if (dias <= ESTOQUE_MINIMO_DIAS) {
-      lowStock.push({ name: m.name as string, units: m.stock_units as number, daysLeft: dias });
+      lowStock.push({ medId: m.id as string, name: m.name as string, units: m.stock_units as number, daysLeft: dias });
     }
   }
 

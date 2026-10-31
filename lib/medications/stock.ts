@@ -59,21 +59,54 @@ export const LOW_STOCK_DAYS = 7;
  * assumia dose diária e o semanal aparecia "acabado" na primeira semana.
  * Sem cadência declarada, todo dia é dia de dose (o comportamento anterior).
  */
-export function stockState(m: MedicationStock, now: Date = new Date()): StockState {
-  if (m.stock_units == null || !m.stock_updated_on) return { kind: "sem_dado" };
-
+/** Consumo desde a atualização: dias de dose em (atualização, hoje]. */
+function consumoAteHoje(m: MedicationStock & { stock_units: number; stock_updated_on: string }, now: Date) {
   const porDiaDeDose = Math.max(m.reminder_times?.length ?? 1, 1);
   const diasDesde = Math.max(
     0,
     Math.floor((now.getTime() - new Date(m.stock_updated_on).getTime()) / 86_400_000)
   );
   const inicio = m.stock_updated_on.slice(0, 10);
-
-  // Consumo desde a atualização: dias de dose em (atualização, hoje].
   let unidades = m.stock_units;
   for (let k = 1; k <= diasDesde; k++) {
     if (ehDiaDeDose(m, somarDiasISO(inicio, k))) unidades -= porDiaDeDose;
   }
+  return { porDiaDeDose, diasDesde, inicio, unidades };
+}
+
+/**
+ * Unidades que a conta diz que ainda restam hoje (nunca negativo). Nulo sem
+ * estoque informado. Base da reposição "comprei mais": soma-se ao que resta.
+ */
+export function unidadesRestantes(m: MedicationStock, now: Date = new Date()): number | null {
+  if (m.stock_units == null || !m.stock_updated_on) return null;
+  return Math.max(0, consumoAteHoje({ ...m, stock_units: m.stock_units, stock_updated_on: m.stock_updated_on }, now).unidades);
+}
+
+export const MAX_UNIDADES_ESTOQUE = 10_000;
+
+/**
+ * Novo total depois de repor (estoque-repor, 31/10/2026).
+ * - "somar": comprei mais X → o que resta pela conta + X. Sem estoque
+ *   anterior, X vira o total.
+ * - "total": contei e tenho X → X.
+ */
+export function totalAposReposicao(
+  m: MedicationStock,
+  modo: "somar" | "total",
+  unidades: number,
+  now: Date = new Date()
+): number {
+  const base = modo === "somar" ? (unidadesRestantes(m, now) ?? 0) : 0;
+  return Math.min(MAX_UNIDADES_ESTOQUE, base + unidades);
+}
+
+export function stockState(m: MedicationStock, now: Date = new Date()): StockState {
+  if (m.stock_units == null || !m.stock_updated_on) return { kind: "sem_dado" };
+
+  const c = consumoAteHoje({ ...m, stock_units: m.stock_units, stock_updated_on: m.stock_updated_on }, now);
+  const { porDiaDeDose, diasDesde, inicio } = c;
+  let unidades = c.unidades;
   if (unidades < porDiaDeDose) return { kind: "informacao_vencida", daysSinceUpdate: diasDesde };
 
   // Dias de calendário que o restante cobre a partir de hoje.

@@ -55,7 +55,26 @@ export type CardAgora = {
     detectedAt: string | null;
     emergencyText: string | null;
   };
+  /**
+   * Medicação atrasada (um item): o remédio e a dose que "Registrei" e "Adiar
+   * 15 min" gravam pelas rotas da notificação (correção de 31/10/2026 — antes
+   * o botão apontava para um formulário que não existia).
+   */
+  medicacao?: { medId: string; scheduledFor: string };
 };
+
+/**
+ * Ações que só ESCONDEM o card até o fim do dia neste aparelho ("Hoje não",
+ * "Adiar aviso", "Entendi"). Não havia rota para nenhuma delas: o botão não
+ * fazia nada. O componente as trata localmente.
+ */
+export const INTENTS_DE_DISPENSAR = [
+  "/api/card/dispensar",
+  "/api/estoque/adiar",
+  "/api/exercicio/adiar",
+  "/api/exercicio/dispensar",
+  "/api/interacao/lida",
+] as const;
 
 export type HypoPlan = {
   correctionText: string;
@@ -96,8 +115,8 @@ export type CardContext = {
   rapidInsulin: { appliedAt: string; minutesAgo: number } | null;
   /** veredito `blocked` da fatia 1, ainda não lido pelo usuário */
   blockedInteraction: { message: string } | null;
-  lateMedications: { name: string; scheduledAt: string; minutesLate: number }[];
-  lowStock: { name: string; units: number; daysLeft: number }[];
+  lateMedications: { medId?: string; name: string; scheduledAt: string; minutesLate: number }[];
+  lowStock: { medId?: string; name: string; units: number; daysLeft: number }[];
   /** chaves em `nao_registrado` vindas do recibo da fatia 3 */
   receiptMissing: string[];
   exerciseSessionToday: boolean;
@@ -375,16 +394,17 @@ export function elegerCard(ctx: CardContext): CardAgora {
         : `previsto ${HORA(primeira.scheduledAt, ctx.timezone)} · atrasado ${primeira.minutesLate} min`,
       body: null,
       why: "O horário passou sem registro de dose e sem adiamento ativo.",
-      actions: varias
-        ? [
-            { label: "Ver agenda", kind: "primary", intent: "/medicacao" },
-            { label: "Adiar 15 min", kind: "secondary", intent: "/api/medications/snooze" },
-          ]
-        : [
-            { label: "Registrei", kind: "primary", intent: "/api/medications/taken" },
-            { label: "Adiar 15 min", kind: "secondary", intent: "/api/medications/snooze" },
-          ],
+      // Com vários atrasados, adiar exigiria escolher um: vai para a agenda.
+      // Com um só (e o id dele), os botões gravam pelas rotas da notificação.
+      actions:
+        varias || !primeira.medId
+          ? [{ label: "Ver agenda", kind: "primary", intent: "/medicacao" }]
+          : [
+              { label: "Registrei", kind: "primary", intent: "/api/medications/taken" },
+              { label: "Adiar 15 min", kind: "secondary", intent: "/api/medications/snooze" },
+            ],
       narratable: false,
+      ...(!varias && primeira.medId ? { medicacao: { medId: primeira.medId, scheduledFor: primeira.scheduledAt } } : {}),
     };
   }
 
@@ -400,8 +420,14 @@ export function elegerCard(ctx: CardContext): CardAgora {
       evidence: `${item.units} em estoque · ~${item.daysLeft} dia(s)`,
       body: null,
       why: "O estoque cadastrado não cobre os próximos 7 dias no ritmo dos seus horários.",
+      // "Repor" leva à tela de reposição DESTE item (somar compra ou informar
+      // o total) — antes caía na lista inteira de medicamentos.
       actions: [
-        { label: "Atualizar estoque", kind: "primary", intent: "/medicacao/medicamentos" },
+        {
+          label: "Repor estoque",
+          kind: "primary",
+          intent: item.medId ? `/medicacao/estoque/${item.medId}` : "/medicacao/medicamentos",
+        },
         { label: "Adiar aviso", kind: "secondary", intent: "/api/estoque/adiar" },
       ],
       narratable: false,
