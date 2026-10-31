@@ -438,6 +438,13 @@ export default async function MeusMedicamentosPage({
                               {stockLabel(estoque, m.kind === "supplement")}
                             </p>
                           ) : null}
+                          {/* Repor em um passo: somar a compra ou informar o total (estoque-repor). */}
+                          <Link
+                            href={`/medicacao/estoque/${m.id}`}
+                            className="ml-2 mt-1 inline-block text-[11px] text-emerald-300 underline"
+                          >
+                            {estoque.kind === "sem_dado" ? "Informar estoque" : "Repor"}
+                          </Link>
                           {inconsistente ? (
                             <p className="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
                               Configuração inconsistente: marcado como uso livre, mas tem horário. Nenhum

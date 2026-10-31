@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { markHypoActed, recordHypoRecheck } from "@/app/actions/hypo-plan";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CardAgora, CardLevel } from "@/lib/painel/card-agora";
+import { INTENTS_DE_DISPENSAR, type CardAgora, type CardLevel } from "@/lib/painel/card-agora";
+import { localDateKey } from "@/lib/time/local-day";
 
 /**
  * Card "o que fazer agora" — primeiro elemento do painel.
@@ -111,6 +112,76 @@ export function CardAgoraView({
   // Pendência compartilhada com os botões: enquanto um envio corre, os botões
   // que gravam ficam desabilitados (toque duplo não grava duas vezes).
   const [pendente, startTransition] = useTransition();
+  const router = useRouter();
+  // "Até amanhã" no fuso do aparelho, que é onde a pessoa vê o card.
+  const chaveDispensa = `glyx-card-dispensado:${card.id}:${localDateKey(
+    new Date().toISOString(),
+    Intl.DateTimeFormat().resolvedOptions().timeZone
+  )}`;
+  const [dispensado, setDispensado] = useState(false);
+  useEffect(() => {
+    try {
+      setDispensado(window.localStorage.getItem(chaveDispensa) === "1");
+    } catch {
+      /* armazenamento indisponível: o card aparece */
+    }
+  }, [chaveDispensa]);
+
+  const dispensar = () => {
+    try {
+      window.localStorage.setItem(chaveDispensa, "1");
+    } catch {
+      /* sem armazenamento, esconde só nesta visita */
+    }
+    setDispensado(true);
+  };
+  const mostrarDeNovo = () => {
+    try {
+      window.localStorage.removeItem(chaveDispensa);
+    } catch {
+      /* nada a desfazer */
+    }
+    setDispensado(false);
+  };
+
+  // "Registrei" e "Adiar 15 min" da medicação atrasada: as MESMAS rotas da
+  // notificação, com o remédio e a dose do card.
+  const medicacao = (intent: string) =>
+    startTransition(async () => {
+      if (!card.medicacao) return;
+      const taken = intent === "/api/medications/taken";
+      const res = await fetch(intent, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          taken
+            ? { medication_id: card.medicacao.medId, scheduled_for: card.medicacao.scheduledFor, pedido: crypto.randomUUID() }
+            : { medication_id: card.medicacao.medId, minutes: 15 }
+        ),
+      }).catch(() => null);
+      const corpo = res ? ((await res.json().catch(() => ({}))) as { error?: string; url?: string; conflito?: boolean }) : {};
+      if (res?.ok) {
+        setErro(null);
+        router.refresh();
+      } else if (res?.status === 409 && corpo.conflito && corpo.url) {
+        router.push(corpo.url);
+      } else {
+        setErro(corpo.error ?? "Não consegui registrar agora. Tente pela tela de medicação.");
+      }
+    });
+
+  if (dispensado) {
+    return (
+      <Card className="w-full">
+        <div className="flex items-center justify-between gap-3 p-3 text-xs text-zinc-500">
+          <span>Aviso dispensado até amanhã neste aparelho.</span>
+          <Button type="button" variant="ghost" size="sm" onClick={mostrarDeNovo}>
+            Mostrar
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className={cn("w-full", BORDA[card.level])}>
@@ -144,6 +215,27 @@ export function CardAgoraView({
                 size="sm"
                 aria-expanded={emergencia}
                 onClick={() => setEmergencia((v) => !v)}
+              >
+                {a.label}
+              </Button>
+            ) : (INTENTS_DE_DISPENSAR as readonly string[]).includes(a.intent) ? (
+              <Button
+                key={a.label}
+                type="button"
+                variant={a.kind === "primary" ? "default" : "outline"}
+                size="sm"
+                onClick={dispensar}
+              >
+                {a.label}
+              </Button>
+            ) : a.intent === "/api/medications/taken" || a.intent === "/api/medications/snooze" ? (
+              <Button
+                key={a.label}
+                type="button"
+                variant={a.kind === "primary" ? "default" : "outline"}
+                size="sm"
+                disabled={pendente || !card.medicacao}
+                onClick={() => medicacao(a.intent)}
               >
                 {a.label}
               </Button>

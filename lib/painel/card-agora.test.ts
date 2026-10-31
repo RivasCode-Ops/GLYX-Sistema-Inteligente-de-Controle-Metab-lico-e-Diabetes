@@ -5,6 +5,7 @@ import {
   elegerCard,
   exerciseSuppressed,
   glucoseBlind,
+  INTENTS_DE_DISPENSAR,
   textoDoCard,
   type CardContext,
   type HypoPlan,
@@ -412,5 +413,59 @@ describe("ciclo de hipoglicemia — correções de 31/10/2026", () => {
   it("última leitura baixa de ontem não comanda mais o painel", () => {
     const c = elegerCard(ctx({ lastGlucose: 55, lastGlucoseAt: "2026-09-06T10:00:00.000Z" }));
     expect(c.id).not.toMatch(/^hipo/);
+  });
+});
+
+describe("ações do card que antes não faziam nada (31/10/2026)", () => {
+  it("estoque baixo: 'Repor estoque' leva à tela daquele item", () => {
+    const c = elegerCard(ctx({ lowStock: [{ medId: "m1", name: "Metformina", units: 4, daysLeft: 2 }] }));
+    expect(c.id).toBe("estoque_baixo");
+    expect(c.actions[0]).toMatchObject({ label: "Repor estoque", intent: "/medicacao/estoque/m1" });
+  });
+
+  it("medicação atrasada (uma): botões levam o remédio e a dose", () => {
+    const c = elegerCard(
+      ctx({ lateMedications: [{ medId: "m1", name: "Metformina", scheduledAt: "2026-09-07T11:00:00.000Z", minutesLate: 125 }] })
+    );
+    expect(c.id).toBe("medicacao_atrasada");
+    expect(c.medicacao).toEqual({ medId: "m1", scheduledFor: "2026-09-07T11:00:00.000Z" });
+    expect(c.actions.map((a) => a.intent)).toEqual(["/api/medications/taken", "/api/medications/snooze"]);
+  });
+
+  it("várias atrasadas: vai para a agenda (adiar exigiria escolher uma)", () => {
+    const c = elegerCard(
+      ctx({
+        lateMedications: [
+          { medId: "m1", name: "A", scheduledAt: "2026-09-07T11:00:00.000Z", minutesLate: 125 },
+          { medId: "m2", name: "B", scheduledAt: "2026-09-07T11:00:00.000Z", minutesLate: 125 },
+        ],
+      })
+    );
+    expect(c.actions.map((a) => a.intent)).toEqual(["/medicacao"]);
+  });
+
+  it("toda ação '/api/' do card tem quem a execute", () => {
+    const tratadas = new Set<string>([
+      ...INTENTS_DE_DISPENSAR,
+      "/api/hypo/acted",
+      "/api/hypo/recheck",
+      "/api/hypo/emergency",
+      "/api/medications/taken",
+      "/api/medications/snooze",
+    ]);
+    const cenarios = [
+      ctx({ lastGlucose: 62 }),
+      ctx({ blockedInteraction: { message: "x" } }),
+      ctx({ rapidInsulin: { appliedAt: "2026-09-07T16:30:00.000Z", minutesAgo: 35 }, exerciseStartingNow: true }),
+      ctx({ lowStock: [{ medId: "m1", name: "X", units: 2, daysLeft: 1 }] }),
+      ctx({ lateMedications: [{ medId: "m1", name: "X", scheduledAt: "2026-09-07T11:00:00.000Z", minutesLate: 60 }] }),
+      ctx({ withinPreferredExerciseWindow: true }),
+      ctx(),
+    ];
+    for (const c of cenarios.map(elegerCard)) {
+      for (const a of c.actions.filter((x) => x.intent.startsWith("/api/"))) {
+        expect(tratadas, `${c.id}: ${a.intent}`).toContain(a.intent);
+      }
+    }
   });
 });
