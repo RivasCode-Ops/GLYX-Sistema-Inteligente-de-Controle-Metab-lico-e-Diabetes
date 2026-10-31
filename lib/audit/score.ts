@@ -197,7 +197,7 @@ export function scoreFromMetrics(
       label: "Valores alterados em exames",
       severity: "warning",
       weight: 1,
-      evidence: `${metrics.examAlteredCount} parâmetro(s) classificado(s) como alterado(s) nos laudos recentes.`,
+      evidence: `${metrics.examAlteredCount} valor(es) fora da faixa de referência do próprio laudo, nos exames recentes.`,
       scoreImpact: clamp(metrics.examAlteredCount * 3, 3, 12),
     });
   }

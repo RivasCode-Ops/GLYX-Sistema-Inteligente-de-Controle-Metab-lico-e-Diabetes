@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 
 type Feasibility = {
   verdict: "realista" | "agressiva" | "arriscada";
+  /** Motivo do veredito, calculado por regra (não pela IA). */
+  verdict_reason?: string;
   summary: string;
   monthly_milestones: { month: number; weight_kg: number }[];
   factors_for: string[];
@@ -55,8 +57,8 @@ export function GoalFeasibilityCard() {
       <CardHeader>
         <CardTitle className="text-base">Viabilidade da meta</CardTitle>
         <CardDescription>
-          A IA compara seu objetivo com estrutura física, histórico e saúde atual e devolve um
-          veredito honesto com marcos mensais.
+          O veredito e os marcos mensais saem de regras fixas (IMC e ritmo seguro); a IA só
+          explica o resultado com o seu histórico e saúde atual.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -71,6 +73,7 @@ export function GoalFeasibilityCard() {
               <p className="text-xs font-semibold uppercase tracking-wide">
                 Meta {result.verdict}
               </p>
+              {result.verdict_reason ? <p className="mt-1 text-xs">{result.verdict_reason}</p> : null}
               <p className="mt-1 text-sm">{result.summary}</p>
             </div>
 

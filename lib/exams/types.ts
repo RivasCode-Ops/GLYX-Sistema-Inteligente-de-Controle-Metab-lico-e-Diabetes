@@ -82,7 +82,31 @@ export function parseExamType(raw: unknown): ExamType {
   return parsed.success ? parsed.data : "lab";
 }
 
-/** Conta sinais “alterados” úteis para o mapa de risco (lab values + findings). */
+/**
+ * Valores fora da faixa de referência DO LAUDO — a régua do mapa de risco
+ * (Etapa 2, B11). Só conta valor numérico com pelo menos um limite numérico
+ * lido do laudo; limite inclusivo (no limite = dentro). Valor sem faixa não é
+ * "normal" nem "alterado": não entra.
+ */
+export function countOutOfReference(
+  values: { value_num: number | string | null; ref_min: number | string | null; ref_max: number | string | null }[]
+): number {
+  let n = 0;
+  for (const v of values) {
+    if (v.value_num == null) continue;
+    const valor = Number(v.value_num);
+    const min = v.ref_min == null ? null : Number(v.ref_min);
+    const max = v.ref_max == null ? null : Number(v.ref_max);
+    if (!Number.isFinite(valor) || (min == null && max == null)) continue;
+    if ((min != null && valor < min) || (max != null && valor > max)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Conta sinais “alterados” escritos pela interpretação de IA (lab values +
+ * findings). Não alimenta mais o score (B11) — fica para exibição do laudo.
+ */
 export function countAlteredSignals(summary: unknown): number {
   const parsed = parsedExamSummarySchema.safeParse(summary);
   if (!parsed.success) return 0;

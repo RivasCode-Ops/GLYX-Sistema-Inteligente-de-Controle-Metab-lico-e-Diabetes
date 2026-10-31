@@ -9,13 +9,14 @@ import { sanitizeForPrompt } from "@/lib/ai/sanitize-context";
 import { describeGlucoseAverage, glucoseAverage } from "@/lib/ai/glucose-average";
 import { GOAL_LABEL, bmr, dailyTargets, safeWeeklyRateKg, tdee } from "@/lib/health/energy";
 import type { ActivityLevel, BodyGoal, Sex } from "@/lib/health/energy";
+import { assessGoalFeasibility } from "@/lib/health/goal-feasibility";
 import { createClient } from "@/lib/supabase/server";
 import { parseModelJson } from "@/lib/ai/parse-json";
 
+// Veredito e marcos NÃO vêm do modelo (C10): são de `assessGoalFeasibility`.
+// O modelo só redige o texto em volta deles.
 const resultSchema = z.object({
-  verdict: z.enum(["realista", "agressiva", "arriscada"]),
   summary: z.string(),
-  monthly_milestones: z.array(z.object({ month: z.number(), weight_kg: z.number() })),
   factors_for: z.array(z.string()),
   factors_against: z.array(z.string()),
   risks: z.array(z.string()),
@@ -96,6 +97,12 @@ export async function POST() {
   const goal = profile.body_goal as BodyGoal;
   const targets = dailyTargets(body, goal);
   const weeklyRate = safeWeeklyRateKg(body.weightKg, goal);
+  const viabilidade = assessGoalFeasibility({
+    weightKg: body.weightKg,
+    heightCm: body.heightCm,
+    goal,
+    targetWeightKg: profile.target_weight_kg != null ? Number(profile.target_weight_kg) : null,
+  });
 
   const PROMPT = `És um analista de viabilidade de metas corporais para pessoas com diabetes (PT-BR), educativo e honesto — nunca prescreves tratamento.
 
@@ -112,12 +119,15 @@ CÁLCULOS JÁ FEITOS (usar como âncora, não recalcular):
 - BMR ${bmr(body)} kcal | TDEE ${tdee(body)} kcal | Meta calórica: ${targets.calories} kcal/dia (${targets.deficitOrSurplus >= 0 ? "+" : ""}${targets.deficitOrSurplus}) | Proteína: ${targets.protein_g} g/dia
 - Ritmo seguro: ${weeklyRate} kg/semana (ADA: déficit 500-750 kcal/dia; perda saudável 0,5-1%/semana; meta 5-7% do peso)
 
+VEREDITO JÁ DEFINIDO POR REGRA (não altere, não conteste, não crie outro):
+- Veredito: "${viabilidade.verdict}" — ${viabilidade.motivo}
+- Marcos mensais (calculados no ritmo seguro): ${viabilidade.monthlyMilestones.map((m) => `mês ${m.month}: ${m.weight_kg} kg`).join("; ")}
+
 REGRAS:
+- Explique o veredito acima com os dados; não escreva outro veredito nem outros números de peso.
 - Se insulina ou sulfonilureia estiver nas medicações, inclua risco de hipoglicemia em déficit/exercício e recomende ajuste médico ANTES de iniciar.
-- Veredito "arriscada" se a meta declarada exigir ritmo acima do seguro ou peso final abaixo de IMC 18,5.
-- Marcos mensais realistas a partir do peso atual no ritmo seguro (máx. 6 meses).
 - Resposta APENAS JSON válido:
-{"verdict":"realista|agressiva|arriscada","summary":"2-3 frases diretas","monthly_milestones":[{"month":1,"weight_kg":0}],"factors_for":["..."],"factors_against":["..."],"risks":["..."],"recommendation":"próximo passo concreto, incluindo aval médico quando aplicável"}`;
+{"summary":"2-3 frases diretas","factors_for":["..."],"factors_against":["..."],"risks":["..."],"recommendation":"próximo passo concreto, incluindo aval médico quando aplicável"}`;
 
   const openai = createAiClient();
   let completion;
@@ -153,6 +163,9 @@ REGRAS:
 
   return NextResponse.json({
     ...parsed.data,
+    verdict: viabilidade.verdict,
+    verdict_reason: viabilidade.motivo,
+    monthly_milestones: viabilidade.monthlyMilestones,
     computed: {
       bmr: bmr(body),
       tdee: tdee(body),
