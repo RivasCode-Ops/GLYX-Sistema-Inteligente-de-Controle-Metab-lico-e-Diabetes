@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MATCH_BEFORE_MS, computeDoseStatus, doseWindows } from "@/lib/medications/adherence";
 import { ehDiaDeDose, type CamposDeCadencia } from "@/lib/medications/cadence";
+import { stockState, type MedicationStock } from "@/lib/medications/stock";
 import { checkSubstanceSafety } from "@/lib/queries/substance-safety";
 import { getContextReceipt } from "@/lib/queries/context-receipt";
 import { resolveGlucoseTargets } from "@/lib/health/glucose-thresholds";
@@ -146,20 +147,15 @@ export async function getCardAgora(
     }
   }
 
-  // Estoque: doses/dia = número de horários, mínimo 1 — mesma conta da tela de
-  // medicamentos.
+  // Estoque: a MESMA conta da tela de medicamentos (`stockState`, ciente da
+  // cadência — B13). Era uma cópia que assumia dose diária.
   const lowStock: CardContext["lowStock"] = [];
   for (const m of meds) {
-    const unidades = m.stock_units as number | null;
-    if (unidades == null || !m.stock_updated_on) continue;
-    const porDia = Math.max(((m.reminder_times as string[] | null) ?? []).length, 1);
-    const decorridos = Math.max(
-      0,
-      Math.floor((agora.getTime() - new Date(m.stock_updated_on as string).getTime()) / 86_400_000)
-    );
-    const dias = Math.floor((unidades - decorridos * porDia) / porDia);
+    const estado = stockState(m as MedicationStock, agora);
+    if (estado.kind === "sem_dado") continue;
+    const dias = estado.kind === "estimado" ? estado.daysLeft : 0;
     if (dias <= ESTOQUE_MINIMO_DIAS) {
-      lowStock.push({ name: m.name as string, units: unidades, daysLeft: Math.max(dias, 0) });
+      lowStock.push({ name: m.name as string, units: m.stock_units as number, daysLeft: dias });
     }
   }
 

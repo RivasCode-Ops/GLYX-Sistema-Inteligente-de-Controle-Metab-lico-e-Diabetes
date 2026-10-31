@@ -58,6 +58,21 @@ describe("getNextStepInsight", () => {
     expect(r.tone).toBe("neutral");
   });
 
+  it("usa a zona da faixa do perfil, não 70/180 fixos (B10)", () => {
+    // Meta 70–140: 160 é "acima" — no cartão ao lado e aqui.
+    expect(
+      getNextStepInsight({ latestGlucose: 160, zone: "acima", carbsToday: 10, activeMinutes: 0 }).tone
+    ).toBe("danger");
+    // Meta 80–200: 75 é "abaixo" mesmo sendo ≥ 70.
+    expect(
+      getNextStepInsight({ latestGlucose: 75, zone: "abaixo", carbsToday: 10, activeMinutes: 0 }).tone
+    ).toBe("danger");
+    // Meta 80–250: 190 está na meta — sem alarme.
+    expect(
+      getNextStepInsight({ latestGlucose: 190, zone: "na_meta", carbsToday: 10, activeMinutes: 5 }).tone
+    ).toBe("success");
+  });
+
   it("reforça positivo quando dentro da meta e dia já tem registro", () => {
     const r = getNextStepInsight({ latestGlucose: 100, carbsToday: 40, activeMinutes: 10 });
     expect(r.tone).toBe("success");

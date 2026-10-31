@@ -60,6 +60,29 @@ describe("stockState", () => {
     expect(s).toEqual({ kind: "estimado", daysLeft: 10, low: false });
   });
 
+  it("semanal só consome no dia da dose (B13)", () => {
+    // AGORA é terça (dow 2). Atualizado na segunda com 4 unidades: a dose de
+    // hoje consome 1; as 3 restantes cobrem as próximas 3 terças (27 dias).
+    const semanal = {
+      stock_units: 4,
+      stock_updated_on: diasAtras(1),
+      reminder_times: ["08:00"],
+      cadence: "semanal",
+      cadence_weekday: 2,
+    };
+    expect(stockState(semanal, AGORA)).toEqual({ kind: "estimado", daysLeft: 27, low: false });
+    // A conta antiga (diária) daria 3 dias e acenderia "estoque baixo".
+    expect(stockState({ ...semanal, cadence: null }, AGORA)).toMatchObject({ daysLeft: 3, low: true });
+  });
+
+  it("semanal com a última unidade usada hoje: informação vencida", () => {
+    const s = stockState(
+      { stock_units: 1, stock_updated_on: diasAtras(1), reminder_times: ["08:00"], cadence: "semanal", cadence_weekday: 2 },
+      AGORA
+    );
+    expect(s.kind).toBe("informacao_vencida");
+  });
+
   it("ícone acompanha o tipo do item", () => {
     const s = stockState({ stock_units: 30, stock_updated_on: diasAtras(1) }, AGORA);
     expect(stockLabel(s, true)).toContain("🥄");

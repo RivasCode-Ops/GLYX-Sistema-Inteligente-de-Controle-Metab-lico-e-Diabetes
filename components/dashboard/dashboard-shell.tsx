@@ -75,6 +75,7 @@ export function DashboardShell({
         <div className="flex flex-col gap-4">
           <NextStepCard
             latestGlucose={latestGlucose}
+            glucoseZone={glucoseZone}
             carbsToday={carbsToday}
             activeMinutes={activeMinutes}
           />
