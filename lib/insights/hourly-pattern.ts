@@ -1,3 +1,4 @@
+import { isAboveTarget } from "@/lib/health/glucose-thresholds";
 // Padrão de glicemia por hora do dia (fuso do usuário): em quais janelas o
 // valor costuma ficar acima da meta. Alimenta o contexto da IA para ela
 // apontar "seus piores horários" com dado real, não impressão.
@@ -33,7 +34,7 @@ export function computeHourlyPattern(
       hour,
       avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
       count: vals.length,
-      pctAbove: Math.round((vals.filter((v) => v > targetMax).length / vals.length) * 100),
+      pctAbove: Math.round((vals.filter((v) => isAboveTarget(v, targetMax)).length / vals.length) * 100),
     }))
     .sort((a, b) => a.hour - b.hour);
 }

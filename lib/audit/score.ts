@@ -6,7 +6,9 @@ import type {
   MetabolicAuditReport,
 } from "@/lib/audit/types";
 import {
+  cvOfMetrics,
   hasEnoughGlucoseData,
+  HIGH_CV_PERCENT,
   MIN_DAYS_FOR_ANALYSIS,
   MIN_READINGS_FOR_ANALYSIS,
 } from "@/lib/audit/metrics";
@@ -97,42 +99,52 @@ export function scoreFromMetrics(
     }
   }
 
-  if (metrics.hypoCount > 0) {
-    const impact = clamp(metrics.hypoCount * 6, 6, 24);
+  // B5: a unidade é o EPISÓDIO (27 leituras de uma hiper de 2 h são 1 evento).
+  // Pesos, limites e o corte de "crítico" ficaram os mesmos, só trocou a
+  // unidade — recalibrar é decisão clínica pendente (D7/B15). Métricas sem
+  // episódio (auditoria antiga) caem na contagem de leitura.
+  const hypoEpisodes = metrics.hypoEpisodes ?? metrics.hypoCount;
+  if (hypoEpisodes > 0) {
+    const impact = clamp(hypoEpisodes * 6, 6, 24);
     score -= pushFactor(factors, {
       id: "hypos",
       label: "Episódios de hipoglicemia",
-      severity: metrics.hypoCount >= 3 ? "critical" : "warning",
+      severity: hypoEpisodes >= 3 ? "critical" : "warning",
       weight: 3,
-      evidence: `${metrics.hypoCount} leitura(s) abaixo da meta mínima.`,
+      evidence:
+        metrics.hypoEpisodes != null
+          ? `${hypoEpisodes} episódio(s) abaixo da meta mínima (${metrics.hypoCount} leituras).`
+          : `${hypoEpisodes} leitura(s) abaixo da meta mínima.`,
       scoreImpact: impact,
     });
   }
 
-  if (metrics.hyperCount > 0) {
-    const impact = clamp(Math.round(metrics.hyperCount * 2.5), 4, 22);
+  const hyperEpisodes = metrics.hyperEpisodes ?? metrics.hyperCount;
+  if (hyperEpisodes > 0) {
+    const impact = clamp(Math.round(hyperEpisodes * 2.5), 4, 22);
     score -= pushFactor(factors, {
       id: "hypers",
-      label: "Leituras acima da meta",
-      severity: metrics.hyperCount >= 8 ? "critical" : "warning",
+      label: "Episódios acima da meta",
+      severity: hyperEpisodes >= 8 ? "critical" : "warning",
       weight: 2,
-      evidence: `${metrics.hyperCount} leitura(s) acima da meta máxima.`,
+      evidence:
+        metrics.hyperEpisodes != null
+          ? `${hyperEpisodes} episódio(s) acima da meta máxima (${metrics.hyperCount} leituras).`
+          : `${hyperEpisodes} leitura(s) acima da meta máxima.`,
       scoreImpact: impact,
     });
   }
 
-  if (metrics.stdDev != null && metrics.avgGlucose != null && metrics.avgGlucose > 0) {
-    const cv = (metrics.stdDev / metrics.avgGlucose) * 100;
-    if (cv >= 36) {
-      score -= pushFactor(factors, {
-        id: "variability_high",
-        label: "Variabilidade alta",
-        severity: "warning",
-        weight: 2,
-        evidence: `Desvio ~${metrics.stdDev} mg/dL (CV ~${Math.round(cv)}%).`,
-        scoreImpact: 12,
-      });
-    }
+  const cv = cvOfMetrics(metrics);
+  if (cv != null && cv >= HIGH_CV_PERCENT) {
+    score -= pushFactor(factors, {
+      id: "variability_high",
+      label: "Variabilidade alta",
+      severity: "warning",
+      weight: 2,
+      evidence: `Desvio ~${metrics.stdDev} mg/dL (CV ~${Math.round(cv)}%).`,
+      scoreImpact: 12,
+    });
   }
 
   if (metrics.spikeMealCount >= 3) {

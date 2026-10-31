@@ -27,11 +27,11 @@ describe("classifyGlucose", () => {
   });
 
   it("as fronteiras não deixam buraco nem sobreposição", () => {
-    // Mínimo pertence à faixa; máximo NÃO — mesma convenção do resto do app,
-    // onde `>= targetMax` já era "Atenção".
+    // Mínimo e máximo pertencem à faixa (Etapa 2, B4 — consenso de CGM: TIR
+    // 70–180 inclusive). Antes, 180 era "acima" aqui e "na meta" na auditoria.
     expect(classifyGlucose(70, FAIXA).inRange).toBe(true);
-    expect(classifyGlucose(180, FAIXA).inRange).toBe(false);
-    expect(classifyGlucose(179, FAIXA).inRange).toBe(true);
+    expect(classifyGlucose(180, FAIXA).inRange).toBe(true);
+    expect(classifyGlucose(181, FAIXA).inRange).toBe(false);
   });
 
   it("o topo acompanha a faixa do usuário, e não um número fixo", () => {
@@ -53,7 +53,7 @@ describe("classifyGlucose", () => {
 
   it("faixa degenerada não quebra a classificação", () => {
     const zero = { targetMin: 100, targetMax: 100 };
-    expect(classifyGlucose(100, zero).inRange).toBe(false);
+    expect(classifyGlucose(101, zero).inRange).toBe(false);
     expect(classifyGlucose(99, zero).zone).toBe("abaixo");
   });
 });

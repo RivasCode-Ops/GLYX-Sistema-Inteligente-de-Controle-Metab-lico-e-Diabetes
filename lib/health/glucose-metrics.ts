@@ -28,7 +28,29 @@
  * — quando as duas divergem, isso é achado para o médico, não erro do app.
  */
 
+import { isAboveTarget, isBelowTarget } from "@/lib/health/glucose-thresholds";
+
 export type GlucosePoint = { value_mg_dl: number; recorded_at: string };
+
+/**
+ * CV em % com desvio AMOSTRAL (n-1), uma casa — a única fórmula (Etapa 2, B6).
+ * A auditoria usava desvio populacional e arredondava o CV para inteiro; a
+ * mesma semana saía com dois CVs. Com uma leitura só não há dispersão a afirmar.
+ */
+export function sampleStdDev(valores: number[]): number | null {
+  const n = valores.length;
+  if (n < 2) return null;
+  const media = valores.reduce((s, v) => s + v, 0) / n;
+  return Math.sqrt(valores.reduce((s, v) => s + (v - media) ** 2, 0) / (n - 1));
+}
+
+export function cvPercentOf(valores: number[]): number | null {
+  const sd = sampleStdDev(valores);
+  if (sd == null) return null;
+  const media = valores.reduce((s, v) => s + v, 0) / valores.length;
+  if (media <= 0) return null;
+  return Math.round((sd / media) * 1000) / 10;
+}
 
 export type GlucoseTargets = { targetMin: number; targetMax: number };
 
@@ -178,19 +200,13 @@ export function computeGlucoseMetrics(
   const n = valores.length;
   const mean = valores.reduce((s, v) => s + v, 0) / n;
 
-  // Desvio amostral (n-1). Com uma leitura só não há dispersão a afirmar.
-  const cvPercent =
-    n > 1
-      ? Math.round(
-          (Math.sqrt(valores.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1)) / mean) * 1000
-        ) / 10
-      : null;
+  const cvPercent = cvPercentOf(valores);
 
-  const abaixo = valores.filter((v) => v < targets.targetMin).length;
-  const acima = valores.filter((v) => v >= targets.targetMax).length;
+  const abaixo = valores.filter((v) => isBelowTarget(v, targets.targetMin)).length;
+  const acima = valores.filter((v) => isAboveTarget(v, targets.targetMax)).length;
 
-  const hipo = detectEpisodes(sorted, "hipo", (v) => v < targets.targetMin);
-  const hiper = detectEpisodes(sorted, "hiper", (v) => v >= targets.targetMax);
+  const hipo = detectEpisodes(sorted, "hipo", (v) => isBelowTarget(v, targets.targetMin));
+  const hiper = detectEpisodes(sorted, "hiper", (v) => isAboveTarget(v, targets.targetMax));
 
   const hipoByHour = Array(24).fill(0) as number[];
   const hiperByHour = Array(24).fill(0) as number[];

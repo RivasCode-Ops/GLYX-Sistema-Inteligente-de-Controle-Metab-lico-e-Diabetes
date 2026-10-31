@@ -54,6 +54,23 @@ export type GlucoseTargets = {
   severeHyper: number;
 };
 
+/**
+ * A régua de pertencimento à faixa — a ÚNICA comparação permitida (Etapa 2, B4).
+ *
+ * Até 30/10/2026 conviviam `>= targetMax` (classificação, métricas de CGM) e
+ * `> targetMax` (auditoria, histórico, padrão por hora): 180 com meta 70–180 era
+ * "acima" numa tela e "na meta" na outra. Fica o que o cabeçalho deste módulo
+ * sempre documentou e o consenso de CGM usa (Battelino 2019: TIR 70–180
+ * inclusive, TAR > 180, TBR < 70). Escolha registrada para validação (D7).
+ */
+export function isBelowTarget(value: number, targetMin: number): boolean {
+  return value < targetMin;
+}
+
+export function isAboveTarget(value: number, targetMax: number): boolean {
+  return value > targetMax;
+}
+
 /** Limiar de hipoglicemia do usuário: meta mínima do perfil, ou o padrão. */
 export function hypoThresholdFor(targetGlucoseMin: number | null | undefined): number {
   return targetGlucoseMin ?? DEFAULT_HYPO_MG_DL;
@@ -139,10 +156,10 @@ export function classifyGlucose(
   value: number,
   targets: Pick<GlucoseTargets, "targetMin" | "targetMax">
 ): GlucoseClassification {
-  if (value < targets.targetMin) {
+  if (isBelowTarget(value, targets.targetMin)) {
     return { zone: "abaixo", label: "Abaixo da meta", inRange: false };
   }
-  if (value >= targets.targetMax) {
+  if (isAboveTarget(value, targets.targetMax)) {
     return { zone: "acima", label: "Acima da meta", inRange: false };
   }
   const topo =
