@@ -44,12 +44,15 @@ const TITULO: Record<CardLevel, string> = {
 function HypoForms({
   card,
   onDone,
+  pendente,
+  startTransition,
 }: {
   card: CardAgora;
   onDone: (erro: string | null) => void;
+  pendente: boolean;
+  startTransition: (f: () => Promise<void>) => void;
 }) {
   const router = useRouter();
-  const [pendente, startTransition] = useTransition();
   if (!card.hypo) return null;
   const h = card.hypo;
 
@@ -105,6 +108,9 @@ export function CardAgoraView({
   const [porQue, setPorQue] = useState(false);
   const [emergencia, setEmergencia] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Pendência compartilhada com os botões: enquanto um envio corre, os botões
+  // que gravam ficam desabilitados (toque duplo não grava duas vezes).
+  const [pendente, startTransition] = useTransition();
 
   return (
     <Card className={cn("w-full", BORDA[card.level])}>
@@ -125,7 +131,7 @@ export function CardAgoraView({
           <p className="mt-3 whitespace-pre-line text-sm text-zinc-200">{card.body}</p>
         ) : null}
 
-        <HypoForms card={card} onDone={setErro} />
+        <HypoForms card={card} onDone={setErro} pendente={pendente} startTransition={startTransition} />
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {card.actions.map((a) =>
@@ -148,6 +154,7 @@ export function CardAgoraView({
                 form={`card-agora-${a.intent.replace(/\W+/g, "-")}`}
                 variant={a.kind === "primary" ? "default" : "outline"}
                 size="sm"
+                disabled={pendente}
               >
                 {a.label}
               </Button>

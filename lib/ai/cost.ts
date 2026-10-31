@@ -48,3 +48,19 @@ export function formatUsd(value: number): string {
   if (value < 0.01) return `US$ ${value.toFixed(4)}`;
   return `US$ ${value.toFixed(2)}`;
 }
+
+/**
+ * Tokens estimados quando o provedor não manda `usage` (resposta barrada pela
+ * guarda ou conexão caída: o `usage` vem só no último pedaço). ~4 caracteres
+ * por token em português, arredondado PARA CIMA: o teto global prefere
+ * superestimar a deixar custo invisível.
+ */
+export function estimarUsoDeTokens(
+  textoEnviado: string,
+  caracteresRecebidos: number
+): { prompt_tokens: number; completion_tokens: number } {
+  return {
+    prompt_tokens: Math.ceil(textoEnviado.length / 4),
+    completion_tokens: Math.ceil(caracteresRecebidos / 4),
+  };
+}

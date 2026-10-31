@@ -39,7 +39,30 @@ export const FORBIDDEN_PHRASES = [...CAUSA, ...CONDUTA, ...LIBERACAO];
  * Casa coisas como "vai cair para 60 às 15h" ou "sua glicemia às 15:00 estará".
  */
 export const FORBIDDEN_PREDICTION =
-  /\bglicemia\b[^.!?]{0,80}\b(vai|ir[áa]|dever[áa]|estar[áa])\b[^.!?]{0,80}\d/i;
+  /\bglicemia\b[^.!?]{0,80}\b((vai|ir[áa]|dever[áa]|pode)\s+(cair|subir|baixar|chegar|ficar|estar|atingir|passar|descer)|estar[áa]|ficar[áa]|cair[áa]|subir[áa]|chegar[áa])\b[^.!?]{0,80}\d/i;
+
+/**
+ * Contextos em que a frase proibida aparece NEGADA ou com objeto inofensivo —
+ * exatamente o que o app pede para dizer (correção de 31/10/2026). Sem isto,
+ * "não é seguro", "não significa que está sem risco" e "pode manter a
+ * caminhada" derrubavam a resposta inteira, inclusive o alerta de substância
+ * fora da base. Casados sobre o texto normalizado (sem acento, minúsculo).
+ */
+const CONTEXTOS_PERMITIDOS: RegExp[] = [
+  /\b(nao|nunca|nem|jamais)\s+(e|esta|sera|seria)\s+(seguro|liberado)\b/g,
+  /\b(nao|nem)\s+(significa|quer dizer|garante|indica)\s+(que\s+)?(esta\s+|seja\s+|ha\s+|estar\s+|fique\s+)?(sem risco|seguro|liberado)\b/g,
+  /\b(nao|nem)\s+(da|e possivel|consigo|posso|podemos)\s+(para\s+)?(dizer|afirmar|concluir|saber)\s+(que\s+)?(isso\s+|ele\s+|ela\s+)?(e a causa|esta causando)\b/g,
+  /\bpode manter\s+(a |o |as |os |sua |seu |suas |seus )?(caminhada|rotina|atividade|treino|exercicio|alimentacao|horario|ritmo|habito|registro|hidratacao|sono)/g,
+];
+
+function trechosPermitidos(normalizado: string): [number, number][] {
+  const out: [number, number][] = [];
+  for (const re of CONTEXTOS_PERMITIDOS) {
+    re.lastIndex = 0;
+    for (const m of normalizado.matchAll(re)) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
 
 /** Ocorrência encontrada, com contexto suficiente para achar no arquivo. */
 export type ForbiddenHit = { phrase: string; excerpt: string };
@@ -55,18 +78,25 @@ export function findForbiddenLanguage(texto: string): ForbiddenHit[] {
     .toLowerCase();
 
   const hits: ForbiddenHit[] = [];
+  const permitidos = trechosPermitidos(normalizado);
+  const dentroDePermitido = (i: number, fim: number) => permitidos.some(([a, b]) => i >= a && fim <= b);
 
   for (const frase of FORBIDDEN_PHRASES) {
     const alvo = frase
       .normalize("NFD")
       .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
       .toLowerCase();
-    const i = normalizado.indexOf(alvo);
-    if (i === -1) continue;
-    hits.push({ phrase: frase, excerpt: texto.slice(Math.max(0, i - 40), i + alvo.length + 40) });
+    // Toda ocorrência conta: uma negada não pode esconder outra afirmada.
+    for (let i = normalizado.indexOf(alvo); i !== -1; i = normalizado.indexOf(alvo, i + 1)) {
+      if (dentroDePermitido(i, i + alvo.length)) continue;
+      hits.push({ phrase: frase, excerpt: texto.slice(Math.max(0, i - 40), i + alvo.length + 40) });
+      break;
+    }
   }
 
-  const previsao = FORBIDDEN_PREDICTION.exec(texto);
+  // Sobre o texto SEM acento: `\b` do JavaScript não vê borda depois de "á",
+  // e "estará" passava (achado em 31/10/2026).
+  const previsao = FORBIDDEN_PREDICTION.exec(normalizado);
   if (previsao) {
     hits.push({ phrase: "previsão de glicemia com hora e valor", excerpt: previsao[0] });
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
+import { guardarTextoDaIA } from "@/lib/safety/ai-output-guard";
 import { z } from "zod";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
@@ -86,14 +86,16 @@ export async function POST(req: Request) {
     const { error, status } = mealEstimateError(estimate.motivo, "texto");
     return NextResponse.json({ error }, { status });
   }
-  const barrada = respostaBarradaOuNull("ai/meal-text", estimate.raw);
-  if (barrada) return barrada;
+  // Só o texto passa pela guarda: a estimativa não se perde por uma frase
+  // (correção de 31/10/2026).
+  const notas = guardarTextoDaIA(typeof estimate.raw.notes === "string" ? estimate.raw.notes : "", "");
+  if (notas.bloqueado) console.warn("[ai/meal-text] texto barrado por linguagem proibida:", notas.frases);
 
   return NextResponse.json({
     meal: {
       ...estimate.totals,
       glycemic_load_estimate: estimate.glycemicLoad,
-      notes: typeof estimate.raw.notes === "string" ? estimate.raw.notes : "",
+      notes: notas.texto,
     },
   });
 }

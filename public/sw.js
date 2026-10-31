@@ -141,7 +141,13 @@ self.addEventListener("notificationclick", (event) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ medication_id: info.medId, pedido: info.pedido || undefined }),
+        // A dose que este alarme anunciou: pular no alarme das 08:00 às 19:45
+        // marca a das 08:00, não a das 20:00.
+        body: JSON.stringify({
+          medication_id: info.medId,
+          scheduled_for: info.scheduledFor || undefined,
+          pedido: info.pedido || undefined,
+        }),
       })
         .then((res) =>
           res.ok

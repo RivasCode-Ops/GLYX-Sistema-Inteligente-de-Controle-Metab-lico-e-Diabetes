@@ -165,6 +165,12 @@ export function glucoseBlind(ctx: CardContext): boolean {
  */
 export const HIPO_LEITURA_MAX_MINUTOS = 60;
 
+/**
+ * Até quando uma última leitura baixa, sem nada depois, ainda pede "meça de
+ * novo" (6 h, a mesma janela em que um episódio aberto comanda o card).
+ */
+export const HIPO_ACOMPANHAMENTO_MAX_MINUTOS = 6 * 60;
+
 /** Minutos desde a leitura, ou null se não há horário. */
 function idadeDaLeituraMin(ctx: CardContext): number | null {
   if (!ctx.lastGlucoseAt) return null;
@@ -199,29 +205,44 @@ export function elegerCard(ctx: CardContext): CardAgora {
     return `${valor}${hora}${tend}`;
   };
 
+  const limiarHipo = ctx.hypoPlan?.thresholdMgDl ?? ctx.targetRange.low;
+  const ev = ctx.openHypoEvent;
+  // "Fiz" depois da última leitura: o card de agir não volta igual (cada toque
+  // criava outro episódio, sem confirmação na tela). Espera a reavaliação.
+  const agiuDepoisDaLeitura = Boolean(
+    ev?.actedAt && (!ctx.lastGlucoseAt || Date.parse(ev.actedAt) >= Date.parse(ctx.lastGlucoseAt))
+  );
+
   // 1 / 1b — hipoglicemia. O texto NUNCA passa pela LLM.
-  if (hipoCondicao(ctx)) {
+  if (hipoCondicao(ctx) && !(agiuDepoisDaLeitura && ctx.hypoPlan)) {
     if (ctx.hypoPlan) {
+      // Abaixo do limiar há episódio a registrar; no ramo "caindo" (ainda
+      // acima do limiar) a conduta aparece, mas "Fiz" não grava hipo que não
+      // houve.
+      const abaixo = (ctx.lastGlucose as number) < limiarHipo;
       return {
         id: "hipo_ativa",
         level: "critico",
-        title: "Glicemia baixa",
+        title: abaixo ? "Glicemia baixa" : "Glicemia caindo perto do limiar",
         evidence: evidenciaGlicemia(),
         // Literal, sem reescrita: é a conduta que ele definiu com o médico.
         body: ctx.hypoPlan.correctionText,
-        why: `Sua leitura ficou abaixo do limiar de ${ctx.hypoPlan.thresholdMgDl} mg/dL que você cadastrou.`,
+        why: abaixo
+          ? `Sua leitura ficou abaixo do limiar de ${ctx.hypoPlan.thresholdMgDl} mg/dL que você cadastrou.`
+          : `Sua leitura está caindo e a menos de 20 mg/dL do limiar de ${ctx.hypoPlan.thresholdMgDl} mg/dL que você cadastrou.`,
         actions: [
-          { label: "Fiz", kind: "primary", intent: "/api/hypo/acted" },
-          { label: "Registrar nova medição", kind: "secondary", intent: "/glicemia" },
+          ...(abaixo ? [{ label: "Fiz", kind: "primary" as const, intent: "/api/hypo/acted" }] : []),
+          { label: "Registrar nova medição", kind: abaixo ? ("secondary" as const) : ("primary" as const), intent: "/glicemia" },
           ...(ctx.hypoPlan.emergencyText
             ? [{ label: "Emergência", kind: "secondary" as const, intent: "/api/hypo/emergency" }]
             : []),
         ],
         narratable: false,
         hypo: {
-          // Evento já agido não é reaberto: "Fiz" de novo cria outro episódio.
-          eventId: ctx.openHypoEvent && !ctx.openHypoEvent.actedAt ? ctx.openHypoEvent.id : null,
-          glucoseMgDl: ctx.lastGlucose,
+          // Leitura nova ainda baixa depois de agir é o MESMO episódio: "Fiz"
+          // atualiza o evento aberto em vez de criar outro.
+          eventId: ev?.id ?? null,
+          glucoseMgDl: abaixo ? ctx.lastGlucose : null,
           detectedAt: ctx.lastGlucoseAt,
           emergencyText: ctx.hypoPlan.emergencyText,
         },
@@ -264,6 +285,39 @@ export function elegerCard(ctx: CardContext): CardAgora {
           detectedAt: ctx.openHypoEvent.detectedAt,
           emergencyText: ctx.hypoPlan.emergencyText,
         },
+      };
+    }
+    if (agiuDepoisDaLeitura) {
+      // A confirmação do "Fiz" e o relógio da reavaliação, no lugar do card
+      // de agir.
+      const faltam = ctx.hypoPlan.recheckMinutes - minutos;
+      return {
+        id: "hipo_aguardando",
+        level: "critico",
+        title: "Correção registrada",
+        evidence: `você agiu às ${HORA(ctx.openHypoEvent.actedAt, ctx.timezone)} · reavaliar em ${faltam} min`,
+        body: null,
+        why: `Você cadastrou reavaliação em ${ctx.hypoPlan.recheckMinutes} minutos após agir.`,
+        actions: [{ label: "Registrar nova medição", kind: "secondary", intent: "/glicemia" }],
+        narratable: false,
+      };
+    }
+  }
+
+  // 1d — a última leitura foi baixa e nada veio depois. Antes o card sumia
+  // aos 60 min sem que nada tivesse sido resolvido.
+  if (!glucoseBlind(ctx) && ctx.lastGlucose != null && ctx.lastGlucose < limiarHipo) {
+    const idade = idadeDaLeituraMin(ctx);
+    if (idade != null && idade > HIPO_LEITURA_MAX_MINUTOS && idade <= HIPO_ACOMPANHAMENTO_MAX_MINUTOS) {
+      return {
+        id: "hipo_leitura_antiga",
+        level: "atencao",
+        title: "Última leitura foi baixa",
+        evidence: evidenciaGlicemia(),
+        body: "Não chegou leitura nova depois dela. Meça de novo para saber como está agora.",
+        why: `A última leitura registrada ficou abaixo de ${limiarHipo} mg/dL e tem mais de ${HIPO_LEITURA_MAX_MINUTOS} minutos.`,
+        actions: [{ label: "Registrar medição", kind: "primary", intent: "/glicemia" }],
+        narratable: false,
       };
     }
   }

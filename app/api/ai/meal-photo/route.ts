@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { respostaBarradaOuNull } from "@/lib/ai/guard-response";
+import { guardarTextoDaIA } from "@/lib/safety/ai-output-guard";
 import { aiProviderOptions, createAiClient } from "@/lib/ai/client";
 import { aiModel, isOpenAIConfigured, aiKeyEnvName } from "@/lib/env";
 import { isUnusableCompletion, mealEstimateError, validateMealEstimate } from "@/lib/ai/parse-meal";
@@ -116,8 +116,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error }, { status });
   }
   const parsed = estimate.raw;
-  const barrada = respostaBarradaOuNull("ai/meal-photo", parsed);
-  if (barrada) return barrada;
+  // Só os TEXTOS passam pela guarda: frase proibida apaga a observação, não a
+  // estimativa de carboidrato (antes, 422 e a refeição inteira se perdia por
+  // uma frase de observação — correção de 31/10/2026).
+  const notas = guardarTextoDaIA(typeof parsed.notes === "string" ? parsed.notes : "", "");
+  const dica = guardarTextoDaIA(typeof parsed.eating_order_tip === "string" ? parsed.eating_order_tip : "", "");
+  if (notas.bloqueado || dica.bloqueado) {
+    console.warn("[ai/meal-photo] texto barrado por linguagem proibida:", [...notas.frases, ...dica.frases]);
+  }
 
   // Só analisa — o usuário revisa e decide se conta no consumo diário
   // (ação separada salva, com a mesma foto reenviada pelo cliente).
@@ -127,8 +133,8 @@ export async function POST(req: Request) {
     meal: {
       ...estimate.totals,
       glycemic_load_estimate: estimate.glycemicLoad,
-      notes: typeof parsed.notes === "string" ? parsed.notes : "",
-      eating_order_tip: typeof parsed.eating_order_tip === "string" ? parsed.eating_order_tip : "",
+      notes: notas.texto,
+      eating_order_tip: dica.texto,
     },
     saved: false,
   });

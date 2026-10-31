@@ -369,3 +369,48 @@ describe("ciclo de hipoglicemia (Etapa 2, B2)", () => {
     expect(c.id).not.toMatch(/^hipo/);
   });
 });
+
+describe("ciclo de hipoglicemia — correções de 31/10/2026", () => {
+  it("depois de 'Fiz', a mesma leitura baixa não reabre o card de agir: mostra a correção registrada", () => {
+    const c = elegerCard(
+      ctx({
+        lastGlucose: 62,
+        openHypoEvent: { id: "ev1", detectedAt: "2026-09-07T17:00:00.000Z", glucoseMgDl: 62, actedAt: "2026-09-07T17:02:00.000Z" },
+      })
+    );
+    expect(c.id).toBe("hipo_aguardando");
+    expect(c.actions.map((a) => a.intent)).not.toContain("/api/hypo/acted");
+    expect(c.evidence).toMatch(/reavaliar em 12 min/);
+  });
+
+  it("leitura nova ainda baixa depois de agir: card de agir volta, no MESMO evento", () => {
+    const c = elegerCard(
+      ctx({
+        lastGlucose: 60,
+        lastGlucoseAt: "2026-09-07T17:04:00.000Z",
+        openHypoEvent: { id: "ev1", detectedAt: "2026-09-07T16:40:00.000Z", glucoseMgDl: 62, actedAt: "2026-09-07T16:42:00.000Z" },
+      })
+    );
+    expect(c.id).toBe("hipo_ativa");
+    expect(c.hypo?.eventId).toBe("ev1");
+  });
+
+  it("caindo perto do limiar (ainda acima): mostra a conduta, mas sem 'Fiz' e sem registrar hipo", () => {
+    const c = elegerCard(ctx({ lastGlucose: 85, glucoseTrend: "down" }));
+    expect(c.id).toBe("hipo_ativa");
+    expect(c.title).toMatch(/caindo/);
+    expect(c.actions.map((a) => a.intent)).not.toContain("/api/hypo/acted");
+    expect(c.hypo?.glucoseMgDl).toBeNull();
+  });
+
+  it("última leitura baixa há 90 min sem nada depois: pede nova medição em vez de sumir", () => {
+    const c = elegerCard(ctx({ lastGlucose: 55, lastGlucoseAt: "2026-09-07T15:35:00.000Z" }));
+    expect(c.id).toBe("hipo_leitura_antiga");
+    expect(c.actions[0].intent).toBe("/glicemia");
+  });
+
+  it("última leitura baixa de ontem não comanda mais o painel", () => {
+    const c = elegerCard(ctx({ lastGlucose: 55, lastGlucoseAt: "2026-09-06T10:00:00.000Z" }));
+    expect(c.id).not.toMatch(/^hipo/);
+  });
+});

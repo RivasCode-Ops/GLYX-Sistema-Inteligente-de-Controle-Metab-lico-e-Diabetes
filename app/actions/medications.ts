@@ -21,6 +21,7 @@ import {
   type ErroBanco,
   type Intencao,
 } from "@/lib/medications/register-dose";
+import { doseDoPulo } from "@/lib/medications/pulo";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const LABEL_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
@@ -435,7 +436,13 @@ export type ResultadoRegistroTela = ActionResult & {
   conflito?: { medicationId: string; scheduledFor: string; takenAtPedido: string; pedido: string | null };
 };
 
-type OpcoesRegistro = { pedido?: string | null; intencao?: Intencao | null; alvoId?: string | null };
+type OpcoesRegistro = {
+  pedido?: string | null;
+  intencao?: Intencao | null;
+  alvoId?: string | null;
+  /** Dose prevista a que o registro se refere (ISO UTC), quando a tela a sabe. */
+  doseInformada?: string | null;
+};
 
 async function inserirRegistroDeDose(
   medicationId: string,
@@ -469,6 +476,7 @@ async function inserirRegistroDeDose(
     medicationId,
     confirmed,
     takenAt: takenAtInformado ?? null,
+    doseInformada: opcoes.doseInformada ?? null,
     pedido: opcoes.pedido ?? null,
     intencao: opcoes.intencao ?? null,
     alvoId: opcoes.alvoId ?? null,
@@ -567,5 +575,10 @@ export async function logMedicationTaken(formData: FormData): Promise<ResultadoR
 export async function logMedicationSkipped(formData: FormData): Promise<ActionResult> {
   const medicationId = formData.get("medication_id") as string | null;
   if (!medicationId) return { error: "Medicamento inválido." };
-  return inserirRegistroDeDose(medicationId, false, null, { pedido: opcoesDoFormulario(formData).pedido });
+  // Dose pulada = a dose prevista da linha, não a hora do clique (lib/medications/pulo.ts).
+  const dose = doseDoPulo(formData.get("scheduled_for"));
+  return inserirRegistroDeDose(medicationId, false, dose, {
+    pedido: opcoesDoFormulario(formData).pedido,
+    doseInformada: dose ? dose.toISOString() : null,
+  });
 }

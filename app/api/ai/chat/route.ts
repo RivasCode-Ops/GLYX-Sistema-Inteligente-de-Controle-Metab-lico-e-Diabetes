@@ -12,6 +12,7 @@ import {
 } from "@/lib/queries/ai-threads";
 import { criarGuardaDeStream } from "@/lib/safety/ai-output-guard";
 import { checkAndRecordAiUsage, rateLimitMessage, recordAiTokens } from "@/lib/ai/rate-limit";
+import { estimarUsoDeTokens } from "@/lib/ai/cost";
 import { createClient } from "@/lib/supabase/server";
 import { AVISO_STREAM_INTERROMPIDO, validarPayloadDoChat } from "@/lib/ai/chat-payload";
 
@@ -95,20 +96,21 @@ export async function POST(req: Request) {
   }
 
   const openai = createAiClient();
+  const mensagens = [
+    { role: "system" as const, content: SYSTEM },
+    // Mapa de telas antes do resumo de dados: é conteúdo do app, fixo e
+    // confiável, enquanto o resumo carrega texto livre do usuário.
+    { role: "system" as const, content: featureIndexForPrompt() },
+    ...(userContext ? [{ role: "system" as const, content: userContext }] : []),
+    ...historico.map((m) => ({ role: m.role, content: m.content })),
+    { role: "user" as const, content: lastUserMessage },
+  ];
   let stream;
   try {
     stream = await openai.chat.completions.create({
       ...aiProviderOptions(),
       model: aiModel(),
-      messages: [
-        { role: "system", content: SYSTEM },
-        // Mapa de telas antes do resumo de dados: é conteúdo do app, fixo e
-        // confiável, enquanto o resumo carrega texto livre do usuário.
-        { role: "system" as const, content: featureIndexForPrompt() },
-        ...(userContext ? [{ role: "system" as const, content: userContext }] : []),
-        ...historico.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user" as const, content: lastUserMessage },
-      ],
+      messages: mensagens,
       // 800 cortava a resposta no meio da palavra — uma explicação sobre risco
       // glicêmico terminou literalmente em "**Cair ab". Resposta clínica
       // truncada é pior que resposta curta: o usuário não sabe que faltou
@@ -134,9 +136,11 @@ export async function POST(req: Request) {
       const emitir = (texto: string) => {
         if (texto) controller.enqueue(encoder.encode(texto));
       };
+      let recebido = 0;
       try {
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content;
+          if (delta) recebido += delta.length;
           if (delta) emitir(guarda.receber(delta));
           if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
           if (chunk.usage) usage = chunk.usage;
@@ -174,7 +178,16 @@ export async function POST(req: Request) {
         reply += aviso;
         controller.enqueue(encoder.encode(aviso));
       }
-      await recordAiTokens(supabase, rate.usageId, usage, aiModel());
+      // Barrada ou interrompida, o provedor não chega a mandar o `usage` (ele
+      // vem no último pedaço). Sem registro, o teto global não via esse custo
+      // — que tem o contexto inteiro. Estimativa conservadora no lugar
+      // (correção de 31/10/2026).
+      await recordAiTokens(
+        supabase,
+        rate.usageId,
+        usage ?? estimarUsoDeTokens(mensagens.map((m) => m.content).join(""), recebido),
+        aiModel()
+      );
 
       // Grava pergunta e resposta juntas, depois do stream. A pergunta sozinha,
       // gravada antes, viraria conversa pela metade toda vez que o provedor

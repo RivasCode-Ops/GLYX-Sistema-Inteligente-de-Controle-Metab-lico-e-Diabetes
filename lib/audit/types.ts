@@ -41,6 +41,9 @@ export const auditMetricsSchema = z.object({
    */
   hypoEpisodes: z.number().int().optional(),
   hyperEpisodes: z.number().int().optional(),
+  /** Leituras fora sem vizinha a ≤ 30 min (glicosímetro): eventos que não formam episódio. */
+  hypoIsoladas: z.number().int().optional(),
+  hyperIsoladas: z.number().int().optional(),
   /** CV amostral em %, uma casa — mesma fórmula do painel. */
   cvPercent: z.number().nullable().optional(),
   avgGlucose: z.number().nullable(),

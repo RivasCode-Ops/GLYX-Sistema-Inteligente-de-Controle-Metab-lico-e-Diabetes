@@ -104,6 +104,7 @@ export function DailyDosesCard({
         ({ time, scheduledUTC, windowEndUTC }) => ({
           med: m,
           time,
+          scheduledISO: scheduledUTC.toISOString(),
           status: computeDoseStatus(scheduledUTC, windowEndUTC, medLogs, medSnoozes, usedLogs, now),
         })
       );
@@ -124,7 +125,7 @@ export function DailyDosesCard({
       </CardHeader>
       <CardContent>
         <ul className="divide-y divide-zinc-800/70">
-          {rows.map(({ med, time, status }) => (
+          {rows.map(({ med, time, scheduledISO, status }) => (
             <li key={`${med.id}-${time}`} className="flex flex-wrap items-center gap-2 py-2.5">
               <span className="w-12 shrink-0 font-mono text-sm text-zinc-400">{time}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-zinc-200">
@@ -187,6 +188,8 @@ export function DailyDosesCard({
                   {markSkippedAction && status.state !== "pulada" && status.state !== "agendada" ? (
                     <FormularioDeAcao acao={markSkippedAction} className="shrink-0">
                       <input type="hidden" name="medication_id" value={med.id} />
+                      {/* A dose DESTA linha: pular a das 08:00 às 15:00 marca a das 08:00. */}
+                      <input type="hidden" name="scheduled_for" value={scheduledISO} />
                       <input type="hidden" name="pedido" value={crypto.randomUUID()} />
                       <Button type="submit" variant="ghost" size="sm" className="text-zinc-400">
                         Pulei hoje
