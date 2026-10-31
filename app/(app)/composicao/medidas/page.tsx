@@ -2,6 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getBodySnapshot } from "@/lib/queries/body-composition";
 import { MeasurementForm } from "@/components/composicao/measurement-form";
 import { BODY_FIELDS, measurementValue } from "@/lib/body/fields";
+import { BotaoApagar } from "@/components/ui/botao-apagar";
+import { deleteBodyMeasurement } from "@/app/actions/body";
 
 export const metadata = { title: "Medidas corporais — GLYX" };
 
@@ -40,6 +42,17 @@ export default async function MedidasPage() {
               {previous
                 ? ` · comparada com ${new Date(`${previous.measured_on}T12:00:00Z`).toLocaleDateString("pt-BR")}`
                 : ""}
+              {/* D1: medida lançada errada sai por aqui; a anterior vira a última. */}
+              {latest ? (
+                <span className="ml-2">
+                  <BotaoApagar
+                    acao={deleteBodyMeasurement}
+                    campos={{ measured_on: latest.measured_on }}
+                    rotulo="Apagar esta medição"
+                    descricao={`a medição de ${new Date(`${latest.measured_on}T12:00:00Z`).toLocaleDateString("pt-BR")}`}
+                  />
+                </span>
+              ) : null}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -22,6 +22,8 @@ const JANELA_INSULINA_RAPIDA_H = 5;
 
 /** Dias de estoque abaixo dos quais o card de reposição aparece. */
 const ESTOQUE_MINIMO_DIAS = 7;
+/** Episódio de hipo aberto há mais que isto não comanda mais o card. */
+const JANELA_EPISODIO_HIPO_H = 6;
 
 export type CardAgoraResult = { card: CardAgora; receipt: ContextReceipt };
 
@@ -58,6 +60,9 @@ export async function getCardAgora(
         .select("id, detected_at, glucose_mg_dl, acted_at")
         .eq("user_id", userId)
         .is("recheck_at", null)
+        // Só episódio recente: evento esquecido de dias atrás suprimia a
+        // sugestão de exercício para sempre e reabria a reavaliação (B2).
+        .gte("detected_at", new Date(agora.getTime() - JANELA_EPISODIO_HIPO_H * 3600_000).toISOString())
         .order("detected_at", { ascending: false })
         .limit(1)
         .maybeSingle(),

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { MetabolicAlert } from "@/types/database";
 import { demoAlerts } from "@/lib/demo/data";
 import { formatarDataHora } from "@/lib/time/format";
+import { MarcarAlertasLidos } from "@/components/analise/marcar-alertas-lidos";
 
 export default async function AnaliseAlertasPage() {
   let alerts: MetabolicAlert[] = [];
@@ -30,6 +31,9 @@ export default async function AnaliseAlertasPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      {isSupabaseConfigured() ? (
+        <MarcarAlertasLidos haNaoLidos={alerts.some((a) => !a.read_at)} />
+      ) : null}
       <p className="text-sm text-zinc-400">
         Alertas gerados pelas regras do motor por leitura extrema (hipo/hiperglicemia) e futuras
         integrações.

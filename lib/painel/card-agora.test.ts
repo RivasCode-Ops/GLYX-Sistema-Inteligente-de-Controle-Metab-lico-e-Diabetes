@@ -324,3 +324,48 @@ describe("o card neutro não inventa urgência", () => {
     }
   });
 });
+
+describe("ciclo de hipoglicemia (Etapa 2, B2)", () => {
+  it("sem evento aberto, o card leva a leitura para o 'Fiz' abrir o episódio", () => {
+    const c = elegerCard(ctx({ lastGlucose: 62 }));
+    expect(c.id).toBe("hipo_ativa");
+    expect(c.hypo).toEqual({
+      eventId: null,
+      glucoseMgDl: 62,
+      detectedAt: "2026-09-07T17:00:00.000Z",
+      emergencyText: null,
+    });
+  });
+
+  it("com evento aberto e ainda não agido, 'Fiz' fecha esse evento", () => {
+    const c = elegerCard(
+      ctx({
+        lastGlucose: 62,
+        openHypoEvent: { id: "ev1", detectedAt: "2026-09-07T16:58:00.000Z", glucoseMgDl: 64, actedAt: null },
+      })
+    );
+    expect(c.hypo?.eventId).toBe("ev1");
+  });
+
+  it("depois do tempo de reavaliação, o card de reavaliação aponta o mesmo evento", () => {
+    const c = elegerCard(
+      ctx({
+        lastGlucose: 95,
+        openHypoEvent: {
+          id: "ev1",
+          detectedAt: "2026-09-07T16:40:00.000Z",
+          glucoseMgDl: 64,
+          actedAt: "2026-09-07T16:45:00.000Z",
+        },
+      })
+    );
+    expect(c.id).toBe("hipo_recheck");
+    expect(c.hypo?.eventId).toBe("ev1");
+    expect(c.actions[0].intent).toBe("/api/hypo/recheck");
+  });
+
+  it("depois da reavaliação (evento fechado), nenhum card de hipo", () => {
+    const c = elegerCard(ctx({ lastGlucose: 105, openHypoEvent: null }));
+    expect(c.id).not.toMatch(/^hipo/);
+  });
+});

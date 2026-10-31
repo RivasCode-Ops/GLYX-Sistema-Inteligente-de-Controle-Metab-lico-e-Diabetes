@@ -2,6 +2,8 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getTimeline } from "@/lib/queries/timeline";
 import { demoTimeline } from "@/lib/demo/data";
 import { formatarDataHora } from "@/lib/time/format";
+import { BotaoApagar } from "@/components/ui/botao-apagar";
+import { deleteInsulinLog } from "@/app/actions/insulin";
 
 export default async function AnaliseLinhaDoTempoPage() {
   let items: Awaited<ReturnType<typeof getTimeline>> = [];
@@ -34,6 +36,14 @@ export default async function AnaliseLinhaDoTempoPage() {
                   {formatarDataHora(it.at)}
                 </span>
               </div>
+              {/* D1: insulina registrada por engano não tinha como sair. */}
+              {it.type === "insulina" && isSupabaseConfigured() ? (
+                <BotaoApagar
+                  acao={deleteInsulinLog}
+                  campos={{ id: it.id }}
+                  descricao={`o registro de insulina de ${formatarDataHora(it.at)}`}
+                />
+              ) : null}
             </li>
           ))}
         </ul>

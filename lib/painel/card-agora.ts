@@ -44,6 +44,17 @@ export type CardAgora = {
   actions: CardAction[];
   /** true quando o texto pode ser reescrito pela LLM */
   narratable: boolean;
+  /**
+   * Ciclo de hipoglicemia (Etapa 2, B2): o evento que "Fiz" e a reavaliação
+   * fecham. Nulo quando o evento ainda não existe — "Fiz" então o cria com a
+   * leitura que disparou o card.
+   */
+  hypo?: {
+    eventId: string | null;
+    glucoseMgDl: number | null;
+    detectedAt: string | null;
+    emergencyText: string | null;
+  };
 };
 
 export type HypoPlan = {
@@ -207,6 +218,13 @@ export function elegerCard(ctx: CardContext): CardAgora {
             : []),
         ],
         narratable: false,
+        hypo: {
+          // Evento já agido não é reaberto: "Fiz" de novo cria outro episódio.
+          eventId: ctx.openHypoEvent && !ctx.openHypoEvent.actedAt ? ctx.openHypoEvent.id : null,
+          glucoseMgDl: ctx.lastGlucose,
+          detectedAt: ctx.lastGlucoseAt,
+          emergencyText: ctx.hypoPlan.emergencyText,
+        },
       };
     }
     return {
@@ -240,6 +258,12 @@ export function elegerCard(ctx: CardContext): CardAgora {
         why: `Você cadastrou reavaliação em ${ctx.hypoPlan.recheckMinutes} minutos após agir.`,
         actions: [{ label: "Registrar medição", kind: "primary", intent: "/api/hypo/recheck" }],
         narratable: false,
+        hypo: {
+          eventId: ctx.openHypoEvent.id,
+          glucoseMgDl: ctx.openHypoEvent.glucoseMgDl,
+          detectedAt: ctx.openHypoEvent.detectedAt,
+          emergencyText: ctx.hypoPlan.emergencyText,
+        },
       };
     }
   }

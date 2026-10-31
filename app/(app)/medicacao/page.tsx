@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { logMedicationTaken } from "@/app/actions/medications";
+import { logMedicationSkipped, logMedicationTaken } from "@/app/actions/medications";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +63,15 @@ export default async function MedicacaoDosesPage({
     // para o destino (FormularioDeAcao). Sem `redirect()` depois da ação.
     const r = await logMedicationTaken(formData);
     const ir = destinoAposRegistro(r, Boolean(formData.get("intencao")), "/medicacao");
+    return ir ? { ir } : null;
+  }
+
+  // "Pulei hoje" pela tela (Etapa 2, B3): a ação existia (D16) e não tinha
+  // botão — dose pulada só podia virar "não registrada", que é outra coisa.
+  async function logMedicationSkippedAction(_anterior: ResultadoDeAcao, formData: FormData): Promise<ResultadoDeAcao> {
+    "use server";
+    const r = await logMedicationSkipped(formData);
+    const ir = destinoAposRegistro(r, false, "/medicacao");
     return ir ? { ir } : null;
   }
 
@@ -257,6 +266,7 @@ export default async function MedicacaoDosesPage({
           snoozes={todaySnoozes}
           timezone={timezone}
           markTakenAction={logMedicationTakenAction}
+          markSkippedAction={logMedicationSkippedAction}
         />
       ) : null}
 

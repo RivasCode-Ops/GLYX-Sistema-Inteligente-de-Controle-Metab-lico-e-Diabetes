@@ -78,16 +78,36 @@ export async function markHypoActed(formData: FormData): Promise<ActionResult> {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
 
-  const eventId = formData.get("event_id") as string | null;
-  if (!eventId) return { error: "Evento inválido." };
+  const agora = new Date();
+  const eventId = (formData.get("event_id") as string | null) || null;
 
-  const { error } = await supabase
-    .from("hypo_events")
-    .update({ acted_at: new Date().toISOString() })
-    .eq("id", eventId)
-    .eq("user_id", user.id)
-    .is("acted_at", null);
-  if (error) return { error: publicDbError(error, "actions/hypo-plan") };
+  if (eventId) {
+    const { error } = await supabase
+      .from("hypo_events")
+      .update({ acted_at: agora.toISOString() })
+      .eq("id", eventId)
+      .eq("user_id", user.id)
+      .is("acted_at", null);
+    if (error) return { error: publicDbError(error, "actions/hypo-plan") };
+  } else {
+    // Sem evento ainda (gatilho de criação não aplicado, ou a leitura chegou
+    // por um caminho que não o dispara): "Fiz" abre o episódio com a leitura
+    // que elegeu o card — o ciclo não pode depender de um passo invisível (B2).
+    const valor = Number(formData.get("glucose_mg_dl"));
+    const detectadoEm = String(formData.get("detected_at") ?? "");
+    const t = Date.parse(detectadoEm);
+    if (!Number.isFinite(valor) || valor < 20 || valor > 600) return { error: "Leitura inválida." };
+    if (!Number.isFinite(t) || t > agora.getTime() + 60_000 || agora.getTime() - t > 2 * 3600_000) {
+      return { error: "Leitura muito antiga para abrir o episódio — registre uma nova medição." };
+    }
+    const { error } = await supabase.from("hypo_events").insert({
+      user_id: user.id,
+      detected_at: new Date(t).toISOString(),
+      glucose_mg_dl: Math.round(valor),
+      acted_at: agora.toISOString(),
+    });
+    if (error) return { error: publicDbError(error, "actions/hypo-plan") };
+  }
 
   revalidatePath("/dashboard");
   return { ok: true };

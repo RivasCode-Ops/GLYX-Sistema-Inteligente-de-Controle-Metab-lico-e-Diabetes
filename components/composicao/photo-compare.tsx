@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { BotaoApagar } from "@/components/ui/botao-apagar";
+import { deleteBodyPhoto } from "@/app/actions/body";
 
 export type ComparablePhoto = {
   id: string;
@@ -172,6 +174,13 @@ export function PhotoCompare({ photos }: { photos: ComparablePhoto[] }) {
                 />
                 <figcaption className="px-2 py-1 text-center text-[11px] text-zinc-400">
                   {i === 0 ? "antes" : "depois"} · {fmt(photo.takenOn)}
+                  <span className="ml-1">
+                    <BotaoApagar
+                      acao={deleteBodyPhoto}
+                      campos={{ id: photo.id }}
+                      descricao={`a foto ${POSE_LABEL[photo.pose]} de ${fmt(photo.takenOn)}`}
+                    />
+                  </span>
                 </figcaption>
               </>
             ) : null}
